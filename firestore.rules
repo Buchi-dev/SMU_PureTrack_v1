@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection RBAC
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow write: if isOwner(uid) && isSafeUserWrite(request.resource.data, resource.data) || isAdmin();
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'Admin';
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Allow owners to update only safe fields on their own doc (not role/metadata)
+    function isSafeUserWrite(newData, oldData) {
+      // Owners can only update their own name and department.
+      return !(newData.keys().hasAny(['role', 'metadata'])) &&
+             newData.diff(oldData).changedKeys().hasOnly(['name', 'department']);
+    }
+  }
+}

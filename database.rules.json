@@ -1,0 +1,16 @@
+{
+  "rules": {
+    "sensorReadings": {
+      "$deviceId": {
+        ".read": true,
+        ".write": true,
+        "latestReading": {
+          ".indexOn": ["timestamp", "receivedAt"]
+        },
+        "history": {
+          ".indexOn": ["timestamp"]
+        }
+      }
+    }
+  }
+}
