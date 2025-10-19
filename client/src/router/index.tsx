@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { Result, Button } from 'antd';
+import { Result, Button, theme } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import { DeviceManagement } from '../pages/admin/DeviceManagement';
@@ -9,6 +9,39 @@ import { ManageReports } from '../pages/admin/ManageReports';
 import Analytics from '../pages/admin/Analytics/Analytics';
 import UserManagement from '../pages/admin/UserManagement/UserManagement';
 import Settings from '../pages/admin/Settings';
+
+/**
+ * 404 Not Found Component with Theme Support
+ */
+const NotFoundPage = () => {
+  const { token } = theme.useToken();
+  
+  return (
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      height: '100vh',
+      backgroundColor: token.colorBgLayout,
+      padding: token.paddingLG,
+    }}>
+      <Result
+        status="404"
+        title="404"
+        subTitle="Sorry, the page you visited does not exist."
+        extra={
+          <Button 
+            type="primary" 
+            icon={<HomeOutlined />}
+            onClick={() => window.location.href = '/admin/dashboard'}
+          >
+            Back to Dashboard
+          </Button>
+        }
+      />
+    </div>
+  );
+};
 
 /**
  * Application Routes Configuration
@@ -61,30 +94,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        backgroundColor: '#f5f5f5'
-      }}>
-        <Result
-          status="404"
-          title="404"
-          subTitle="Sorry, the page you visited does not exist."
-          extra={
-            <Button 
-              type="primary" 
-              icon={<HomeOutlined />}
-              onClick={() => window.location.href = '/admin/dashboard'}
-            >
-              Back to Dashboard
-            </Button>
-          }
-        />
-      </div>
-    ),
+    element: <NotFoundPage />,
   },
 ]);
 

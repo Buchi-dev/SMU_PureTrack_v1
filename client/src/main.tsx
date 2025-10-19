@@ -7,7 +7,7 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider themeMode="dark">
+    <ThemeProvider themeMode="light">
       <App />
     </ThemeProvider>
   </StrictMode>,
