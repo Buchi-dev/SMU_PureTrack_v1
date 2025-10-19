@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
   Menu,
@@ -26,6 +27,7 @@ import {
   FileTextOutlined,
   ApiOutlined,
 } from '@ant-design/icons';
+import { ROUTES } from '../../router';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;
@@ -36,11 +38,32 @@ interface AdminLayoutProps {
 
 export const AdminLayout = ({ children }: AdminLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>(['dashboard']);
+  const navigate = useNavigate();
+  const location = useLocation();
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
 
-  // Sidebar menu items
+  // Update selected menu item based on current route
+  useEffect(() => {
+    const path = location.pathname;
+    if (path.includes('/devices')) {
+      setSelectedKeys(['devices']);
+    } else if (path.includes('/dashboard')) {
+      setSelectedKeys(['dashboard']);
+    } else if (path.includes('/analytics')) {
+      setSelectedKeys(['analytics']);
+    } else if (path.includes('/users')) {
+      setSelectedKeys(['users']);
+    } else if (path.includes('/reports')) {
+      setSelectedKeys(['reports']);
+    } else if (path.includes('/settings')) {
+      setSelectedKeys(['settings']);
+    }
+  }, [location.pathname]);
+
+  // Sidebar menu items with route mapping
   const menuItems: MenuProps['items'] = [
     {
       key: 'dashboard',
@@ -51,31 +74,6 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       key: 'devices',
       icon: <ApiOutlined />,
       label: 'Devices',
-      children: [
-        {
-          key: 'devices-list',
-          label: 'Device List',
-        },
-        {
-          key: 'devices-config',
-          label: 'Configuration',
-        },
-      ],
-    },
-    {
-      key: 'data',
-      icon: <DatabaseOutlined />,
-      label: 'Data Management',
-      children: [
-        {
-          key: 'data-view',
-          label: 'View Data',
-        },
-        {
-          key: 'data-export',
-          label: 'Export Data',
-        },
-      ],
     },
     {
       key: 'analytics',
@@ -93,23 +91,14 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       label: 'Reports',
     },
     {
+      key: 'data',
+      icon: <DatabaseOutlined />,
+      label: 'Data Management',
+    },
+    {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
-      children: [
-        {
-          key: 'settings-general',
-          label: 'General',
-        },
-        {
-          key: 'settings-security',
-          label: 'Security',
-        },
-        {
-          key: 'settings-notifications',
-          label: 'Notifications',
-        },
-      ],
     },
   ];
 
@@ -136,16 +125,34 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     },
   ];
 
+  // Handle menu navigation
   const handleMenuClick: MenuProps['onClick'] = (e) => {
-    console.log('Menu clicked:', e.key);
-    // Add your navigation logic here
+    const routeMap: Record<string, string> = {
+      dashboard: ROUTES.ADMIN.DASHBOARD,
+      devices: ROUTES.ADMIN.DEVICES,
+      analytics: ROUTES.ADMIN.ANALYTICS,
+      users: ROUTES.ADMIN.USERS,
+      reports: ROUTES.ADMIN.REPORTS,
+      data: ROUTES.ADMIN.BASE + '/data',
+      settings: ROUTES.ADMIN.SETTINGS,
+    };
+
+    const route = routeMap[e.key];
+    if (route) {
+      navigate(route);
+    }
   };
 
+  // Handle user menu actions
   const handleUserMenuClick: MenuProps['onClick'] = (e) => {
-    console.log('User menu clicked:', e.key);
     if (e.key === 'logout') {
       // Add logout logic here
       console.log('Logging out...');
+      // Example: navigate(ROUTES.AUTH.LOGIN);
+    } else if (e.key === 'profile') {
+      console.log('Navigate to profile');
+    } else if (e.key === 'settings') {
+      navigate(ROUTES.ADMIN.SETTINGS);
     }
   };
 
@@ -195,7 +202,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         <Menu
           theme="dark"
           mode="inline"
-          defaultSelectedKeys={['dashboard']}
+          selectedKeys={selectedKeys}
           items={menuItems}
           onClick={handleMenuClick}
           style={{ marginTop: 8 }}
