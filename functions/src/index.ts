@@ -74,7 +74,6 @@ interface SensorReading {
   turbidity: number;
   tds: number;
   ph: number;
-  temperature: number;
   timestamp: number;
   receivedAt: number | object;
 }
@@ -83,7 +82,6 @@ interface SensorData {
   turbidity?: number;
   tds?: number;
   ph?: number;
-  temperature?: number;
   timestamp?: number;
 }
 
@@ -248,7 +246,6 @@ export const deviceManagement = onRequest(
             "turbidity",
             "tds",
             "ph",
-            "temperature",
           ],
           status: (deviceData?.status as DeviceStatus) || "online",
           registeredAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -511,7 +508,6 @@ export const processSensorData = onMessagePublished(
         turbidity: sensorData.turbidity || 0,
         tds: sensorData.tds || 0,
         ph: sensorData.ph || 0,
-        temperature: sensorData.temperature || 0,
         timestamp: sensorData.timestamp || Date.now(),
         receivedAt: admin.database.ServerValue.TIMESTAMP,
       };
