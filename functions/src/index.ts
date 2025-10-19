@@ -550,7 +550,7 @@ export const autoRegisterDevice = onMessagePublished(
     region: "us-central1",
     retry: true,
     minInstances: 0,
-    maxInstances: 3,
+    maxInstances: 2, // Reduced: registration is infrequent
   },
   async (
     event: CloudEvent<MessagePublishedData<DeviceRegistrationInfo>>
@@ -622,6 +622,7 @@ export const monitorDeviceStatus = onMessagePublished(
     region: "us-central1",
     retry: false,
     minInstances: 0,
+    maxInstances: 2, // Added: limit concurrent instances
   },
   async (event: CloudEvent<MessagePublishedData<{status: string}>>): Promise<void> => {
     try {
