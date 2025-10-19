@@ -5,7 +5,14 @@ import {
   safeParseApiResponse, 
   type ApiResponse, 
   type Device, 
-  type SensorReading 
+  type SensorReading,
+  type ReportType,
+  type ReportRequest,
+  type WaterQualityReport,
+  type DeviceStatusReport,
+  type DataSummaryReport,
+  type ComplianceReport,
+  type ReportResponse
 } from '../schemas';
 
 
@@ -55,165 +62,10 @@ reportAxios.interceptors.response.use(
 
 
 // ===========================
-// TYPE DEFINITIONS FOR REPORTS
+// REPORT TYPES IMPORTED FROM SCHEMAS
 // ===========================
-
-export type ReportType = 'water_quality' | 'device_status' | 'data_summary' | 'compliance';
-export type ReportFormat = 'json' | 'pdf' | 'excel';
-
-export interface ReportRequest {
-  reportType: ReportType;
-  deviceId?: string;
-  startDate?: number;
-  endDate?: number;
-  format?: ReportFormat;
-  includeCharts?: boolean;
-}
-
-export interface WaterQualityMetrics {
-  avgTurbidity: number;
-  maxTurbidity: number;
-  minTurbidity: number;
-  avgTDS: number;
-  maxTDS: number;
-  minTDS: number;
-  avgPH: number;
-  maxPH: number;
-  minPH: number;
-  totalReadings: number;
-  timeRange: { start: number; end: number };
-}
-
-export interface DeviceReport {
-  deviceId: string;
-  deviceName: string;
-  location?: string;
-  metrics: WaterQualityMetrics;
-  readings: SensorReading[];
-  trends: {
-    turbidity: string;
-    tds: string;
-    ph: string;
-  };
-  alerts: Array<{
-    severity: string;
-    parameter: string;
-    message: string;
-    value: string;
-  }>;
-}
-
-export interface WaterQualityReport {
-  title: string;
-  period: { start: number; end: number };
-  devices: DeviceReport[];
-}
-
-export interface DeviceStatusSummary {
-  totalDevices: number;
-  statusBreakdown: {
-    online: number;
-    offline: number;
-    error: number;
-    maintenance: number;
-  };
-  healthScore: string;
-}
-
-export interface DeviceStatusInfo {
-  deviceId: string;
-  name: string;
-  type: string;
-  status: string;
-  lastSeen: number;
-  firmwareVersion: string;
-  sensors: string[];
-  location?: string;
-  connectivity: string;
-  uptime: string;
-}
-
-export interface DeviceStatusReport {
-  title: string;
-  generatedAt: number;
-  summary: DeviceStatusSummary;
-  devices: DeviceStatusInfo[];
-  recommendations: string[];
-}
-
-export interface StatisticalData {
-  mean: number;
-  median: number;
-  stdDev: number;
-  min: number;
-  max: number;
-}
-
-export interface DataSummaryReport {
-  title: string;
-  period: { start: number; end: number };
-  summary: {
-    totalReadings: number;
-    totalDevices: number;
-    dataCompleteness: string;
-  };
-  statistics: {
-    turbidity: StatisticalData;
-    tds: StatisticalData;
-    ph: StatisticalData;
-  };
-  dataQuality: Record<string, string>;
-}
-
-export interface ComplianceStatus {
-  parameter: string;
-  value: number;
-  standard: number;
-  unit: string;
-  status: 'compliant' | 'warning' | 'violation';
-  percentage: number;
-}
-
-export interface DeviceComplianceInfo {
-  deviceId: string;
-  deviceName: string;
-  location?: string;
-  totalReadings: number;
-  complianceStatus: ComplianceStatus[];
-  overallCompliance: boolean;
-  violations: {
-    turbidity: number;
-    tds: number;
-    ph: number;
-  };
-  recommendations: string[];
-}
-
-export interface ComplianceReport {
-  title: string;
-  period: { start: number; end: number };
-  standards: {
-    turbidity: string;
-    tds: string;
-    ph: string;
-    reference: string;
-  };
-  devices: DeviceComplianceInfo[];
-  summary: {
-    totalDevices: number;
-    compliantDevices: number;
-    complianceRate: string;
-  };
-}
-
-export interface ReportResponse<T = any> {
-  success: boolean;
-  reportType: ReportType;
-  generatedAt: number;
-  data: T;
-  message?: string;
-  error?: string;
-}
+// All report-related types are now imported from ../schemas/index.ts
+// This ensures consistency and single source of truth for type definitions
 
 
 // ===========================

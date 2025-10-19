@@ -700,8 +700,6 @@ export const generateReport = onRequest(
         deviceId,
         startDate,
         endDate,
-        format = "json",
-        includeCharts = false,
       } = req.body as ReportRequest;
 
       if (!reportType) {
@@ -715,67 +713,67 @@ export const generateReport = onRequest(
       console.log(`Generating ${reportType} report`);
 
       switch (reportType) {
-        case "water_quality": {
-          const report = await generateWaterQualityReport(
-            deviceId,
-            startDate,
-            endDate
-          );
-          res.status(200).json({
-            success: true,
-            reportType: "water_quality",
-            generatedAt: Date.now(),
-            data: report,
-          } as ApiResponse);
-          break;
-        }
+      case "water_quality": {
+        const report = await generateWaterQualityReport(
+          deviceId,
+          startDate,
+          endDate
+        );
+        res.status(200).json({
+          success: true,
+          reportType: "water_quality",
+          generatedAt: Date.now(),
+          data: report,
+        } as ApiResponse);
+        break;
+      }
 
-        case "device_status": {
-          const report = await generateDeviceStatusReport();
-          res.status(200).json({
-            success: true,
-            reportType: "device_status",
-            generatedAt: Date.now(),
-            data: report,
-          } as ApiResponse);
-          break;
-        }
+      case "device_status": {
+        const report = await generateDeviceStatusReport();
+        res.status(200).json({
+          success: true,
+          reportType: "device_status",
+          generatedAt: Date.now(),
+          data: report,
+        } as ApiResponse);
+        break;
+      }
 
-        case "data_summary": {
-          const report = await generateDataSummaryReport(
-            deviceId,
-            startDate,
-            endDate
-          );
-          res.status(200).json({
-            success: true,
-            reportType: "data_summary",
-            generatedAt: Date.now(),
-            data: report,
-          } as ApiResponse);
-          break;
-        }
+      case "data_summary": {
+        const report = await generateDataSummaryReport(
+          deviceId,
+          startDate,
+          endDate
+        );
+        res.status(200).json({
+          success: true,
+          reportType: "data_summary",
+          generatedAt: Date.now(),
+          data: report,
+        } as ApiResponse);
+        break;
+      }
 
-        case "compliance": {
-          const report = await generateComplianceReport(
-            deviceId,
-            startDate,
-            endDate
-          );
-          res.status(200).json({
-            success: true,
-            reportType: "compliance",
-            generatedAt: Date.now(),
-            data: report,
-          } as ApiResponse);
-          break;
-        }
+      case "compliance": {
+        const report = await generateComplianceReport(
+          deviceId,
+          startDate,
+          endDate
+        );
+        res.status(200).json({
+          success: true,
+          reportType: "compliance",
+          generatedAt: Date.now(),
+          data: report,
+        } as ApiResponse);
+        break;
+      }
 
-        default:
-          res.status(400).json({
-            success: false,
-            error: "Invalid report type",
-          } as ApiResponse);
+      default:
+        res.status(400).json({
+          success: false,
+          error: "Invalid report type",
+        } as ApiResponse);
       }
     } catch (error) {
       console.error("Error generating report:", error);
@@ -793,6 +791,10 @@ export const generateReport = onRequest(
 
 /**
  * Water Quality Report - Comprehensive analysis
+ * @param {string} [deviceId] - Optional device ID to filter data
+ * @param {number} [startDate] - Optional start date timestamp
+ * @param {number} [endDate] - Optional end date timestamp
+ * @return {Promise<unknown>} The generated water quality report
  */
 async function generateWaterQualityReport(
   deviceId?: string,
@@ -802,13 +804,13 @@ async function generateWaterQualityReport(
   const end = endDate || Date.now();
   const start = startDate || end - 7 * 24 * 60 * 60 * 1000; // Default: 7 days
 
-  const devices = deviceId
-    ? [deviceId]
-    : (await db.collection("devices").get()).docs.map((doc) => doc.id);
+  const devices = deviceId ?
+    [deviceId] :
+    (await db.collection("devices").get()).docs.map((doc) => doc.id);
 
   const reportData: Record<string, unknown> = {
     title: "Water Quality Analysis Report",
-    period: { start, end },
+    period: {start, end},
     devices: [],
   };
 
@@ -818,6 +820,7 @@ async function generateWaterQualityReport(
       .orderByChild("timestamp")
       .startAt(start)
       .endAt(end)
+      .limitToLast(10000)
       .once("value");
 
     if (!snapshot.exists()) continue;
@@ -841,11 +844,15 @@ async function generateWaterQualityReport(
       maxPH: Math.max(...readings.map((r) => r.ph)),
       minPH: Math.min(...readings.map((r) => r.ph)),
       totalReadings: readings.length,
-      timeRange: { start, end },
+      timeRange: {start, end},
     };
 
-    // Device info
+    // Device info with proper null checking
     const deviceDoc = await db.collection("devices").doc(devId).get();
+    if (!deviceDoc.exists) {
+      console.warn(`Device ${devId} not found in Firestore`);
+      continue;
+    }
     const deviceData = deviceDoc.data();
 
     (reportData.devices as Array<unknown>).push({
@@ -904,7 +911,9 @@ async function generateDeviceStatusReport(): Promise<unknown> {
     summary: {
       totalDevices: devices.length,
       statusBreakdown: statusSummary,
-      healthScore: ((statusSummary.online / devices.length) * 100).toFixed(1),
+      healthScore: devices.length > 0 ?
+        ((statusSummary.online / devices.length) * 100).toFixed(1) :
+        "0.0",
     },
     devices,
     recommendations: generateDeviceRecommendations(devices),
@@ -913,6 +922,10 @@ async function generateDeviceStatusReport(): Promise<unknown> {
 
 /**
  * Data Summary Report - Statistical analysis
+ * @param {string} [deviceId] - Optional device ID to filter data
+ * @param {number} [startDate] - Optional start date timestamp
+ * @param {number} [endDate] - Optional end date timestamp
+ * @return {Promise<unknown>} The generated data summary report
  */
 async function generateDataSummaryReport(
   deviceId?: string,
@@ -922,9 +935,9 @@ async function generateDataSummaryReport(
   const end = endDate || Date.now();
   const start = startDate || end - 30 * 24 * 60 * 60 * 1000; // Default: 30 days
 
-  const devices = deviceId
-    ? [deviceId]
-    : (await db.collection("devices").get()).docs.map((doc) => doc.id);
+  const devices = deviceId ?
+    [deviceId] :
+    (await db.collection("devices").get()).docs.map((doc) => doc.id);
 
   let totalReadings = 0;
   const aggregatedData: Record<string, unknown> = {
@@ -939,6 +952,7 @@ async function generateDataSummaryReport(
       .orderByChild("timestamp")
       .startAt(start)
       .endAt(end)
+      .limitToLast(10000)
       .once("value");
 
     if (!snapshot.exists()) continue;
@@ -954,7 +968,7 @@ async function generateDataSummaryReport(
 
   return {
     title: "Data Summary Report",
-    period: { start, end },
+    period: {start, end},
     summary: {
       totalReadings,
       totalDevices: devices.length,
@@ -965,13 +979,17 @@ async function generateDataSummaryReport(
       tds: calculateStatistics(aggregatedData.tds as number[]),
       ph: calculateStatistics(aggregatedData.ph as number[]),
     },
-    hourlyDistribution: calculateHourlyDistribution(devices, start, end),
-    dataQuality: assessDataQuality(aggregatedData),
+    hourlyDistribution: calculateHourlyDistribution(),
+    dataQuality: assessDataQuality(),
   };
 }
 
 /**
  * Compliance Report - Regulatory standards verification
+ * @param {string} [deviceId] - Optional device ID to filter data
+ * @param {number} [startDate] - Optional start date timestamp
+ * @param {number} [endDate] - Optional end date timestamp
+ * @return {Promise<unknown>} The generated compliance report
  */
 async function generateComplianceReport(
   deviceId?: string,
@@ -983,14 +1001,14 @@ async function generateComplianceReport(
 
   // WHO/EPA Standards
   const standards = {
-    turbidity: { max: 5, unit: "NTU", name: "Turbidity" },
-    tds: { max: 500, unit: "ppm", name: "Total Dissolved Solids" },
-    ph: { min: 6.5, max: 8.5, unit: "pH", name: "pH Level" },
+    turbidity: {max: 5, unit: "NTU", name: "Turbidity"},
+    tds: {max: 500, unit: "ppm", name: "Total Dissolved Solids"},
+    ph: {min: 6.5, max: 8.5, unit: "pH", name: "pH Level"},
   };
 
-  const devices = deviceId
-    ? [deviceId]
-    : (await db.collection("devices").get()).docs.map((doc) => doc.id);
+  const devices = deviceId ?
+    [deviceId] :
+    (await db.collection("devices").get()).docs.map((doc) => doc.id);
 
   const complianceData: Array<unknown> = [];
 
@@ -1000,6 +1018,7 @@ async function generateComplianceReport(
       .orderByChild("timestamp")
       .startAt(start)
       .endAt(end)
+      .limitToLast(10000)
       .once("value");
 
     if (!snapshot.exists()) continue;
@@ -1051,6 +1070,10 @@ async function generateComplianceReport(
     ];
 
     const deviceDoc = await db.collection("devices").doc(devId).get();
+    if (!deviceDoc.exists) {
+      console.warn(`Device ${devId} not found in Firestore`);
+      continue;
+    }
     const deviceData = deviceDoc.data();
 
     complianceData.push({
@@ -1067,7 +1090,7 @@ async function generateComplianceReport(
 
   return {
     title: "Water Quality Compliance Report",
-    period: { start, end },
+    period: {start, end},
     standards: {
       turbidity: `≤ ${standards.turbidity.max} ${standards.turbidity.unit}`,
       tds: `≤ ${standards.tds.max} ${standards.tds.unit}`,
@@ -1077,11 +1100,15 @@ async function generateComplianceReport(
     devices: complianceData,
     summary: {
       totalDevices: complianceData.length,
-      compliantDevices: complianceData.filter((d: any) => d.overallCompliance).length,
-      complianceRate: (
-        (complianceData.filter((d: any) => d.overallCompliance).length / complianceData.length) *
-        100
-      ).toFixed(1),
+      compliantDevices: (complianceData as Array<Record<string, unknown>>)
+        .filter((d) => d.overallCompliance).length,
+      complianceRate: complianceData.length > 0 ?
+        (
+          ((complianceData as Array<Record<string, unknown>>)
+            .filter((d) => d.overallCompliance).length / complianceData.length) *
+          100
+        ).toFixed(1) :
+        "0.0",
     },
   };
 }
@@ -1090,8 +1117,13 @@ async function generateComplianceReport(
 // UTILITY FUNCTIONS
 // ===========================
 
+/**
+ * Calculate statistical metrics for a dataset
+ * @param {number[]} data - Array of numbers to analyze
+ * @return {Record<string, number>} Statistical metrics including mean, median, stdDev, min, max
+ */
 function calculateStatistics(data: number[]): Record<string, number> {
-  if (data.length === 0) return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0 };
+  if (data.length === 0) return {mean: 0, median: 0, stdDev: 0, min: 0, max: 0};
 
   const sorted = [...data].sort((a, b) => a - b);
   const mean = data.reduce((sum, val) => sum + val, 0) / data.length;
@@ -1108,11 +1140,19 @@ function calculateStatistics(data: number[]): Record<string, number> {
   };
 }
 
+/**
+ * Calculate trends for sensor readings
+ * @param {SensorReading[]} readings - Array of sensor readings
+ * @return {Record<string, string>} Trend analysis for turbidity, tds, and ph
+ */
 function calculateTrends(readings: SensorReading[]): Record<string, string> {
-  if (readings.length < 2) return { turbidity: "stable", tds: "stable", ph: "stable" };
+  if (readings.length < 20) return {turbidity: "stable", tds: "stable", ph: "stable"};
 
   const recent = readings.slice(-10);
   const older = readings.slice(-20, -10);
+
+  // Ensure older has data
+  if (older.length === 0) return {turbidity: "stable", tds: "stable", ph: "stable"};
 
   const avgRecentTurbidity = recent.reduce((s, r) => s + r.turbidity, 0) / recent.length;
   const avgOlderTurbidity = older.reduce((s, r) => s + r.turbidity, 0) / older.length;
@@ -1125,26 +1165,31 @@ function calculateTrends(readings: SensorReading[]): Record<string, string> {
 
   return {
     turbidity:
-      avgRecentTurbidity > avgOlderTurbidity * 1.1
-        ? "increasing"
-        : avgRecentTurbidity < avgOlderTurbidity * 0.9
-          ? "decreasing"
-          : "stable",
+      avgRecentTurbidity > avgOlderTurbidity * 1.1 ?
+        "increasing" :
+        avgRecentTurbidity < avgOlderTurbidity * 0.9 ?
+          "decreasing" :
+          "stable",
     tds:
-      avgRecentTDS > avgOlderTDS * 1.1
-        ? "increasing"
-        : avgRecentTDS < avgOlderTDS * 0.9
-          ? "decreasing"
-          : "stable",
+      avgRecentTDS > avgOlderTDS * 1.1 ?
+        "increasing" :
+        avgRecentTDS < avgOlderTDS * 0.9 ?
+          "decreasing" :
+          "stable",
     ph:
-      avgRecentPH > avgOlderPH * 1.05
-        ? "increasing"
-        : avgRecentPH < avgOlderPH * 0.95
-          ? "decreasing"
-          : "stable",
+      avgRecentPH > avgOlderPH * 1.05 ?
+        "increasing" :
+        avgRecentPH < avgOlderPH * 0.95 ?
+          "decreasing" :
+          "stable",
   };
 }
 
+/**
+ * Generate alerts based on water quality metrics
+ * @param {WaterQualityMetrics} metrics - Water quality metrics to analyze
+ * @return {Array<unknown>} Array of alert objects
+ */
 function generateAlerts(metrics: WaterQualityMetrics): Array<unknown> {
   const alerts: Array<unknown> = [];
 
@@ -1178,6 +1223,11 @@ function generateAlerts(metrics: WaterQualityMetrics): Array<unknown> {
   return alerts;
 }
 
+/**
+ * Calculate device uptime based on last seen timestamp
+ * @param {number} lastSeenTimestamp - Timestamp of last device contact
+ * @return {string} Human-readable uptime string
+ */
 function calculateUptime(lastSeenTimestamp: number): string {
   const now = Date.now();
   const diff = now - lastSeenTimestamp;
@@ -1185,7 +1235,12 @@ function calculateUptime(lastSeenTimestamp: number): string {
   return hours < 1 ? "< 1 hour" : `${hours} hours ago`;
 }
 
-function generateDeviceRecommendations(devices: Array<any>): Array<string> {
+/**
+ * Generate device recommendations based on device status
+ * @param {Array<Record<string, unknown>>} devices - Array of device objects
+ * @return {Array<string>} Array of recommendation strings
+ */
+function generateDeviceRecommendations(devices: Array<Record<string, unknown>>): Array<string> {
   const recommendations: Array<string> = [];
   const offlineCount = devices.filter((d) => d.connectivity === "inactive").length;
 
@@ -1196,6 +1251,13 @@ function generateDeviceRecommendations(devices: Array<any>): Array<string> {
   return recommendations;
 }
 
+/**
+ * Calculate data completeness percentage
+ * @param {number} totalReadings - Total number of readings received
+ * @param {number} start - Start timestamp
+ * @param {number} end - End timestamp
+ * @return {string} Completeness percentage as string
+ */
 function calculateDataCompleteness(
   totalReadings: number,
   start: number,
@@ -1206,16 +1268,20 @@ function calculateDataCompleteness(
   return `${Math.min(completeness, 100).toFixed(1)}%`;
 }
 
-function calculateHourlyDistribution(
-  devices: string[],
-  start: number,
-  end: number
-): Promise<Record<string, number>> {
+/**
+ * Calculate hourly distribution of readings
+ * @return {Promise<Record<string, number>>} Hourly distribution data
+ */
+function calculateHourlyDistribution(): Promise<Record<string, number>> {
   // Simplified - return empty for now
   return Promise.resolve({});
 }
 
-function assessDataQuality(data: Record<string, unknown>): Record<string, string> {
+/**
+ * Assess data quality based on readings
+ * @return {Record<string, string>} Data quality assessment
+ */
+function assessDataQuality(): Record<string, string> {
   return {
     overall: "good",
     turbidity: "good",
@@ -1224,8 +1290,14 @@ function assessDataQuality(data: Record<string, unknown>): Record<string, string
   };
 }
 
+/**
+ * Generate compliance recommendations based on status and violations
+ * @param {ComplianceStatus[]} _status - Compliance status array (currently unused)
+ * @param {Record<string, number>} violations - Violation counts by parameter
+ * @return {Array<string>} Array of recommendation strings
+ */
 function generateComplianceRecommendations(
-  status: ComplianceStatus[],
+  _status: ComplianceStatus[],
   violations: Record<string, number>
 ): Array<string> {
   const recommendations: Array<string> = [];

@@ -137,6 +137,7 @@ const ManageReports = () => {
 
     // Summary Statistics
     if (config.includeStatistics && sensorData.length > 0) {
+      // Safe division - already protected by sensorData.length > 0 check above
       const avgTurbidity = sensorData.reduce((sum, d) => sum + d.turbidity, 0) / sensorData.length;
       const avgTDS = sensorData.reduce((sum, d) => sum + d.tds, 0) / sensorData.length;
       const avgPH = sensorData.reduce((sum, d) => sum + d.ph, 0) / sensorData.length;
@@ -209,6 +210,7 @@ const ManageReports = () => {
       const validReadings = sensorData.filter(d => 
         d.turbidity <= 5 && d.tds <= 500 && d.ph >= 6.5 && d.ph <= 8.5
       ).length;
+      // Safe division - protected by sensorData.length > 0 check above
       const qualityScore = (validReadings / sensorData.length) * 100;
 
       doc.setFontSize(10);
@@ -375,9 +377,9 @@ const ManageReports = () => {
       startY: yPos,
       head: [['Status', 'Count', 'Percentage']],
       body: [
-        ['Online', onlineDevices.toString(), `${((onlineDevices / selectedDevices.length) * 100).toFixed(1)}%`],
-        ['Offline', offlineDevices.toString(), `${((offlineDevices / selectedDevices.length) * 100).toFixed(1)}%`],
-        ['Error', errorDevices.toString(), `${((errorDevices / selectedDevices.length) * 100).toFixed(1)}%`],
+        ['Online', onlineDevices.toString(), selectedDevices.length > 0 ? `${((onlineDevices / selectedDevices.length) * 100).toFixed(1)}%` : '0.0%'],
+        ['Offline', offlineDevices.toString(), selectedDevices.length > 0 ? `${((offlineDevices / selectedDevices.length) * 100).toFixed(1)}%` : '0.0%'],
+        ['Error', errorDevices.toString(), selectedDevices.length > 0 ? `${((errorDevices / selectedDevices.length) * 100).toFixed(1)}%` : '0.0%'],
         ['Total', selectedDevices.length.toString(), '100%'],
       ],
       styles: { fontSize: 9, cellPadding: 3 },
