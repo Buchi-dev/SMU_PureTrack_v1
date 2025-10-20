@@ -267,6 +267,123 @@ export type ComplianceReport = z.infer<typeof ComplianceReportSchema>;
 export type ReportRequest = z.infer<typeof ReportRequestSchema>;
 export type ReportResponse<T = any> = Omit<z.infer<typeof ReportResponseSchema>, 'data'> & { data: T };
 
+// ===========================
+// EMAIL ALERT SCHEMAS
+// ===========================
+
+// Alert Condition Schema
+export const AlertConditionSchema = z.enum([
+  'greater_than',
+  'less_than', 
+  'equals',
+  'not_equals',
+  'between',
+  'outside'
+]);
+
+// Alert Parameter Schema
+export const AlertParameterSchema = z.enum([
+  'turbidity',
+  'tds',
+  'ph',
+  'device_offline'
+]);
+
+// Alert Severity Schema
+export const AlertSeveritySchema = z.enum([
+  'low',
+  'medium',
+  'high', 
+  'critical'
+]);
+
+// Alert Rule Schema
+export const AlertRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  deviceIds: z.array(z.string()),
+  parameter: AlertParameterSchema,
+  condition: AlertConditionSchema,
+  threshold: z.number(),
+  secondaryThreshold: z.number().optional(),
+  severity: AlertSeveritySchema,
+  emailEnabled: z.boolean(),
+  emailRecipients: z.array(z.string().email()),
+  isActive: z.boolean(),
+  cooldownMinutes: z.number().positive(),
+  createdAt: z.date(),
+  lastTriggered: z.date().optional(),
+});
+
+// Email Notification Status Schema
+export const EmailNotificationStatusSchema = z.enum([
+  'pending',
+  'sent',
+  'failed'
+]);
+
+// Email Notification Schema
+export const EmailNotificationSchema = z.object({
+  id: z.string(),
+  alertRuleId: z.string(),
+  deviceId: z.string(),
+  subject: z.string(),
+  message: z.string(),
+  recipients: z.array(z.string().email()),
+  sentAt: z.date(),
+  status: EmailNotificationStatusSchema,
+  errorMessage: z.string().optional(),
+});
+
+// Email Settings Schema
+export const EmailSettingsSchema = z.object({
+  smtpHost: z.string(),
+  smtpPort: z.number().positive(),
+  smtpSecure: z.boolean(),
+  smtpUser: z.string(),
+  smtpPassword: z.string(),
+  fromEmail: z.string().email(),
+  fromName: z.string(),
+  enabled: z.boolean(),
+});
+
+// Alert Trigger Schema
+export const AlertTriggerSchema = z.object({
+  ruleId: z.string(),
+  deviceId: z.string(),
+  parameter: AlertParameterSchema,
+  currentValue: z.number(),
+  threshold: z.number(),
+  severity: AlertSeveritySchema,
+  triggeredAt: z.date(),
+  message: z.string(),
+});
+
+// Email Template Schema
+export const EmailTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  alertType: z.string(),
+  subject: z.string(),
+  htmlBody: z.string(),
+  textBody: z.string(),
+  variables: z.array(z.string()).optional(),
+  isDefault: z.boolean(),
+  createdAt: z.date(),
+  updatedAt: z.date().optional(),
+});
+
+// Export Alert-related types
+export type AlertCondition = z.infer<typeof AlertConditionSchema>;
+export type AlertParameter = z.infer<typeof AlertParameterSchema>; 
+export type AlertSeverity = z.infer<typeof AlertSeveritySchema>;
+export type AlertRule = z.infer<typeof AlertRuleSchema>;
+export type EmailNotificationStatus = z.infer<typeof EmailNotificationStatusSchema>;
+export type EmailNotification = z.infer<typeof EmailNotificationSchema>;
+export type EmailSettings = z.infer<typeof EmailSettingsSchema>;
+export type AlertTrigger = z.infer<typeof AlertTriggerSchema>;
+export type EmailTemplate = z.infer<typeof EmailTemplateSchema>;
+
 // Safe parsing (returns success/error instead of throwing) 
 // Only include functions that are actually used in the codebase
 export const safeParseApiResponse = (data: unknown) => {
