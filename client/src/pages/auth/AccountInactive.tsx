@@ -37,13 +37,19 @@ export default function AccountInactive() {
           const userData = userDoc.data();
           const status = userData.status;
 
+          // Check if profile is incomplete
+          if (!userData.department || !userData.phoneNumber) {
+            navigate("/auth/complete-account");
+            return;
+          }
+
           // If status changed to Approved, redirect
           if (status === "Approved") {
             const role = userData.role;
             if (role === "Admin") {
               navigate("/admin/dashboard");
             } else {
-              navigate("/dashboard");
+              navigate("/staff/dashboard");
             }
             return;
           }

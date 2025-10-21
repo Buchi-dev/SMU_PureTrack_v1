@@ -4,10 +4,10 @@ import { Spin } from 'antd';
 
 /**
  * Smart Root Redirect
- * Redirects users to appropriate dashboard based on their role
+ * Redirects users to appropriate dashboard based on their role and status
  */
 export const RootRedirect = () => {
-  const { isAuthenticated, isAdmin, isApproved, loading } = useAuth();
+  const { isAuthenticated, isAdmin, isApproved, isPending, isSuspended, userProfile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -27,16 +27,28 @@ export const RootRedirect = () => {
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Authenticated but not approved -> Will be handled by auth flow
-  if (!isApproved) {
+  // Check if profile is incomplete (missing department or phone)
+  if (!userProfile || !userProfile.department || !userProfile.phoneNumber) {
+    return <Navigate to="/auth/complete-account" replace />;
+  }
+
+  // Check user status
+  if (isSuspended) {
+    return <Navigate to="/auth/account-inactive" replace />;
+  }
+
+  if (isPending) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
-  // Admin users -> Admin Dashboard
-  if (isAdmin) {
-    return <Navigate to="/admin/dashboard" replace />;
+  // Approved users - redirect to appropriate dashboard
+  if (isApproved) {
+    if (isAdmin) {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+    return <Navigate to="/staff/dashboard" replace />;
   }
 
-  // Staff users -> Staff Dashboard
-  return <Navigate to="/staff/dashboard" replace />;
+  // Default fallback - pending approval
+  return <Navigate to="/auth/pending-approval" replace />;
 };

@@ -47,6 +47,13 @@ export default function PendingApproval() {
 
           console.log("User status:", status);
 
+          // Check if profile is incomplete
+          if (!userData.department || !userData.phoneNumber) {
+            console.log("User needs to complete profile");
+            navigate("/auth/complete-account");
+            return;
+          }
+
           // If status changes to Approved, redirect to dashboard
           if (status === "Approved") {
             console.log("User approved! Redirecting to dashboard...");
@@ -55,7 +62,7 @@ export default function PendingApproval() {
             if (role === "Admin") {
               navigate("/admin/dashboard");
             } else {
-              navigate("/dashboard");
+              navigate("/staff/dashboard");
             }
             return;
           }

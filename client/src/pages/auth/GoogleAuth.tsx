@@ -53,6 +53,7 @@ export default function GoogleAuth() {
       const role = userData.role;
       navigate(role === "Admin" ? "/admin/dashboard" : "/staff/dashboard");
     } else {
+      // Unknown status, default to pending
       navigate("/auth/pending-approval");
     }
   };

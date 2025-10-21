@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Form, Input, Button, Card, Typography, Space, Alert, message } from "antd";
 import { PhoneOutlined, BankOutlined, UserOutlined } from "@ant-design/icons";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 
 const { Title, Paragraph } = Typography;
@@ -63,12 +63,18 @@ export default function AccountCompletion() {
         });
 
         // Check if profile is already complete
-        if (userData.department && userData.phoneNumber && userData.status !== "Pending") {
-          // Profile complete, check status
+        if (userData.department && userData.phoneNumber) {
+          // Profile complete, redirect based on status
           if (userData.status === "Approved") {
-            navigate("/admin/dashboard");
+            const role = userData.role;
+            navigate(role === "Admin" ? "/admin/dashboard" : "/staff/dashboard");
+            return;
           } else if (userData.status === "Suspended") {
             navigate("/auth/account-inactive");
+            return;
+          } else if (userData.status === "Pending") {
+            navigate("/auth/pending-approval");
+            return;
           }
         }
 
@@ -102,7 +108,7 @@ export default function AccountCompletion() {
         middlename: values.middlename || "",
         department: values.department,
         phoneNumber: values.phoneNumber,
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(),
       });
 
       message.success("Profile completed successfully!");

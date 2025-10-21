@@ -768,10 +768,9 @@ export const beforeCreate = beforeUserCreated(
  *
  * This function:
  * - Checks if user exists in Firestore
- * - Validates user status (Pending/Approved/Suspended)
  * - Logs all sign-in attempts to login_logs collection
- * - Rejects sign-in for Pending or Suspended users
- * - Allows sign-in only for Approved users
+ * - Allows sign-in for all user statuses (Pending, Approved, Suspended)
+ * - Client-side routing handles redirects based on user status
  * - Updates lastLogin timestamp on successful sign-in
  */
 export const beforeSignIn = beforeUserSignedIn(
@@ -827,33 +826,10 @@ export const beforeSignIn = beforeUserSignedIn(
         message: `Sign-in attempt with status: ${status}`,
       };
 
-      // Check account status
-      if (status === "Suspended") {
-        loginLog.result = "rejected";
-        loginLog.message = "Account is suspended";
-        await db.collection("login_logs").add(loginLog);
-
-        throw new HttpsError(
-          "permission-denied",
-          "Your account has been suspended. Please contact the administrator for assistance."
-        );
-      }
-
-      if (status === "Pending") {
-        loginLog.result = "rejected";
-        loginLog.message = "Account pending approval";
-        await db.collection("login_logs").add(loginLog);
-
-        throw new HttpsError(
-          "permission-denied",
-          "Your account is pending approval. An administrator" +
-          " will review your registration shortly."
-        );
-      }
-
-      // Status is "Approved" - allow sign-in
+      // Allow sign-in for all statuses (Pending, Suspended, Approved)
+      // Client-side will handle routing based on status
       loginLog.result = "success";
-      loginLog.message = "Sign-in successful";
+      loginLog.message = `Sign-in allowed with status: ${status}`;
       await db.collection("login_logs").add(loginLog);
 
       // Update last login timestamp
@@ -862,7 +838,7 @@ export const beforeSignIn = beforeUserSignedIn(
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      console.log(`✓ Sign-in approved for ${user.email}`);
+      console.log(`✓ Sign-in allowed for ${user.email} (Status: ${status})`);
 
       // Allow sign-in to proceed
       return;

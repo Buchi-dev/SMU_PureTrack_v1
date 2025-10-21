@@ -1,9 +1,52 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ==================== USER PROFILES ====================
+    // Users can read and update their own profile
+    match /users/{userId} {
+      // Allow user to read their own profile
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Allow user to update their own profile (cannot modify protected fields)
+      allow update: if request.auth != null 
+                    && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uuid', 'email', 'role', 'status', 'createdAt']);
+      
+      // Only Cloud Functions can create or delete user profiles
+      allow create, delete: if false;
+    }
+    
+    // ==================== LOGIN LOGS ====================
+    // Only Cloud Functions can write to login logs
+    match /login_logs/{logId} {
+      allow read, write: if false;
+    }
+    
+    // ==================== DEVICES ====================
     match /devices/{deviceId} {
-      allow read: if true; // Public read for now
-      allow write: if false; // Only Cloud Functions can write
+      // Authenticated users can read devices
+      allow read: if request.auth != null;
+      
+      // Only Cloud Functions can write to devices
+      allow write: if false;
+    }
+    
+    // ==================== SENSOR READINGS ====================
+    match /sensor_readings/{readingId} {
+      // Authenticated users can read sensor readings
+      allow read: if request.auth != null;
+      
+      // Only Cloud Functions can write sensor readings
+      allow write: if false;
+    }
+    
+    // ==================== REPORTS ====================
+    match /reports/{reportId} {
+      // Authenticated users can read reports
+      allow read: if request.auth != null;
+      
+      // Only Cloud Functions can write reports
+      allow write: if false;
     }
   }
 }
