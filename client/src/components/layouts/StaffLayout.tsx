@@ -1,3 +1,5 @@
+
+
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -13,12 +15,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   DashboardOutlined,
-  SettingOutlined,
-  DatabaseOutlined,
   BellOutlined,
-  TeamOutlined,
   BarChartOutlined,
-  FileTextOutlined,
   ApiOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
@@ -28,11 +26,11 @@ import UserMenu from '../UserMenu';
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;
 
-interface AdminLayoutProps {
+interface StaffLayoutProps {
   children: React.ReactNode;
 }
 
-export const AdminLayout = ({ children }: AdminLayoutProps) => {
+export const StaffLayout = ({ children }: StaffLayoutProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<string[]>(['dashboard']);
   const navigate = useNavigate();
@@ -44,26 +42,18 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
   // Update selected menu item based on current route
   useEffect(() => {
     const path = location.pathname;
-    if (path.includes('/devices')) {
+    if (path.includes('/staff/devices')) {
       setSelectedKeys(['devices']);
-    } else if (path.includes('/readings')) {
+    } else if (path.includes('/staff/readings')) {
       setSelectedKeys(['readings']);
-    } else if (path.includes('/data')) {
-      setSelectedKeys(['data']);
-    } else if (path.includes('/dashboard')) {
-      setSelectedKeys(['dashboard']);
-    } else if (path.includes('/analytics')) {
+    } else if (path.includes('/staff/analytics')) {
       setSelectedKeys(['analytics']);
-    } else if (path.includes('/users')) {
-      setSelectedKeys(['users']);
-    } else if (path.includes('/reports')) {
-      setSelectedKeys(['reports']);
-    } else if (path.includes('/settings')) {
-      setSelectedKeys(['settings']);
+    } else if (path.includes('/staff/dashboard')) {
+      setSelectedKeys(['dashboard']);
     }
   }, [location.pathname]);
 
-  // Sidebar menu items with route mapping
+  // Sidebar menu items for staff (limited access)
   const menuItems: MenuProps['items'] = [
     {
       key: 'dashboard',
@@ -73,51 +63,27 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
     {
       key: 'devices',
       icon: <ApiOutlined />,
-      label: 'Devices',
+      label: 'View Devices',
     },
     {
       key: 'readings',
       icon: <LineChartOutlined />,
-      label: 'Sensor Readings',
+      label: 'Sensor Data',
     },
     {
       key: 'analytics',
       icon: <BarChartOutlined />,
       label: 'Analytics',
     },
-    {
-      key: 'users',
-      icon: <TeamOutlined />,
-      label: 'User Management',
-    },
-    {
-      key: 'reports',
-      icon: <FileTextOutlined />,
-      label: 'Reports',
-    },
-    {
-      key: 'data',
-      icon: <DatabaseOutlined />,
-      label: 'Data Management',
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: 'Settings',
-    },
   ];
 
   // Handle menu navigation
   const handleMenuClick: MenuProps['onClick'] = (e) => {
     const routeMap: Record<string, string> = {
-      dashboard: ROUTES.ADMIN.DASHBOARD,
-      devices: ROUTES.ADMIN.DEVICES,
-      readings: ROUTES.ADMIN.READINGS,
-      data: ROUTES.ADMIN.DATA,
-      analytics: ROUTES.ADMIN.ANALYTICS,
-      users: ROUTES.ADMIN.USERS,
-      reports: ROUTES.ADMIN.REPORTS,
-      settings: ROUTES.ADMIN.SETTINGS,
+      dashboard: ROUTES.STAFF.DASHBOARD,
+      devices: ROUTES.STAFF.DEVICES,
+      readings: ROUTES.STAFF.READINGS,
+      analytics: ROUTES.STAFF.ANALYTICS,
     };
 
     const route = routeMap[e.key];
@@ -159,11 +125,11 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         >
           {!collapsed ? (
             <Text strong style={{ color: '#fff', fontSize: '18px' }}>
-              Admin Panel
+              Staff Portal
             </Text>
           ) : (
             <Text strong style={{ color: '#fff', fontSize: '18px' }}>
-              AP
+              SP
             </Text>
           )}
         </div>
@@ -210,7 +176,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
           {/* Right side - Notifications & User */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* Notifications */}
-            <Badge count={5} size="small">
+            <Badge count={3} size="small">
               <Button
                 type="text"
                 icon={<BellOutlined style={{ fontSize: '18px' }} />}
@@ -238,7 +204,7 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
 
         {/* Footer */}
         <Footer style={{ textAlign: 'center' }}>
-          Admin Panel ©{new Date().getFullYear()} • Capstone System
+          Staff Portal ©{new Date().getFullYear()} • Water Quality Monitoring System
         </Footer>
       </Layout>
     </Layout>

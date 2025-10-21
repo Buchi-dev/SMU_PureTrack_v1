@@ -3,6 +3,11 @@ import {
   onMessagePublished,
   MessagePublishedData,
 } from "firebase-functions/v2/pubsub";
+import {
+  beforeUserCreated,
+  beforeUserSignedIn,
+  HttpsError,
+} from "firebase-functions/v2/identity";
 import type {CloudEvent} from "firebase-functions/v2";
 import {setGlobalOptions} from "firebase-functions/v2";
 import * as admin from "firebase-admin";
@@ -643,6 +648,247 @@ export const monitorDeviceStatus = onMessagePublished(
     } catch (error) {
       console.error("Error monitoring device status:", error);
       // Don't throw - status updates are informational only
+    }
+  }
+);
+
+// ===========================
+// AUTHENTICATION BLOCKING FUNCTIONS
+// ===========================
+
+/**
+ * User Types and Interfaces
+ */
+type UserStatus = "Pending" | "Approved" | "Suspended";
+type UserRole = "Staff" | "Admin";
+
+interface UserProfile {
+  uuid: string;
+  firstname: string;
+  lastname: string;
+  middlename: string;
+  department: string;
+  phoneNumber: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: admin.firestore.FieldValue;
+  updatedAt?: admin.firestore.FieldValue;
+  lastLogin?: admin.firestore.FieldValue;
+}
+
+interface LoginLog {
+  uid: string;
+  email: string;
+  displayName: string;
+  statusAttempted: UserStatus;
+  timestamp: admin.firestore.FieldValue;
+  result: "success" | "rejected" | "error";
+  message: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+/**
+ * beforeCreate — Initialize new user profile
+ * Triggered when a user signs in for the first time via Google OAuth
+ *
+ * This function:
+ * - Creates user profile in Firestore with default values
+ * - Sets initial Role = "Staff" and Status = "Pending"
+ * - Extracts name from Google displayName
+ * - Allows user creation to proceed (they'll need approval before next sign-in)
+ */
+export const beforeCreate = beforeUserCreated(
+  {
+    region: "us-central1",
+  },
+  async (event) => {
+    const user = event.data;
+
+    // Guard clause for undefined user
+    if (!user) {
+      console.error("User data is undefined in beforeCreate");
+      return;
+    }
+
+    console.log(`Creating new user profile for: ${user.email}`);
+
+    // Extract first and last name from displayName
+    const displayNameParts = (user.displayName || "").split(" ");
+    const firstname = displayNameParts[0] || "";
+    const lastname = displayNameParts.slice(1).join(" ") || "";
+
+    // Create user profile in Firestore
+    const userProfile: UserProfile = {
+      uuid: user.uid,
+      firstname,
+      lastname,
+      middlename: "",
+      department: "",
+      phoneNumber: user.phoneNumber || "",
+      email: user.email || "",
+      role: "Staff",
+      status: "Pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    try {
+      await db.collection("users").doc(user.uid).set(userProfile);
+
+      console.log(`✓ User profile created for ${user.email} with status: Pending`);
+
+      // Log the account creation
+      await db.collection("business_logs").add({
+        action: "user_created",
+        uid: user.uid,
+        email: user.email,
+        performedBy: "system",
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        details: {
+          role: "Staff",
+          status: "Pending",
+          provider: "google.com",
+        },
+      });
+
+      // Allow user creation - they'll be redirected to complete profile
+      return;
+    } catch (error) {
+      console.error("Error creating user profile:", error);
+      // Still allow creation - we can handle missing profile data gracefully
+      return;
+    }
+  }
+);
+
+/**
+ * beforeSignIn — Validate user status before allowing sign-in
+ * Triggered on every sign-in attempt (including first sign-in after creation)
+ *
+ * This function:
+ * - Checks if user exists in Firestore
+ * - Validates user status (Pending/Approved/Suspended)
+ * - Logs all sign-in attempts to login_logs collection
+ * - Rejects sign-in for Pending or Suspended users
+ * - Allows sign-in only for Approved users
+ * - Updates lastLogin timestamp on successful sign-in
+ */
+export const beforeSignIn = beforeUserSignedIn(
+  {
+    region: "us-central1",
+  },
+  async (event) => {
+    const user = event.data;
+
+    // Guard clause for undefined user
+    if (!user) {
+      console.error("User data is undefined in beforeSignIn");
+      throw new HttpsError("internal", "User data is missing");
+    }
+
+    console.log(`Sign-in attempt by: ${user.email}`);
+
+    try {
+      // Get user profile from Firestore
+      const userDoc = await db.collection("users").doc(user.uid).get();
+
+      if (!userDoc.exists) {
+        // User record not found (shouldn't happen due to beforeCreate)
+        const errorLog: LoginLog = {
+          uid: user.uid,
+          email: user.email || "",
+          displayName: user.displayName || "",
+          statusAttempted: "Pending",
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+          result: "error",
+          message: "User record not found in database",
+        };
+
+        await db.collection("login_logs").add(errorLog);
+
+        throw new HttpsError(
+          "not-found",
+          "User record not found. Please contact administrator."
+        );
+      }
+
+      const userData = userDoc.data() as UserProfile;
+      const status = userData.status;
+
+      // Log the sign-in attempt
+      const loginLog: LoginLog = {
+        uid: user.uid,
+        email: user.email || "",
+        displayName: user.displayName || "",
+        statusAttempted: status,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        result: "success", // Will be updated if rejected
+        message: `Sign-in attempt with status: ${status}`,
+      };
+
+      // Check account status
+      if (status === "Suspended") {
+        loginLog.result = "rejected";
+        loginLog.message = "Account is suspended";
+        await db.collection("login_logs").add(loginLog);
+
+        throw new HttpsError(
+          "permission-denied",
+          "Your account has been suspended. Please contact the administrator for assistance."
+        );
+      }
+
+      if (status === "Pending") {
+        loginLog.result = "rejected";
+        loginLog.message = "Account pending approval";
+        await db.collection("login_logs").add(loginLog);
+
+        throw new HttpsError(
+          "permission-denied",
+          "Your account is pending approval. An administrator" +
+          " will review your registration shortly."
+        );
+      }
+
+      // Status is "Approved" - allow sign-in
+      loginLog.result = "success";
+      loginLog.message = "Sign-in successful";
+      await db.collection("login_logs").add(loginLog);
+
+      // Update last login timestamp
+      await db.collection("users").doc(user.uid).update({
+        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`✓ Sign-in approved for ${user.email}`);
+
+      // Allow sign-in to proceed
+      return;
+    } catch (error) {
+      // If it's already an HttpsError, re-throw it
+      if (error instanceof HttpsError) {
+        throw error;
+      }
+
+      // Log unexpected errors
+      console.error("Unexpected error in beforeSignIn:", error);
+
+      await db.collection("login_logs").add({
+        uid: user.uid,
+        email: user.email || "",
+        displayName: user.displayName || "",
+        statusAttempted: "Pending",
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        result: "error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+
+      throw new HttpsError(
+        "internal",
+        "An error occurred during sign-in. Please try again."
+      );
     }
   }
 );
