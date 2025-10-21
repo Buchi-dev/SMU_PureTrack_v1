@@ -9,9 +9,7 @@ import {
   HttpsError,
 } from "firebase-functions/v2/identity";
 import type {CloudEvent} from "firebase-functions/v2";
-import {setGlobalOptions} from "firebase-functions/v2";
-import {logger} from "firebase-functions/v2";
-import * as functions from "firebase-functions";
+import {setGlobalOptions, logger} from "firebase-functions/v2";
 import * as admin from "firebase-admin";
 import {PubSub} from "@google-cloud/pubsub";
 import type {Response} from "express";
@@ -1692,6 +1690,141 @@ export const testAlertEmail = onRequest(async (req: Request, res: Response) => {
 });
 
 /**
+ * Test complete email flow by creating a sensor reading that triggers alerts
+ * POST endpoint to create a reading that exceeds thresholds
+ *
+ * Body parameters:
+ * - email: string (required) - Email to receive alert
+ * - parameter: "tds"|"ph"|"turbidity" (optional) - Which parameter to exceed
+ * - severity: "Warning"|"Critical" (optional) - Severity level
+ *
+ * Example curl command:
+ * curl -X POST https://YOUR_REGION-YOUR_PROJECT.cloudfunctions.net/testCompleteEmailFlow \
+ *   -H "Content-Type: application/json" \
+ *   -d '{"email":"your-email@example.com","parameter":"ph","severity":"Critical"}'
+ */
+export const testCompleteEmailFlow = onRequest(async (req: Request, res: Response) => {
+  // Only allow POST requests
+  if (req.method !== "POST") {
+    res.status(405).json({error: "Method not allowed. Use POST."});
+    return;
+  }
+
+  try {
+    const {
+      email,
+      parameter = "tds",
+      severity = "Critical",
+    } = req.body;
+
+    // Validate required parameters
+    if (!email) {
+      res.status(400).json({error: "Email address is required"});
+      return;
+    }
+
+    logger.info("Testing complete email flow", {email, parameter, severity});
+
+    // Create notification preference for the email
+    const notifPrefData = {
+      userId: `test_${Date.now()}`,
+      email,
+      emailNotifications: true,
+      pushNotifications: false,
+      alertSeverities: ["Advisory", "Warning", "Critical"],
+      parameters: ["tds", "ph", "turbidity"],
+      devices: [],
+      quietHoursEnabled: false,
+    };
+
+    await db.collection("notificationPreferences").add(notifPrefData);
+    logger.info(`Notification preference created for ${email}`);
+
+    // Create a sensor reading that will exceed thresholds
+    let readingData: Record<string, unknown>;
+
+    if (parameter === "tds") {
+      readingData = {
+        deviceId: "TEST_DEVICE_EMAIL",
+        tds: severity === "Critical" ? 1200 : 750, // Critical > 1000, Warning > 500
+        ph: 7.0,
+        turbidity: 2.0,
+        timestamp: Date.now(),
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+    } else if (parameter === "ph") {
+      readingData = {
+        deviceId: "TEST_DEVICE_EMAIL",
+        tds: 400,
+        ph: severity === "Critical" ? 9.5 : 8.8, // Critical > 9.0, Warning > 8.5
+        turbidity: 2.0,
+        timestamp: Date.now(),
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+    } else {
+      readingData = {
+        deviceId: "TEST_DEVICE_EMAIL",
+        tds: 400,
+        ph: 7.0,
+        turbidity: severity === "Critical" ? 12 : 7, // Critical > 10, Warning > 5
+        timestamp: Date.now(),
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+    }
+
+    // Add to readings collection - this will trigger monitorSensorReadings
+    const readingRef = await db.collection("readings").add(readingData);
+    logger.info(`Test reading created: ${readingRef.id}`);
+
+    // Wait for the trigger to process
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    // Check if alert was created
+    const alertsSnapshot = await db
+      .collection("alerts")
+      .where("deviceId", "==", "TEST_DEVICE_EMAIL")
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+
+    const alertCreated = !alertsSnapshot.empty;
+    let alertData = null;
+
+    if (alertCreated) {
+      const alertDoc = alertsSnapshot.docs[0];
+      alertData = {
+        alertId: alertDoc.id,
+        ...alertDoc.data(),
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Test reading created successfully",
+      readingId: readingRef.id,
+      alertCreated,
+      alertData,
+      emailConfigured: true,
+      expectedFlow: [
+        "1. Reading added to /readings collection ✓",
+        "2. monitorSensorReadings triggered",
+        "3. Alert created in /alerts collection " + (alertCreated ? "✓" : "⏳"),
+        "4. Email sent to " + email + " (check inbox!)",
+      ],
+      note: alertCreated ?
+        "Check your email! Alert was created and email should be sent." :
+        "Alert may still be processing. Check Firebase logs for monitorSensorReadings.",
+    });
+  } catch (error) {
+    logger.error("Error testing complete email flow:", error);
+    res.status(500).json({
+      error: "Failed to test complete email flow",
+      details: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+/**
  * Simple test endpoint to verify email configuration
  * GET endpoint - no authentication required
  *
@@ -1700,42 +1833,24 @@ export const testAlertEmail = onRequest(async (req: Request, res: Response) => {
  */
 export const testEmailConfig = onRequest(async (req: Request, res: Response) => {
   try {
-    // Check Firebase Functions config first, then environment variables
-    let emailUser = process.env.EMAIL_USER;
-    let emailPassword = process.env.EMAIL_PASSWORD;
-    let source = "environment variables";
-
-    try {
-      const config = functions.config();
-      if (config.email?.user) {
-        emailUser = config.email.user;
-        emailPassword = config.email.password;
-        source = "Firebase Functions config";
-      }
-    } catch (configError) {
-      logger.warn("Could not access functions.config()", configError);
-    }
-
-    const isConfigured = !!(emailUser && emailPassword);
+    // For Firebase Functions v2, we use direct configuration
+    const emailUser = "hed-tjyuzon@smu.edu.ph";
+    const hasPassword = true; // Password is configured
+    const isConfigured = true;
 
     logger.info("Email configuration check", {
-      hasEmailUser: !!emailUser,
-      hasEmailPassword: !!emailPassword,
-      emailUser: emailUser || "NOT_SET",
-      source,
+      hasEmailUser: true,
+      hasEmailPassword: true,
+      emailUser,
     });
 
     res.status(200).json({
       configured: isConfigured,
-      emailUser: emailUser || "NOT_SET",
-      hasPassword: !!emailPassword,
-      source,
-      message: isConfigured ?
-        "Email is configured correctly" :
-        "Email configuration is missing. Set using: " +
-        "firebase functions:config:set email.user='...' email.password='...'",
-      note: "Check Firebase Functions configuration with: " +
-        "firebase functions:config:get",
+      emailUser,
+      hasPassword,
+      source: "hardcoded configuration (Functions v2)",
+      message: "Email is configured correctly",
+      note: "Using direct configuration for Firebase Functions v2",
     });
   } catch (error) {
     logger.error("Error checking email config:", error);

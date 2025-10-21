@@ -5,7 +5,6 @@
 
 import * as admin from "firebase-admin";
 import * as nodemailer from "nodemailer";
-import * as functions from "firebase-functions";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 import {logger} from "firebase-functions/v2";
@@ -120,35 +119,21 @@ const DEFAULT_THRESHOLDS: AlertThresholds = {
 // EMAIL CONFIGURATION
 // ===========================
 
-// Get email config from Firebase Functions config
-const getEmailConfig = () => {
-  try {
-    const config = functions.config();
-    return {
-      user: config.email?.user || process.env.EMAIL_USER || "your-email@gmail.com",
-      pass: config.email?.password || process.env.EMAIL_PASSWORD || "your-app-password",
-    };
-  } catch (error) {
-    logger.warn("Failed to get email config, using environment variables", error);
-    return {
-      user: process.env.EMAIL_USER || "hed-tjyuzon@smu.edu.ph",
-      pass: process.env.EMAIL_PASSWORD || "khjo xjed akne uonm",
-    };
-  }
-};
+// For Firebase Functions v2, use direct credentials
+// These should be set via environment variables in production
+const EMAIL_USER = "hed-tjyuzon@smu.edu.ph";
+const EMAIL_PASSWORD = "khjo xjed akne uonm";
 
 // Configure nodemailer transporter
-// Note: In production, use environment variables for credentials
-const emailConfig = getEmailConfig();
 const emailTransporter = nodemailer.createTransport({
-  service: "gmail", // or your email service
+  service: "gmail",
   auth: {
-    user: emailConfig.user,
-    pass: emailConfig.pass,
+    user: EMAIL_USER,
+    pass: EMAIL_PASSWORD,
   },
 });
 
-logger.info("Email transporter configured", {user: emailConfig.user});
+logger.info("Email transporter configured", {user: EMAIL_USER});
 
 // ===========================
 // HELPER FUNCTIONS
@@ -434,13 +419,13 @@ async function createAlert(
     severity,
     status: "Active",
     currentValue,
-    thresholdValue: thresholdValue ?? undefined,
-    trendDirection,
+    ...(thresholdValue !== null && {thresholdValue}),
+    ...(trendDirection && {trendDirection}),
     message,
     recommendedAction,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     notificationsSent: [],
-    metadata,
+    ...(metadata && {metadata}),
   };
 
   const alertRef = await db.collection("alerts").add(alertData);
