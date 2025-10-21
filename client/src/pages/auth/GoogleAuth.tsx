@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Alert, Typography, Space, Spin, Divider, theme } from "antd";
+import { Button, Card, Alert, Typography, Space, theme } from "antd";
 import { GoogleOutlined, LoadingOutlined } from "@ant-design/icons";
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
@@ -167,7 +167,10 @@ export default function GoogleAuth() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: token.colorBgLayout,
+        backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         padding: token.paddingLG,
       }}
     >
@@ -255,13 +258,6 @@ export default function GoogleAuth() {
           >
             {loading ? "Signing in..." : "Sign in with Google"}
           </Button>
-
-          {/* Loading State */}
-          {loading && (
-            <div style={{ textAlign: "center", padding: `${token.padding}px 0` }}>
-              <Spin size="large" tip="Authenticating with Google..." />
-            </div>
-          )}
         </Space>
       </Card>
     </div>

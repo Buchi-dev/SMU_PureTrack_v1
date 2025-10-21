@@ -31,13 +31,21 @@ interface StaffLayoutProps {
 }
 
 export const StaffLayout = ({ children }: StaffLayoutProps) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem('staffSidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
   const [selectedKeys, setSelectedKeys] = useState<string[]>(['dashboard']);
   const navigate = useNavigate();
   const location = useLocation();
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
+
+  // Persist collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('staffSidebarCollapsed', JSON.stringify(collapsed));
+  }, [collapsed]);
 
   // Update selected menu item based on current route
   useEffect(() => {
@@ -121,16 +129,27 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
             justifyContent: 'center',
             padding: '16px',
             borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            gap: '12px',
           }}
         >
-          {!collapsed ? (
-            <Text strong style={{ color: '#fff', fontSize: '18px' }}>
-              Staff Portal
-            </Text>
-          ) : (
-            <Text strong style={{ color: '#fff', fontSize: '18px' }}>
-              SP
-            </Text>
+          <img 
+            src="/system_logo.svg" 
+            alt="PureTrack Logo" 
+            style={{ 
+              width: collapsed ? 32 : 40,
+              height: collapsed ? 32 : 40,
+              transition: 'all 0.2s',
+            }} 
+          />
+          {!collapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+              <Text strong style={{ color: '#fff', fontSize: '16px' }}>
+                PureTrack
+              </Text>
+              <Text style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px' }}>
+                Staff Portal
+              </Text>
+            </div>
           )}
         </div>
 

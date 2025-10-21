@@ -129,7 +129,10 @@ export default function AccountInactive() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: token.colorBgLayout,
+          backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
         }}
       >
         <Spin size="large" tip="Checking account status..." />
@@ -144,7 +147,10 @@ export default function AccountInactive() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: token.colorBgLayout,
+        backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         padding: token.paddingLG,
       }}
     >
