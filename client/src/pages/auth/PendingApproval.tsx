@@ -1,22 +1,31 @@
 /**
  * Pending Approval Component
  * Displays a waiting screen for users whose accounts are pending admin approval
+ * Compact single-page design following theme configuration
  */
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Typography, Space, Button, Result } from "antd";
-import { ClockCircleOutlined, ReloadOutlined, LogoutOutlined } from "@ant-design/icons";
+import { Card, Typography, Space, Button, Tag, Divider, theme } from "antd";
+import { 
+  ClockCircleOutlined, 
+  ReloadOutlined, 
+  LogoutOutlined, 
+  CheckCircleOutlined,
+  MailOutlined 
+} from "@ant-design/icons";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 
-const { Title, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 export default function PendingApproval() {
   const [userEmail, setUserEmail] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
   const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
+  const { token } = theme.useToken();
 
   useEffect(() => {
     let unsubscribeSnapshot: (() => void) | undefined;
@@ -44,6 +53,9 @@ export default function PendingApproval() {
 
           const userData = docSnapshot.data();
           const status = userData.status;
+          
+          // Set user name for display
+          setUserName(`${userData.firstname} ${userData.lastname}`);
 
           console.log("User status:", status);
 
@@ -114,63 +126,101 @@ export default function PendingApproval() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "20px",
+        background: token.colorBgLayout,
+        padding: token.paddingLG,
       }}
     >
       <Card
         style={{
-          maxWidth: 550,
+          maxWidth: 600,
           width: "100%",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-          borderRadius: "12px",
+          boxShadow: token.boxShadow,
         }}
+        bordered={false}
       >
-        <Result
-          icon={<ClockCircleOutlined style={{ color: "#faad14" }} />}
-          title="Account Pending Approval"
-          subTitle={
-            <Space direction="vertical" size="small" style={{ width: "100%" }}>
-              <Paragraph>
-                Your account is currently pending approval from an administrator.
-              </Paragraph>
-              <Paragraph type="secondary" style={{ fontSize: "14px" }}>
-                Signed in as: <strong>{userEmail}</strong>
-              </Paragraph>
-            </Space>
-          }
-        >
-          <div
-            style={{
-              background: "#fff7e6",
-              border: "1px solid #ffd591",
-              borderRadius: "8px",
-              padding: "20px",
-              marginBottom: "24px",
-            }}
-          >
-            <Space direction="vertical" size="small" style={{ width: "100%" }}>
-              <Title level={5} style={{ margin: 0 }}>
-                What happens next?
-              </Title>
-              <Paragraph style={{ margin: 0, fontSize: "14px" }}>
-                • An administrator will review your registration
-                <br />
-                • You'll receive access once your account is approved
-                <br />
-                • This page will automatically update when your status changes
-                <br />• You can safely close this page and check back later
-              </Paragraph>
-            </Space>
+        {/* Header with Icon */}
+        <Space direction="vertical" size="middle" style={{ width: "100%", textAlign: "center" }}>
+          <div>
+            <ClockCircleOutlined 
+              style={{ 
+                fontSize: 56, 
+                color: token.colorWarning,
+                marginBottom: token.marginMD,
+              }} 
+            />
+            <Title level={3} style={{ margin: 0, marginBottom: token.marginXS }}>
+              Account Pending Approval
+            </Title>
+            <Text type="secondary">
+              Your account is under review
+            </Text>
           </div>
 
+          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+
+          {/* User Info */}
+          <Space direction="vertical" size="small" style={{ width: "100%" }}>
+            <div style={{ 
+              background: token.colorInfoBg, 
+              padding: token.paddingSM,
+              borderRadius: token.borderRadius,
+              border: `1px solid ${token.colorInfoBorder}`,
+            }}>
+              <Space direction="vertical" size={4} style={{ width: "100%" }}>
+                <Text strong style={{ fontSize: 13 }}>
+                  {userName || "User"}
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {userEmail}
+                </Text>
+              </Space>
+            </div>
+            <Tag 
+              icon={<ClockCircleOutlined />} 
+              color="warning"
+              style={{ 
+                margin: "0 auto",
+                fontSize: 13,
+                padding: `${token.paddingXXS}px ${token.paddingSM}px`,
+              }}
+            >
+              Status: Pending
+            </Tag>
+          </Space>
+
+          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+
+          {/* What's Next */}
+          <Space direction="vertical" size="small" style={{ width: "100%", textAlign: "left" }}>
+            <Title level={5} style={{ margin: 0 }}>
+              What happens next?
+            </Title>
+            <Space direction="vertical" size={2}>
+              <Space align="start" size="small">
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
+                <Text style={{ fontSize: 13 }}>Administrator will review your registration</Text>
+              </Space>
+              <Space align="start" size="small">
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
+                <Text style={{ fontSize: 13 }}>You'll receive access once approved</Text>
+              </Space>
+              <Space align="start" size="small">
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
+                <Text style={{ fontSize: 13 }}>This page auto-updates when status changes</Text>
+              </Space>
+            </Space>
+          </Space>
+
+          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+
+          {/* Actions */}
           <Space style={{ width: "100%", justifyContent: "center" }} size="middle">
             <Button
               icon={<ReloadOutlined />}
               onClick={handleCheckAgain}
               loading={checking}
             >
-              Check Status
+              Refresh
             </Button>
             <Button
               icon={<LogoutOutlined />}
@@ -181,12 +231,11 @@ export default function PendingApproval() {
             </Button>
           </Space>
 
-          <div style={{ marginTop: "24px", textAlign: "center" }}>
-            <Paragraph type="secondary" style={{ fontSize: "13px", margin: 0 }}>
-              Need help? Contact your system administrator.
-            </Paragraph>
-          </div>
-        </Result>
+          {/* Help Text */}
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            <MailOutlined /> Need help? Contact your administrator
+          </Text>
+        </Space>
       </Card>
     </div>
   );

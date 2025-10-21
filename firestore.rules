@@ -1,16 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin';
+    }
+    
     // ==================== USER PROFILES ====================
-    // Users can read and update their own profile
     match /users/{userId} {
-      // Allow user to read their own profile
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Users can read their own profile, Admins can read all profiles
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
       
-      // Allow user to update their own profile (cannot modify protected fields)
+      // Users can update their own profile (cannot modify protected fields)
       allow update: if request.auth != null 
                     && request.auth.uid == userId
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uuid', 'email', 'role', 'status', 'createdAt']);
+      
+      // Admins can update user role, status, and updatedAt
+      allow update: if isAdmin()
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['uuid', 'email', 'createdAt']);
       
       // Only Cloud Functions can create or delete user profiles
       allow create, delete: if false;
