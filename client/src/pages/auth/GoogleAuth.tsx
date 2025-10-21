@@ -1,17 +1,18 @@
 /**
  * Google Authentication Component
  * Handles Google OAuth sign-in using Firebase Authentication
+ * Consistent design pattern with theme configuration
  */
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Alert, Typography, Space, Spin, Switch } from "antd";
+import { Button, Card, Alert, Typography, Space, Spin, Switch, Divider, theme } from "antd";
 import { GoogleOutlined, LoadingOutlined, SwapOutlined } from "@ant-design/icons";
 import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 
-const { Title, Paragraph } = Typography;
+const { Title, Text } = Typography;
 
 export default function GoogleAuth() {
   const [loading, setLoading] = useState(false);
@@ -19,6 +20,7 @@ export default function GoogleAuth() {
   const [retrying, setRetrying] = useState(false);
   const [useRedirect, setUseRedirect] = useState(false);
   const navigate = useNavigate();
+  const { token } = theme.useToken();
 
   // Helper function to handle user profile and navigation
   const handleUserProfile = async (user: any) => {
@@ -189,27 +191,27 @@ export default function GoogleAuth() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        padding: "20px",
+        background: token.colorBgLayout,
+        padding: token.paddingLG,
       }}
     >
       <Card
         style={{
-          maxWidth: 450,
+          maxWidth: 600,
           width: "100%",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-          borderRadius: "12px",
+          boxShadow: token.boxShadow,
         }}
+        bordered={false}
       >
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+        <Space direction="vertical" size="middle" style={{ width: "100%" }}>
           {/* Header */}
           <div style={{ textAlign: "center" }}>
-            <Title level={2} style={{ marginBottom: 8 }}>
+            <Title level={3} style={{ margin: 0, marginBottom: token.marginXS, color: token.colorPrimary }}>
               Water Quality Monitoring
             </Title>
-            <Paragraph type="secondary">
-              Sign in with your Google account to continue
-            </Paragraph>
+            <Text type="secondary" style={{ fontSize: token.fontSize }}>
+              Sign in with your Google account
+            </Text>
           </div>
 
           {/* Error Alert */}
@@ -218,14 +220,14 @@ export default function GoogleAuth() {
               message="Sign-in Error"
               description={
                 <div>
-                  <div style={{ whiteSpace: 'pre-line' }}>{error}</div>
+                  <div style={{ whiteSpace: 'pre-line', fontSize: token.fontSizeSM }}>{error}</div>
                   {(error.includes('503') || error.includes('unavailable')) && (
                     <Button
                       size="small"
                       type="primary"
                       onClick={handleRetry}
                       loading={retrying}
-                      style={{ marginTop: 12 }}
+                      style={{ marginTop: token.marginSM }}
                     >
                       {retrying ? 'Retrying...' : 'Retry Sign In'}
                     </Button>
@@ -239,30 +241,30 @@ export default function GoogleAuth() {
             />
           )}
 
+          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+
           {/* Sign-in Method Toggle */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              padding: "12px 16px",
-              background: "#f0f9ff",
-              border: "1px solid #91d5ff",
-              borderRadius: "8px",
-              marginBottom: "16px",
+              padding: token.paddingSM,
+              background: token.colorInfoBg,
+              border: `1px solid ${token.colorInfoBorder}`,
+              borderRadius: token.borderRadius,
             }}
           >
-            <Space>
-              <SwapOutlined style={{ color: "#1890ff" }} />
-              <span style={{ fontSize: "13px", fontWeight: 500 }}>
-                {useRedirect ? "Redirect Method (Recommended for 503 errors)" : "Popup Method (Default)"}
-              </span>
+            <Space size="small">
+              <SwapOutlined style={{ color: token.colorInfo }} />
+              <Text style={{ fontSize: token.fontSizeSM, fontWeight: 500 }}>
+                {useRedirect ? "Redirect Method" : "Popup Method"}
+              </Text>
             </Space>
             <Switch
               checked={useRedirect}
               onChange={setUseRedirect}
-              checkedChildren="Redirect"
-              unCheckedChildren="Popup"
+              size="small"
             />
           </div>
 
@@ -274,64 +276,40 @@ export default function GoogleAuth() {
             onClick={() => handleGoogleSignIn(false)}
             disabled={loading}
             block
-            style={{
-              height: "50px",
-              fontSize: "16px",
-              fontWeight: 500,
-            }}
           >
-            {loading ? "Signing in..." : `Sign in with Google (${useRedirect ? "Redirect" : "Popup"})`}
+            {loading ? "Signing in..." : "Sign in with Google"}
           </Button>
 
-          {/* Info Section */}
-          <div
-            style={{
-              background: "#f5f5f5",
-              padding: "16px",
-              borderRadius: "8px",
-              marginTop: "16px",
-            }}
-          >
-            <Paragraph style={{ margin: 0, fontSize: "13px" }} type="secondary">
-              <strong>First time signing in?</strong>
-              <br />
-              You'll be asked to complete your profile and wait for admin approval.
-              <br />
-              <br />
-              <strong>Experiencing 503 errors?</strong>
-              <br />
-              Try switching to Redirect method above. It's more reliable when Firebase is under load.
-            </Paragraph>
-          </div>
+          <Divider style={{ margin: `${token.marginXS}px 0` }} />
 
-          {/* Troubleshooting Section */}
+          {/* Info Section */}
+          <Alert
+            message="First time signing in?"
+            description="You'll complete your profile and wait for admin approval."
+            type="info"
+            showIcon
+          />
+
+          {/* Troubleshooting for 503 */}
           {error && error.includes('503') && (
-            <div
-              style={{
-                background: "#fff7e6",
-                border: "1px solid #ffd591",
-                padding: "12px",
-                borderRadius: "8px",
-                marginTop: "8px",
-              }}
-            >
-              <Paragraph style={{ margin: 0, fontSize: "12px" }}>
-                <strong>Troubleshooting 503 Error:</strong>
-                <br />
-                • Wait 2-3 minutes and try again
-                <br />
-                • Check <a href="https://status.firebase.google.com" target="_blank" rel="noopener noreferrer">Firebase Status</a>
-                <br />
-                • Clear browser cache and cookies
-                <br />
-                • Try a different browser or incognito mode
-              </Paragraph>
-            </div>
+            <Alert
+              message="Troubleshooting 503 Error"
+              description={
+                <Space direction="vertical" size={2}>
+                  <Text style={{ fontSize: token.fontSizeSM }}>• Wait 2-3 minutes and try again</Text>
+                  <Text style={{ fontSize: token.fontSizeSM }}>• Try Redirect method above</Text>
+                  <Text style={{ fontSize: token.fontSizeSM }}>• Clear browser cache</Text>
+                  <Text style={{ fontSize: token.fontSizeSM }}>• Try incognito mode</Text>
+                </Space>
+              }
+              type="warning"
+              showIcon
+            />
           )}
 
           {/* Loading Overlay */}
           {loading && (
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ textAlign: "center", padding: `${token.paddingLG}px 0` }}>
               <Spin size="large" tip="Authenticating..." />
             </div>
           )}
