@@ -46,6 +46,7 @@ import { api } from '../../../services/api';
 import type { Device, SensorReading } from '../../../schemas';
 import dayjs, { Dayjs } from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { useThemeToken } from '../../../theme';
 
 dayjs.extend(relativeTime);
 
@@ -72,6 +73,7 @@ interface DataQuality {
 }
 
 const DataManagement = () => {
+  const token = useThemeToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('all');
   const [sensorData, setSensorData] = useState<SensorReading[]>([]);
@@ -483,7 +485,7 @@ const DataManagement = () => {
                 value={dataStats.devicesWithData}
                 prefix={<BarChartOutlined />}
                 suffix={`/ ${devices.length}`}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorInfo }}
               />
             </Card>
           </Col>
@@ -495,20 +497,20 @@ const DataManagement = () => {
                 suffix="%"
                 prefix={
                   dataStats.qualityScore >= 90 ? (
-                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <CheckCircleOutlined style={{ color: token.colorSuccess }} />
                   ) : dataStats.qualityScore >= 70 ? (
-                    <WarningOutlined style={{ color: '#faad14' }} />
+                    <WarningOutlined style={{ color: token.colorWarning }} />
                   ) : (
-                    <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />
+                    <ExclamationCircleOutlined style={{ color: token.colorError }} />
                   )
                 }
                 valueStyle={{
                   color:
                     dataStats.qualityScore >= 90
-                      ? '#52c41a'
+                      ? token.colorSuccess
                       : dataStats.qualityScore >= 70
-                      ? '#faad14'
-                      : '#ff4d4f',
+                      ? token.colorWarning
+                      : token.colorError,
                 }}
               />
               <Progress
@@ -516,10 +518,10 @@ const DataManagement = () => {
                 showInfo={false}
                 strokeColor={
                   dataStats.qualityScore >= 90
-                    ? '#52c41a'
+                    ? token.colorSuccess
                     : dataStats.qualityScore >= 70
-                    ? '#faad14'
-                    : '#ff4d4f'
+                    ? token.colorWarning
+                    : token.colorError
                 }
                 size="small"
                 style={{ marginTop: 8 }}
@@ -532,7 +534,7 @@ const DataManagement = () => {
                 title="Storage Used"
                 value={dataStats.totalDataSize}
                 prefix={<CloudDownloadOutlined />}
-                valueStyle={{ color: '#722ed1' }}
+                valueStyle={{ color: token.colorPrimary }}
               />
             </Card>
           </Col>
@@ -553,7 +555,7 @@ const DataManagement = () => {
               <Statistic
                 title="Valid Records"
                 value={dataQuality.valid}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 suffix={`/ ${dataQuality.total}`}
               />
             </Col>
@@ -561,14 +563,14 @@ const DataManagement = () => {
               <Statistic
                 title="Warnings"
                 value={dataQuality.warnings}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Col>
             <Col xs={24} sm={6}>
               <Statistic
                 title="Errors"
                 value={dataQuality.errors}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: token.colorError }}
               />
             </Col>
             <Col xs={24} sm={6}>

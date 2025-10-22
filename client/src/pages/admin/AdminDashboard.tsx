@@ -182,7 +182,7 @@ const AdminDashboard = () => {
                 </div>
                 <div>
                   <Text>Network</Text>
-                  <Progress percent={90} status="active" strokeColor="#52c41a" />
+                  <Progress percent={90} status="active" strokeColor={token.colorSuccess} />
                 </div>
               </Space>
             </Card>
@@ -203,7 +203,7 @@ const AdminDashboard = () => {
                     <Statistic
                       title="Alerts"
                       value={7}
-                      valueStyle={{ color: '#faad14' }}
+                      valueStyle={{ color: token.colorWarning }}
                     />
                   </Col>
                 </Row>
@@ -213,7 +213,7 @@ const AdminDashboard = () => {
                       title="Avg Response Time"
                       value={127}
                       suffix="ms"
-                      valueStyle={{ color: '#52c41a' }}
+                      valueStyle={{ color: token.colorSuccess }}
                     />
                   </Col>
                   <Col span={12}>
@@ -221,7 +221,7 @@ const AdminDashboard = () => {
                       title="Success Rate"
                       value={99.8}
                       suffix="%"
-                      valueStyle={{ color: '#52c41a' }}
+                      valueStyle={{ color: token.colorSuccess }}
                     />
                   </Col>
                 </Row>

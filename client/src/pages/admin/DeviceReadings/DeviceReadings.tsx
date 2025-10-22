@@ -402,10 +402,10 @@ const DeviceReadings = () => {
                       style={{
                         borderLeft: `4px solid ${
                           getStatusColor(latestReading.turbidity, 'turbidity') === 'success'
-                            ? '#52c41a'
+                            ? token.colorSuccess
                             : getStatusColor(latestReading.turbidity, 'turbidity') === 'warning'
-                            ? '#faad14'
-                            : '#ff4d4f'
+                            ? token.colorWarning
+                            : token.colorError
                         }`,
                       }}
                     >
@@ -422,10 +422,10 @@ const DeviceReadings = () => {
                         valueStyle={{
                           color:
                             getStatusColor(latestReading.turbidity, 'turbidity') === 'success'
-                              ? '#52c41a'
+                              ? token.colorSuccess
                               : getStatusColor(latestReading.turbidity, 'turbidity') === 'warning'
-                              ? '#faad14'
-                              : '#ff4d4f',
+                              ? token.colorWarning
+                              : token.colorError,
                         }}
                       />
                       <Divider style={{ margin: '12px 0' }} />
@@ -452,10 +452,10 @@ const DeviceReadings = () => {
                       style={{
                         borderLeft: `4px solid ${
                           getStatusColor(latestReading.tds, 'tds') === 'success'
-                            ? '#52c41a'
+                            ? token.colorSuccess
                             : getStatusColor(latestReading.tds, 'tds') === 'warning'
-                            ? '#faad14'
-                            : '#ff4d4f'
+                            ? token.colorWarning
+                            : token.colorError
                         }`,
                       }}
                     >
@@ -472,10 +472,10 @@ const DeviceReadings = () => {
                         valueStyle={{
                           color:
                             getStatusColor(latestReading.tds, 'tds') === 'success'
-                              ? '#52c41a'
+                              ? token.colorSuccess
                               : getStatusColor(latestReading.tds, 'tds') === 'warning'
-                              ? '#faad14'
-                              : '#ff4d4f',
+                              ? token.colorWarning
+                              : token.colorError,
                         }}
                       />
                       <Divider style={{ margin: '12px 0' }} />
@@ -500,10 +500,10 @@ const DeviceReadings = () => {
                       style={{
                         borderLeft: `4px solid ${
                           getStatusColor(latestReading.ph, 'ph') === 'success'
-                            ? '#52c41a'
+                            ? token.colorSuccess
                             : getStatusColor(latestReading.ph, 'ph') === 'warning'
-                            ? '#faad14'
-                            : '#ff4d4f'
+                            ? token.colorWarning
+                            : token.colorError
                         }`,
                       }}
                     >
@@ -520,10 +520,10 @@ const DeviceReadings = () => {
                         valueStyle={{
                           color:
                             getStatusColor(latestReading.ph, 'ph') === 'success'
-                              ? '#52c41a'
+                              ? token.colorSuccess
                               : getStatusColor(latestReading.ph, 'ph') === 'warning'
-                              ? '#faad14'
-                              : '#ff4d4f',
+                              ? token.colorWarning
+                              : token.colorError,
                         }}
                       />
                       <Divider style={{ margin: '12px 0' }} />

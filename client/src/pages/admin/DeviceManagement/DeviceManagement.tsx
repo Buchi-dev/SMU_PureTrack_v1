@@ -35,6 +35,7 @@ import { AdminLayout } from '../../../components/layouts';
 import { AddEditDeviceModal } from './AddEditDeviceModal';
 import { ViewDeviceModal } from './ViewDeviceModal';
 import type { ReactNode } from 'react';
+import { useThemeToken } from '../../../theme';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -48,6 +49,7 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
 };
 
 const DeviceManagement = () => {
+  const token = useThemeToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -315,7 +317,7 @@ const DeviceManagement = () => {
               <Statistic
                 title="Online"
                 value={stats.online}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 prefix={<CheckCircleOutlined />}
               />
             </Card>
@@ -325,7 +327,7 @@ const DeviceManagement = () => {
               <Statistic
                 title="Offline"
                 value={stats.offline}
-                valueStyle={{ color: '#d9d9d9' }}
+                valueStyle={{ color: token.colorTextSecondary }}
                 prefix={<CloseCircleOutlined />}
               />
             </Card>
@@ -335,7 +337,7 @@ const DeviceManagement = () => {
               <Statistic
                 title="Error"
                 value={stats.error}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: token.colorError }}
                 prefix={<WarningOutlined />}
               />
             </Card>
@@ -345,7 +347,7 @@ const DeviceManagement = () => {
               <Statistic
                 title="Maintenance"
                 value={stats.maintenance}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
                 prefix={<ToolOutlined />}
               />
             </Card>

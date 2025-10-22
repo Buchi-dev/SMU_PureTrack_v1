@@ -35,6 +35,7 @@ import type { Device, SensorReading, ReportType, ReportConfig, ReportHistory } f
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useThemeToken } from '../../../theme';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -82,6 +83,7 @@ const calculateDataCompleteness = (totalReadings: number, startDate?: number, en
 };
 
 const ManageReports = () => {
+  const token = useThemeToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedType, setSelectedType] = useState<ReportType>('water_quality');
   const [loading, setLoading] = useState(false);
@@ -1152,28 +1154,28 @@ const ManageReports = () => {
       title: 'Water Quality Report',
       description: 'Comprehensive analysis of water quality parameters including turbidity, TDS, and pH levels',
       icon: <ExperimentOutlined />,
-      color: '#1890ff',
+      color: token.colorInfo,
     },
     {
       key: 'device_status',
       title: 'Device Status Report',
       description: 'Overview of all device statuses, connectivity, and operational health',
       icon: <DatabaseOutlined />,
-      color: '#52c41a',
+      color: token.colorSuccess,
     },
     {
       key: 'data_summary',
       title: 'Data Summary Report',
       description: 'Statistical summary of sensor data over selected time period',
       icon: <BarChartOutlined />,
-      color: '#722ed1',
+      color: token.colorPrimary,
     },
     {
       key: 'compliance',
       title: 'Compliance Report',
       description: 'Regulatory compliance assessment and quality standards verification',
       icon: <CheckCircleOutlined />,
-      color: '#faad14',
+      color: token.colorWarning,
     },
   ];
 
@@ -1359,7 +1361,7 @@ const ManageReports = () => {
                     renderItem={item => (
                       <List.Item>
                         <List.Item.Meta
-                          avatar={<FilePdfOutlined style={{ fontSize: 24, color: '#ff4d4f' }} />}
+                          avatar={<FilePdfOutlined style={{ fontSize: 24, color: token.colorError }} />}
                           title={item.title}
                           description={
                             <Space direction="vertical" size={0}>

@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import type { Device, DeviceStatus, SensorReading } from '../../../schemas';
 import { api } from '../../../services/api';
+import { useThemeToken } from '../../../theme';
 
 const { Text } = Typography;
 
@@ -46,6 +47,7 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
 };
 
 export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalProps) => {
+  const token = useThemeToken();
   const [sensorData, setSensorData] = useState<SensorReading | null>(null);
   const [sensorHistory, setSensorHistory] = useState<SensorReading[]>([]);
   const [loading, setLoading] = useState(false);
@@ -87,16 +89,16 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
   };
 
   const getPhColor = (ph: number) => {
-    if (ph < 6.5) return '#ff4d4f'; // Acidic - Red
-    if (ph > 8.5) return '#1890ff'; // Alkaline - Blue
-    return '#52c41a'; // Neutral - Green
+    if (ph < 6.5) return token.colorError; // Acidic - Red
+    if (ph > 8.5) return token.colorInfo; // Alkaline - Blue
+    return token.colorSuccess; // Neutral - Green
   };
 
   const getTurbidityStatus = (turbidity: number) => {
-    if (turbidity < 5) return { text: 'Excellent', color: '#52c41a' };
-    if (turbidity < 20) return { text: 'Good', color: '#73d13d' };
-    if (turbidity < 50) return { text: 'Fair', color: '#faad14' };
-    return { text: 'Poor', color: '#ff4d4f' };
+    if (turbidity < 5) return { text: 'Excellent', color: token.colorSuccess };
+    if (turbidity < 20) return { text: 'Good', color: token.colorSuccess };
+    if (turbidity < 50) return { text: 'Fair', color: token.colorWarning };
+    return { text: 'Poor', color: token.colorError };
   };
 
   if (!device) return null;
@@ -251,7 +253,7 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
                         title="TDS"
                         value={sensorData.tds}
                         precision={0}
-                        valueStyle={{ color: '#1890ff' }}
+                        valueStyle={{ color: token.colorInfo }}
                         suffix="ppm"
                       />
                     </Card>

@@ -6,6 +6,7 @@ import {
   FallOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../theme';
 import {
   LineChart,
   Line,
@@ -22,6 +23,8 @@ import {
 const { Title, Text } = Typography;
 
 const StaffAnalytics = () => {
+  const token = useThemeToken();
+  
   // Mock data for charts
   const phData = [
     { time: '00:00', ph: 7.2 },
@@ -71,7 +74,7 @@ const StaffAnalytics = () => {
                 title="Average pH"
                 value={7.3}
                 precision={1}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 prefix={<RiseOutlined />}
                 suffix="units"
               />
@@ -84,7 +87,7 @@ const StaffAnalytics = () => {
                 title="Avg Temperature"
                 value={25.8}
                 precision={1}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorInfo }}
                 suffix="°C"
               />
               <Text type="secondary">Last 24 hours</Text>
@@ -96,7 +99,7 @@ const StaffAnalytics = () => {
                 title="Avg Turbidity"
                 value={3.8}
                 precision={1}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
                 prefix={<FallOutlined />}
                 suffix="NTU"
               />
@@ -108,7 +111,7 @@ const StaffAnalytics = () => {
               <Statistic
                 title="Data Points"
                 value={1432}
-                valueStyle={{ color: '#722ed1' }}
+                valueStyle={{ color: token.colorPrimary }}
                 prefix={<LineChartOutlined />}
               />
               <Text type="secondary">Collected today</Text>
@@ -128,7 +131,7 @@ const StaffAnalytics = () => {
               <Line
                 type="monotone"
                 dataKey="ph"
-                stroke="#52c41a"
+                stroke={token.colorSuccess}
                 strokeWidth={2}
                 name="pH Level"
               />
@@ -148,7 +151,7 @@ const StaffAnalytics = () => {
               <Line
                 type="monotone"
                 dataKey="temp"
-                stroke="#1890ff"
+                stroke={token.colorInfo}
                 strokeWidth={2}
                 name="Temperature (°C)"
               />
@@ -165,9 +168,9 @@ const StaffAnalytics = () => {
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="ph" fill="#52c41a" name="pH" />
-              <Bar dataKey="temp" fill="#1890ff" name="Temperature" />
-              <Bar dataKey="turbidity" fill="#faad14" name="Turbidity" />
+              <Bar dataKey="ph" fill={token.colorSuccess} name="pH" />
+              <Bar dataKey="temp" fill={token.colorInfo} name="Temperature" />
+              <Bar dataKey="turbidity" fill={token.colorWarning} name="Turbidity" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -179,19 +182,19 @@ const StaffAnalytics = () => {
               <Space direction="vertical" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Overall Quality:</Text>
-                  <Text strong style={{ color: '#52c41a' }}>Good</Text>
+                  <Text strong style={{ color: token.colorSuccess }}>Good</Text>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>pH Status:</Text>
-                  <Text strong style={{ color: '#52c41a' }}>Normal</Text>
+                  <Text strong style={{ color: token.colorSuccess }}>Normal</Text>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Temperature:</Text>
-                  <Text strong style={{ color: '#52c41a' }}>Normal</Text>
+                  <Text strong style={{ color: token.colorSuccess }}>Normal</Text>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Turbidity:</Text>
-                  <Text strong style={{ color: '#faad14' }}>Moderate</Text>
+                  <Text strong style={{ color: token.colorWarning }}>Moderate</Text>
                 </div>
               </Space>
             </Card>
@@ -213,7 +216,7 @@ const StaffAnalytics = () => {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Active Alerts:</Text>
-                  <Text strong style={{ color: '#faad14' }}>2</Text>
+                  <Text strong style={{ color: token.colorWarning }}>2</Text>
                 </div>
               </Space>
             </Card>

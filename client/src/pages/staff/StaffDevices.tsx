@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../theme';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -40,6 +41,7 @@ interface Device {
 
 const StaffDevices = () => {
   const navigate = useNavigate();
+  const token = useThemeToken();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -169,7 +171,7 @@ const StaffDevices = () => {
       dataIndex: 'uptime',
       key: 'uptime',
       render: (uptime: string) => (
-        <Text style={{ color: parseFloat(uptime) > 95 ? '#52c41a' : '#ff4d4f' }}>
+        <Text style={{ color: parseFloat(uptime) > 95 ? token.colorSuccess : token.colorError }}>
           {uptime}
         </Text>
       ),
@@ -215,7 +217,7 @@ const StaffDevices = () => {
                 title="Total Devices"
                 value={stats.total}
                 prefix={<ApiOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorInfo }}
               />
             </Card>
           </Col>
@@ -225,7 +227,7 @@ const StaffDevices = () => {
                 title="Online"
                 value={stats.online}
                 prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -235,7 +237,7 @@ const StaffDevices = () => {
                 title="Warnings"
                 value={stats.warning}
                 prefix={<WarningOutlined />}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>

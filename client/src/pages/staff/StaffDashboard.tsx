@@ -25,6 +25,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../components/layouts/StaffLayout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useThemeToken } from '../../theme';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -54,6 +55,7 @@ interface RecentAlert {
 const StaffDashboard = () => {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
+  const token = useThemeToken();
   const [loading, setLoading] = useState(true);
   const [deviceStats, setDeviceStats] = useState({
     total: 0,
@@ -199,7 +201,7 @@ const StaffDashboard = () => {
       dataIndex: 'ph',
       key: 'ph',
       render: (value: number) => (
-        <Text style={{ color: value > 8 || value < 6.5 ? '#ff4d4f' : '#52c41a' }}>
+        <Text style={{ color: value > 8 || value < 6.5 ? token.colorError : token.colorSuccess }}>
           {value > 0 ? value.toFixed(1) : '-'}
         </Text>
       ),
@@ -217,7 +219,7 @@ const StaffDashboard = () => {
       dataIndex: 'turbidity',
       key: 'turbidity',
       render: (value: number) => (
-        <Text style={{ color: value > 5 ? '#ff4d4f' : '#52c41a' }}>
+        <Text style={{ color: value > 5 ? token.colorError : token.colorSuccess }}>
           {value > 0 ? value.toFixed(1) : '-'}
         </Text>
       ),
@@ -314,7 +316,7 @@ const StaffDashboard = () => {
                 title="Total Devices"
                 value={deviceStats.total}
                 prefix={<ApiOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorInfo }}
               />
             </Card>
           </Col>
@@ -324,13 +326,13 @@ const StaffDashboard = () => {
                 title="Online"
                 value={deviceStats.online}
                 prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
                 suffix={`/ ${deviceStats.total}`}
               />
               <Progress
                 percent={(deviceStats.online / deviceStats.total) * 100}
                 showInfo={false}
-                strokeColor="#52c41a"
+                strokeColor={token.colorSuccess}
               />
             </Card>
           </Col>
@@ -340,7 +342,7 @@ const StaffDashboard = () => {
                 title="Warnings"
                 value={deviceStats.warnings}
                 prefix={<WarningOutlined />}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>
@@ -350,7 +352,7 @@ const StaffDashboard = () => {
                 title="Offline"
                 value={deviceStats.offline}
                 prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: '#8c8c8c' }}
+                valueStyle={{ color: token.colorTextSecondary }}
               />
             </Card>
           </Col>

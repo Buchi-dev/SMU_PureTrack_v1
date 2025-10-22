@@ -21,6 +21,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../theme';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
@@ -40,6 +41,7 @@ interface Reading {
 }
 
 const StaffReadings = () => {
+  const token = useThemeToken();
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<any>(null);
@@ -128,9 +130,9 @@ const StaffReadings = () => {
     };
     
     const range = ranges[type];
-    if (value < range.min || value > range.max) return '#ff4d4f'; // Red
-    if (value < range.min + 0.5 || value > range.max - 0.5) return '#faad14'; // Orange
-    return '#52c41a'; // Green
+    if (value < range.min || value > range.max) return token.colorError;
+    if (value < range.min + 0.5 || value > range.max - 0.5) return token.colorWarning;
+    return token.colorSuccess;
   };
 
   const columns: ColumnsType<Reading> = [
@@ -159,7 +161,7 @@ const StaffReadings = () => {
       dataIndex: 'ph',
       key: 'ph',
       render: (value: number) => (
-        <Tag color={getParamColor(value, 'ph') === '#52c41a' ? 'success' : 'error'}>
+        <Tag color={getParamColor(value, 'ph') === token.colorSuccess ? 'success' : 'error'}>
           {value.toFixed(1)}
         </Tag>
       ),
@@ -170,7 +172,7 @@ const StaffReadings = () => {
       dataIndex: 'temperature',
       key: 'temperature',
       render: (value: number) => (
-        <Tag color={getParamColor(value, 'temp') === '#52c41a' ? 'success' : 'warning'}>
+        <Tag color={getParamColor(value, 'temp') === token.colorSuccess ? 'success' : 'warning'}>
           {value.toFixed(1)}
         </Tag>
       ),
@@ -181,7 +183,7 @@ const StaffReadings = () => {
       dataIndex: 'turbidity',
       key: 'turbidity',
       render: (value: number) => (
-        <Tag color={getParamColor(value, 'turbidity') === '#52c41a' ? 'success' : 'warning'}>
+        <Tag color={getParamColor(value, 'turbidity') === token.colorSuccess ? 'success' : 'warning'}>
           {value.toFixed(1)}
         </Tag>
       ),
@@ -192,7 +194,7 @@ const StaffReadings = () => {
       dataIndex: 'dissolvedOxygen',
       key: 'dissolvedOxygen',
       render: (value: number) => (
-        <Tag color={getParamColor(value, 'do') === '#52c41a' ? 'success' : 'warning'}>
+        <Tag color={getParamColor(value, 'do') === token.colorSuccess ? 'success' : 'warning'}>
           {value.toFixed(1)}
         </Tag>
       ),
@@ -251,7 +253,7 @@ const StaffReadings = () => {
                 title="Total Readings"
                 value={stats.total}
                 prefix={<LineChartOutlined />}
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: token.colorInfo }}
               />
             </Card>
           </Col>
@@ -261,7 +263,7 @@ const StaffReadings = () => {
                 title="Normal"
                 value={stats.normal}
                 prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: token.colorSuccess }}
               />
             </Card>
           </Col>
@@ -271,7 +273,7 @@ const StaffReadings = () => {
                 title="Warnings"
                 value={stats.warning}
                 prefix={<WarningOutlined />}
-                valueStyle={{ color: '#faad14' }}
+                valueStyle={{ color: token.colorWarning }}
               />
             </Card>
           </Col>
@@ -281,7 +283,7 @@ const StaffReadings = () => {
                 title="Critical"
                 value={stats.critical}
                 prefix={<ExclamationCircleOutlined />}
-                valueStyle={{ color: '#ff4d4f' }}
+                valueStyle={{ color: token.colorError }}
               />
             </Card>
           </Col>
