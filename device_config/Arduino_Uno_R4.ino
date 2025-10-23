@@ -16,8 +16,8 @@
 // ===========================
 
 // WiFi Credentials
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+#define WIFI_SSID "Yuzon Only"
+#define WIFI_PASSWORD "Pldtadmin@@2024"
 
 // MQTT Broker Configuration (HiveMQ Cloud)
 #define MQTT_BROKER "36965de434ff42a4a93a697c94a13ad7.s1.eu.hivemq.cloud"
@@ -44,9 +44,9 @@
 #define TURBIDITY_PIN A2    // Turbidity Sensor
 
 // Timing Configuration
-#define SENSOR_READ_INTERVAL 10000   // Read sensors every 10 seconds
+#define SENSOR_READ_INTERVAL 5000   // Read sensors every 5 seconds
 #define MQTT_PUBLISH_INTERVAL 10000 // Publish to MQTT every 10 seconds
-#define HEARTBEAT_INTERVAL 10000    // Send status every 10 seconds
+#define HEARTBEAT_INTERVAL 30000    // Send status every 30 seconds
 
 // ===========================
 // GLOBAL OBJECTS
