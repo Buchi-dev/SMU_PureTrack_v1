@@ -12,6 +12,7 @@ import {
   Alert,
   Progress,
   Spin,
+  message,
 } from 'antd';
 import {
   DashboardOutlined,
@@ -23,14 +24,17 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { StaffLayout } from '../../components/layouts/StaffLayout';
-import { useAuth } from '../../contexts/AuthContext';
-import { useThemeToken } from '../../theme';
+import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useThemeToken } from '../../../theme';
+import { collection, query, orderBy, limit, onSnapshot, where } from 'firebase/firestore';
+import { db } from '../../../config/firebase';
+import { deviceApi } from '../../../services/api';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
 
-// Mock data types
+// Data types
 interface DeviceStatus {
   id: string;
   name: string;
@@ -38,7 +42,7 @@ interface DeviceStatus {
   status: 'online' | 'offline' | 'warning';
   lastUpdate: string;
   ph: number;
-  temperature: number;
+  tds: number;
   turbidity: number;
 }
 
@@ -71,93 +75,108 @@ const StaffDashboard = () => {
     const fetchDashboardData = async () => {
       setLoading(true);
       
-      // Simulate API call - Replace with actual Firebase/API calls
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        // Fetch devices from Firebase API
+        const devices = await deviceApi.listDevices();
+        
+        // Fetch recent sensor readings for each device
+        const devicesWithReadings = await Promise.all(
+          devices.map(async (device) => {
+            try {
+              const readings = await deviceApi.getSensorReadings(device.deviceId);
+              const lastUpdate = readings?.timestamp 
+                ? new Date(readings.timestamp).toLocaleString()
+                : 'No data';
+              
+              // Determine device status based on connection and readings
+              let status: 'online' | 'offline' | 'warning' = 'offline';
+              if (device.status === 'online') {
+                // Check if readings are recent (within last 10 minutes)
+                if (readings?.timestamp) {
+                  const timeDiff = Date.now() - readings.timestamp;
+                  if (timeDiff < 600000) { // 10 minutes
+                    status = 'online';
+                    // Check for warning conditions (parameters out of normal range)
+                    if (readings.ph && (readings.ph < 6.5 || readings.ph > 8.5)) status = 'warning';
+                    if (readings.turbidity && readings.turbidity > 5) status = 'warning';
+                  }
+                }
+              }
+              
+              return {
+                id: device.deviceId,
+                name: device.name || device.deviceId,
+                location: typeof device.metadata?.location === 'string' 
+                  ? device.metadata.location 
+                  : device.metadata?.location?.building || 'Unknown',
+                status,
+                lastUpdate,
+                ph: readings?.ph || 0,
+                tds: readings?.tds || 0,
+                turbidity: readings?.turbidity || 0,
+              };
+            } catch (error) {
+              console.error(`Error fetching readings for device ${device.deviceId}:`, error);
+              return {
+                id: device.deviceId,
+                name: device.name || device.deviceId,
+                location: typeof device.metadata?.location === 'string' 
+                  ? device.metadata.location 
+                  : device.metadata?.location?.building || 'Unknown',
+                status: 'offline' as const,
+                lastUpdate: 'No data',
+                ph: 0,
+                tds: 0,
+                turbidity: 0,
+              };
+            }
+          })
+        );
 
-      // Mock data
-      const mockDevices: DeviceStatus[] = [
-        {
-          id: '1',
-          name: 'Device A',
-          location: 'North Station',
-          status: 'online',
-          lastUpdate: '2 mins ago',
-          ph: 7.2,
-          temperature: 25.5,
-          turbidity: 3.2,
-        },
-        {
-          id: '2',
-          name: 'Device B',
-          location: 'South Station',
-          status: 'warning',
-          lastUpdate: '5 mins ago',
-          ph: 8.5,
-          temperature: 28.0,
-          turbidity: 5.8,
-        },
-        {
-          id: '3',
-          name: 'Device C',
-          location: 'East Station',
-          status: 'online',
-          lastUpdate: '1 min ago',
-          ph: 6.8,
-          temperature: 24.0,
-          turbidity: 2.1,
-        },
-        {
-          id: '4',
-          name: 'Device D',
-          location: 'West Station',
-          status: 'offline',
-          lastUpdate: '30 mins ago',
-          ph: 0,
-          temperature: 0,
-          turbidity: 0,
-        },
-      ];
+        // Fetch recent alerts from Firestore
+        const alertsRef = collection(db, 'alerts');
+        const alertsQuery = query(
+          alertsRef,
+          where('resolved', '==', false),
+          orderBy('createdAt', 'desc'),
+          limit(5)
+        );
+        
+        const alertsSnapshot = await new Promise((resolve) => {
+          const unsubscribe = onSnapshot(alertsQuery, (snapshot) => {
+            unsubscribe();
+            resolve(snapshot);
+          });
+        }) as any;
 
-      const mockAlerts: RecentAlert[] = [
-        {
-          key: '1',
-          device: 'Device B',
-          parameter: 'pH Level',
-          value: 8.5,
-          threshold: 8.0,
-          time: '5 mins ago',
-          severity: 'high',
-        },
-        {
-          key: '2',
-          device: 'Device B',
-          parameter: 'Turbidity',
-          value: 5.8,
-          threshold: 5.0,
-          time: '10 mins ago',
-          severity: 'medium',
-        },
-        {
-          key: '3',
-          device: 'Device A',
-          parameter: 'Temperature',
-          value: 25.5,
-          threshold: 25.0,
-          time: '15 mins ago',
-          severity: 'low',
-        },
-      ];
+        const alerts = alertsSnapshot.docs.map((doc: any) => {
+          const data = doc.data();
+          return {
+            key: doc.id,
+            device: data.deviceName || data.deviceId || 'Unknown Device',
+            parameter: data.parameter || 'Unknown',
+            value: data.currentValue || 0,
+            threshold: data.threshold || 0,
+            time: data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleString() : 'Unknown',
+            severity: data.severity || 'medium',
+          };
+        });
 
-      setRecentReadings(mockDevices);
-      setRecentAlerts(mockAlerts);
-      setDeviceStats({
-        total: mockDevices.length,
-        online: mockDevices.filter(d => d.status === 'online').length,
-        offline: mockDevices.filter(d => d.status === 'offline').length,
-        warnings: mockDevices.filter(d => d.status === 'warning').length,
-      });
+        setRecentReadings(devicesWithReadings);
+        setRecentAlerts(alerts);
+        setDeviceStats({
+          total: devicesWithReadings.length,
+          online: devicesWithReadings.filter(d => d.status === 'online').length,
+          offline: devicesWithReadings.filter(d => d.status === 'offline').length,
+          warnings: devicesWithReadings.filter(d => d.status === 'warning').length,
+        });
 
-      setLoading(false);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        message.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchDashboardData();
@@ -201,17 +220,19 @@ const StaffDashboard = () => {
       dataIndex: 'ph',
       key: 'ph',
       render: (value: number) => (
-        <Text style={{ color: value > 8 || value < 6.5 ? token.colorError : token.colorSuccess }}>
-          {value > 0 ? value.toFixed(1) : '-'}
+        <Text style={{ color: value > 8.5 || value < 6.5 ? token.colorError : token.colorSuccess }}>
+          {value > 0 ? value.toFixed(2) : '-'}
         </Text>
       ),
     },
     {
-      title: 'Temperature (°C)',
-      dataIndex: 'temperature',
-      key: 'temperature',
+      title: 'TDS (ppm)',
+      dataIndex: 'tds',
+      key: 'tds',
       render: (value: number) => (
-        <Text>{value > 0 ? value.toFixed(1) : '-'}</Text>
+        <Text style={{ color: value > 500 ? token.colorWarning : token.colorSuccess }}>
+          {value > 0 ? value.toFixed(1) : '-'}
+        </Text>
       ),
     },
     {
@@ -220,7 +241,7 @@ const StaffDashboard = () => {
       key: 'turbidity',
       render: (value: number) => (
         <Text style={{ color: value > 5 ? token.colorError : token.colorSuccess }}>
-          {value > 0 ? value.toFixed(1) : '-'}
+          {value > 0 ? value.toFixed(2) : '-'}
         </Text>
       ),
     },

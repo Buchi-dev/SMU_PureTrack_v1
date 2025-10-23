@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -12,6 +12,8 @@ import {
   Col,
   Statistic,
   Alert,
+  message,
+  Spin,
 } from 'antd';
 import {
   LineChartOutlined,
@@ -20,8 +22,9 @@ import {
   ExclamationCircleOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
-import { StaffLayout } from '../../components/layouts/StaffLayout';
-import { useThemeToken } from '../../theme';
+import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../../theme';
+import { deviceApi } from '../../../services/api';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
@@ -34,9 +37,8 @@ interface Reading {
   device: string;
   location: string;
   ph: number;
-  temperature: number;
+  tds: number;
   turbidity: number;
-  dissolvedOxygen: number;
   status: 'normal' | 'warning' | 'critical';
 }
 
@@ -45,65 +47,80 @@ const StaffReadings = () => {
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<any>(null);
+  const [readings, setReadings] = useState<Reading[]>([]);
+  const [devices, setDevices] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock readings data
-  const readings: Reading[] = [
-    {
-      key: '1',
-      timestamp: dayjs().subtract(5, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
-      device: 'Device A',
-      location: 'North Station',
-      ph: 7.2,
-      temperature: 25.5,
-      turbidity: 3.2,
-      dissolvedOxygen: 8.5,
-      status: 'normal',
-    },
-    {
-      key: '2',
-      timestamp: dayjs().subtract(10, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
-      device: 'Device B',
-      location: 'South Station',
-      ph: 8.5,
-      temperature: 28.0,
-      turbidity: 5.8,
-      dissolvedOxygen: 6.2,
-      status: 'warning',
-    },
-    {
-      key: '3',
-      timestamp: dayjs().subtract(15, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
-      device: 'Device C',
-      location: 'East Station',
-      ph: 9.2,
-      temperature: 30.5,
-      turbidity: 8.5,
-      dissolvedOxygen: 4.5,
-      status: 'critical',
-    },
-    {
-      key: '4',
-      timestamp: dayjs().subtract(20, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
-      device: 'Device A',
-      location: 'North Station',
-      ph: 7.0,
-      temperature: 24.8,
-      turbidity: 2.9,
-      dissolvedOxygen: 8.8,
-      status: 'normal',
-    },
-    {
-      key: '5',
-      timestamp: dayjs().subtract(25, 'minutes').format('YYYY-MM-DD HH:mm:ss'),
-      device: 'Device D',
-      location: 'West Station',
-      ph: 8.2,
-      temperature: 27.5,
-      turbidity: 5.2,
-      dissolvedOxygen: 7.1,
-      status: 'warning',
-    },
-  ];
+  // Fetch devices and readings from Firebase
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch devices
+        const devicesList = await deviceApi.listDevices();
+        const deviceNames = devicesList.map(d => d.name || d.deviceId);
+        setDevices(deviceNames);
+        
+        // Fetch readings for all devices
+        const allReadings: Reading[] = [];
+        
+        for (const device of devicesList) {
+          try {
+            const history = await deviceApi.getSensorHistory(device.deviceId, 50);
+            
+            history.forEach((reading, index) => {
+              // Determine status based on parameter values
+              let status: 'normal' | 'warning' | 'critical' = 'normal';
+              
+              if (reading.ph) {
+                if (reading.ph < 6.0 || reading.ph > 9.0) status = 'critical';
+                else if (reading.ph < 6.5 || reading.ph > 8.5) status = 'warning';
+              }
+              
+              if (reading.turbidity && reading.turbidity > 5) {
+                if (reading.turbidity > 10) status = 'critical';
+                else if (status === 'normal') status = 'warning';
+              }
+
+              if (reading.tds && reading.tds > 500) {
+                if (reading.tds > 1000) status = 'critical';
+                else if (status === 'normal') status = 'warning';
+              }
+              
+              allReadings.push({
+                key: `${device.deviceId}-${index}`,
+                timestamp: reading.timestamp 
+                  ? dayjs(reading.timestamp).format('YYYY-MM-DD HH:mm:ss')
+                  : dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                device: device.name || device.deviceId,
+                location: typeof device.metadata?.location === 'string' 
+                  ? device.metadata.location 
+                  : device.metadata?.location?.building || 'Unknown',
+                ph: reading.ph || 0,
+                tds: reading.tds || 0,
+                turbidity: reading.turbidity || 0,
+                status,
+              });
+            });
+          } catch (error) {
+            console.error(`Error fetching readings for device ${device.deviceId}:`, error);
+          }
+        }
+        
+        // Sort by timestamp (most recent first)
+        allReadings.sort((a, b) => dayjs(b.timestamp).unix() - dayjs(a.timestamp).unix());
+        
+        setReadings(allReadings);
+      } catch (error) {
+        console.error('Error fetching readings:', error);
+        message.error('Failed to load readings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Filter readings
   const filteredReadings = readings.filter(reading => {
@@ -121,17 +138,16 @@ const StaffReadings = () => {
   };
 
   // Get parameter status color
-  const getParamColor = (value: number, type: 'ph' | 'temp' | 'turbidity' | 'do') => {
+  const getParamColor = (value: number, type: 'ph' | 'tds' | 'turbidity') => {
     const ranges = {
       ph: { min: 6.5, max: 8.5 },
-      temp: { min: 20, max: 30 },
+      tds: { min: 0, max: 500 },
       turbidity: { min: 0, max: 5 },
-      do: { min: 5, max: 10 },
     };
     
     const range = ranges[type];
     if (value < range.min || value > range.max) return token.colorError;
-    if (value < range.min + 0.5 || value > range.max - 0.5) return token.colorWarning;
+    if (value < range.min + 0.5 || value > range.max - 50) return token.colorWarning;
     return token.colorSuccess;
   };
 
@@ -162,21 +178,21 @@ const StaffReadings = () => {
       key: 'ph',
       render: (value: number) => (
         <Tag color={getParamColor(value, 'ph') === token.colorSuccess ? 'success' : 'error'}>
-          {value.toFixed(1)}
+          {value.toFixed(2)}
         </Tag>
       ),
       sorter: (a, b) => a.ph - b.ph,
     },
     {
-      title: 'Temperature (°C)',
-      dataIndex: 'temperature',
-      key: 'temperature',
+      title: 'TDS (ppm)',
+      dataIndex: 'tds',
+      key: 'tds',
       render: (value: number) => (
-        <Tag color={getParamColor(value, 'temp') === token.colorSuccess ? 'success' : 'warning'}>
+        <Tag color={getParamColor(value, 'tds') === token.colorSuccess ? 'success' : 'warning'}>
           {value.toFixed(1)}
         </Tag>
       ),
-      sorter: (a, b) => a.temperature - b.temperature,
+      sorter: (a, b) => a.tds - b.tds,
     },
     {
       title: 'Turbidity (NTU)',
@@ -184,21 +200,10 @@ const StaffReadings = () => {
       key: 'turbidity',
       render: (value: number) => (
         <Tag color={getParamColor(value, 'turbidity') === token.colorSuccess ? 'success' : 'warning'}>
-          {value.toFixed(1)}
+          {value.toFixed(2)}
         </Tag>
       ),
       sorter: (a, b) => a.turbidity - b.turbidity,
-    },
-    {
-      title: 'DO (mg/L)',
-      dataIndex: 'dissolvedOxygen',
-      key: 'dissolvedOxygen',
-      render: (value: number) => (
-        <Tag color={getParamColor(value, 'do') === token.colorSuccess ? 'success' : 'warning'}>
-          {value.toFixed(1)}
-        </Tag>
-      ),
-      sorter: (a, b) => a.dissolvedOxygen - b.dissolvedOxygen,
     },
     {
       title: 'Status',
@@ -222,6 +227,12 @@ const StaffReadings = () => {
 
   return (
     <StaffLayout>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+          <p>Loading sensor readings...</p>
+        </div>
+      ) : (
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
         <div>
@@ -300,10 +311,7 @@ const StaffReadings = () => {
                 onChange={setDeviceFilter}
                 options={[
                   { label: 'All Devices', value: 'all' },
-                  { label: 'Device A', value: 'Device A' },
-                  { label: 'Device B', value: 'Device B' },
-                  { label: 'Device C', value: 'Device C' },
-                  { label: 'Device D', value: 'Device D' },
+                  ...devices.map(device => ({ label: device, value: device })),
                 ]}
               />
             </div>
@@ -342,28 +350,25 @@ const StaffReadings = () => {
         {/* Parameter Reference */}
         <Card title="Parameter Reference Ranges">
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Space direction="vertical" size={0}>
                 <Text strong>pH Level</Text>
                 <Text type="secondary">Normal: 6.5 - 8.5</Text>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`<6.0 or >9.0`}</Text>
               </Space>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Space direction="vertical" size={0}>
-                <Text strong>Temperature</Text>
-                <Text type="secondary">Normal: 20 - 30 °C</Text>
+                <Text strong>TDS (Total Dissolved Solids)</Text>
+                <Text type="secondary">Normal: 0 - 500 ppm</Text>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>1000 ppm`}</Text>
               </Space>
             </Col>
-            <Col xs={24} sm={12} md={6}>
+            <Col xs={24} sm={12} md={8}>
               <Space direction="vertical" size={0}>
                 <Text strong>Turbidity</Text>
                 <Text type="secondary">Normal: 0 - 5 NTU</Text>
-              </Space>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Space direction="vertical" size={0}>
-                <Text strong>Dissolved Oxygen</Text>
-                <Text type="secondary">Normal: 5 - 10 mg/L</Text>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>10 NTU`}</Text>
               </Space>
             </Col>
           </Row>
@@ -381,6 +386,7 @@ const StaffReadings = () => {
           />
         </Card>
       </Space>
+      )}
     </StaffLayout>
   );
 };

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -11,6 +11,8 @@ import {
   Row,
   Col,
   Statistic,
+  message,
+  Spin,
 } from 'antd';
 import {
   ApiOutlined,
@@ -21,8 +23,9 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { StaffLayout } from '../../components/layouts/StaffLayout';
-import { useThemeToken } from '../../theme';
+import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../../theme';
+import { deviceApi } from '../../../services/api';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -44,60 +47,80 @@ const StaffDevices = () => {
   const token = useThemeToken();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock device data
-  const devices: Device[] = [
-    {
-      key: '1',
-      id: '1',
-      name: 'Device A',
-      location: 'North Station',
-      status: 'online',
-      lastUpdate: '2 mins ago',
-      uptime: '99.8%',
-      sensors: ['pH', 'Temperature', 'Turbidity', 'DO'],
-    },
-    {
-      key: '2',
-      id: '2',
-      name: 'Device B',
-      location: 'South Station',
-      status: 'warning',
-      lastUpdate: '5 mins ago',
-      uptime: '97.2%',
-      sensors: ['pH', 'Temperature', 'Turbidity'],
-    },
-    {
-      key: '3',
-      id: '3',
-      name: 'Device C',
-      location: 'East Station',
-      status: 'online',
-      lastUpdate: '1 min ago',
-      uptime: '99.9%',
-      sensors: ['pH', 'Temperature', 'Turbidity', 'DO', 'TDS'],
-    },
-    {
-      key: '4',
-      id: '4',
-      name: 'Device D',
-      location: 'West Station',
-      status: 'offline',
-      lastUpdate: '30 mins ago',
-      uptime: '85.3%',
-      sensors: ['pH', 'Temperature'],
-    },
-    {
-      key: '5',
-      id: '5',
-      name: 'Device E',
-      location: 'Central Station',
-      status: 'online',
-      lastUpdate: '3 mins ago',
-      uptime: '98.5%',
-      sensors: ['pH', 'Temperature', 'Turbidity', 'DO'],
-    },
-  ];
+  // Fetch devices from Firebase
+  useEffect(() => {
+    const fetchDevices = async () => {
+      setLoading(true);
+      try {
+        const devicesList = await deviceApi.listDevices();
+        
+        // Transform API data to match component interface
+        const transformedDevices = await Promise.all(
+          devicesList.map(async (device) => {
+            try {
+              const readings = await deviceApi.getSensorReadings(device.deviceId);
+              
+              // Determine status
+              let status: 'online' | 'offline' | 'warning' = 'offline';
+              if (device.status === 'online' && readings?.timestamp) {
+                const timeDiff = Date.now() - readings.timestamp;
+                if (timeDiff < 600000) { // 10 minutes
+                  status = 'online';
+                  // Check for warning conditions
+                  if (readings.ph && (readings.ph < 6.5 || readings.ph > 8.5)) status = 'warning';
+                  if (readings.turbidity && readings.turbidity > 5) status = 'warning';
+                }
+              }
+              
+              // Calculate uptime (mock calculation based on status)
+              const uptime = status === 'online' ? '99.5%' : status === 'warning' ? '95.0%' : '0%';
+              
+              return {
+                key: device.deviceId,
+                id: device.deviceId,
+                name: device.name || device.deviceId,
+                location: typeof device.metadata?.location === 'string' 
+                  ? device.metadata.location 
+                  : device.metadata?.location?.building || 'Unknown',
+                status,
+                lastUpdate: readings?.timestamp 
+                  ? new Date(readings.timestamp).toLocaleString() 
+                  : 'No data',
+                uptime,
+                sensors: device.sensors || ['turbidity', 'tds', 'ph'],
+              };
+            } catch (error) {
+              console.error(`Error processing device ${device.deviceId}:`, error);
+              return {
+                key: device.deviceId,
+                id: device.deviceId,
+                name: device.name || device.deviceId,
+                location: typeof device.metadata?.location === 'string' 
+                  ? device.metadata.location 
+                  : device.metadata?.location?.building || 'Unknown',
+                status: 'offline' as const,
+                lastUpdate: 'No data',
+                uptime: '0%',
+                sensors: ['turbidity', 'tds', 'ph'],
+              };
+            }
+          })
+        );
+        
+        setDevices(transformedDevices);
+      } catch (error) {
+        console.error('Error fetching devices:', error);
+        message.error('Failed to load devices');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDevices();
+  }, []);
 
   // Filter devices
   const filteredDevices = devices.filter(device => {
@@ -198,6 +221,12 @@ const StaffDevices = () => {
 
   return (
     <StaffLayout>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+          <p>Loading devices...</p>
+        </div>
+      ) : (
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
         <div>
@@ -297,6 +326,7 @@ const StaffDevices = () => {
           />
         </Card>
       </Space>
+      )}
     </StaffLayout>
   );
 };

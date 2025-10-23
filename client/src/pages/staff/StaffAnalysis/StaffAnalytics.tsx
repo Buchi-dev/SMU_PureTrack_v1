@@ -1,12 +1,13 @@
-import { Card, Typography, Row, Col, Space, Statistic } from 'antd';
+import { useState, useEffect } from 'react';
+import { Card, Typography, Row, Col, Space, Statistic, Spin, message } from 'antd';
 import {
   BarChartOutlined,
-  LineChartOutlined,
   RiseOutlined,
   FallOutlined,
 } from '@ant-design/icons';
-import { StaffLayout } from '../../components/layouts/StaffLayout';
-import { useThemeToken } from '../../theme';
+import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { useThemeToken } from '../../../theme';
+import { deviceApi } from '../../../services/api';
 import {
   LineChart,
   Line,
@@ -24,34 +25,103 @@ const { Title, Text } = Typography;
 
 const StaffAnalytics = () => {
   const token = useThemeToken();
+  const [loading, setLoading] = useState(true);
+  const [phData, setPhData] = useState<any[]>([]);
+  const [turbidityData, setTurbidityData] = useState<any[]>([]);
+  const [deviceComparison, setDeviceComparison] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    avgPh: 0,
+    avgTurbidity: 0,
+    avgTds: 0,
+  });
+
+  // Fetch analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      setLoading(true);
+      try {
+        const devicesList = await deviceApi.listDevices();
+        
+        const phDataPoints: any[] = [];
+        const turbidityDataPoints: any[] = [];
+        const deviceStats: any[] = [];
+        
+        let totalPh = 0, totalTurbidity = 0, totalTds = 0;
+        let count = 0;
+        
+        for (const device of devicesList) {
+          try {
+            const history = await deviceApi.getSensorHistory(device.deviceId, 24);
+            
+            // Aggregate data for device comparison
+            if (history.length > 0) {
+              const devicePh = history.reduce((sum, r) => sum + (r.ph || 0), 0) / history.length;
+              const deviceTurb = history.reduce((sum, r) => sum + (r.turbidity || 0), 0) / history.length;
+              const deviceTds = history.reduce((sum, r) => sum + (r.tds || 0), 0) / history.length;
+              
+              deviceStats.push({
+                device: device.name || device.deviceId,
+                ph: Number(devicePh.toFixed(2)),
+                turbidity: Number(deviceTurb.toFixed(2)),
+                tds: Number(deviceTds.toFixed(2)),
+              });
+              
+              totalPh += devicePh;
+              totalTurbidity += deviceTurb;
+              totalTds += deviceTds;
+              
+              count++;
+            }
+            
+            // Create time-series data (last 24 hours)
+            history.forEach((reading, index) => {
+              const timeLabel = `${index}h`;
+              if (reading.ph) {
+                phDataPoints.push({ time: timeLabel, ph: reading.ph });
+              }
+              if (reading.turbidity) {
+                turbidityDataPoints.push({ time: timeLabel, turbidity: reading.turbidity });
+              }
+            });
+            
+          } catch (error) {
+            console.error(`Error fetching analytics for device ${device.deviceId}:`, error);
+          }
+        }
+        
+        setPhData(phDataPoints.slice(-24)); // Last 24 data points
+        setTurbidityData(turbidityDataPoints.slice(-24));
+        setDeviceComparison(deviceStats);
+        
+        if (count > 0) {
+          setStats({
+            avgPh: Number((totalPh / count).toFixed(1)),
+            avgTurbidity: Number((totalTurbidity / count).toFixed(1)),
+            avgTds: Number((totalTds / count).toFixed(1)),
+          });
+        }
+        
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+        message.error('Failed to load analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, []);
   
-  // Mock data for charts
-  const phData = [
-    { time: '00:00', ph: 7.2 },
-    { time: '04:00', ph: 7.4 },
-    { time: '08:00', ph: 7.3 },
-    { time: '12:00', ph: 7.5 },
-    { time: '16:00', ph: 7.1 },
-    { time: '20:00', ph: 7.3 },
-    { time: '24:00', ph: 7.2 },
-  ];
-
-  const temperatureData = [
-    { time: '00:00', temp: 24.5 },
-    { time: '04:00', temp: 23.8 },
-    { time: '08:00', temp: 25.2 },
-    { time: '12:00', temp: 27.5 },
-    { time: '16:00', temp: 28.0 },
-    { time: '20:00', temp: 26.5 },
-    { time: '24:00', temp: 25.0 },
-  ];
-
-  const deviceComparison = [
-    { device: 'Device A', ph: 7.2, temp: 25.5, turbidity: 3.2 },
-    { device: 'Device B', ph: 8.5, temp: 28.0, turbidity: 5.8 },
-    { device: 'Device C', ph: 6.8, temp: 24.0, turbidity: 2.1 },
-    { device: 'Device D', ph: 7.5, temp: 26.5, turbidity: 4.2 },
-  ];
+  if (loading) {
+    return (
+      <StaffLayout>
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <Spin size="large" />
+          <p>Loading analytics...</p>
+        </div>
+      </StaffLayout>
+    );
+  }
 
   return (
     <StaffLayout>
@@ -68,11 +138,11 @@ const StaffAnalytics = () => {
 
         {/* Summary Statistics */}
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Average pH"
-                value={7.3}
+                value={stats.avgPh}
                 precision={1}
                 valueStyle={{ color: token.colorSuccess }}
                 prefix={<RiseOutlined />}
@@ -81,40 +151,29 @@ const StaffAnalytics = () => {
               <Text type="secondary">Last 24 hours</Text>
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
-                title="Avg Temperature"
-                value={25.8}
+                title="Avg TDS"
+                value={stats.avgTds}
                 precision={1}
                 valueStyle={{ color: token.colorInfo }}
-                suffix="°C"
+                suffix="ppm"
               />
               <Text type="secondary">Last 24 hours</Text>
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={8}>
             <Card>
               <Statistic
                 title="Avg Turbidity"
-                value={3.8}
+                value={stats.avgTurbidity}
                 precision={1}
                 valueStyle={{ color: token.colorWarning }}
                 prefix={<FallOutlined />}
                 suffix="NTU"
               />
               <Text type="secondary">Last 24 hours</Text>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Card>
-              <Statistic
-                title="Data Points"
-                value={1432}
-                valueStyle={{ color: token.colorPrimary }}
-                prefix={<LineChartOutlined />}
-              />
-              <Text type="secondary">Collected today</Text>
             </Card>
           </Col>
         </Row>
@@ -139,21 +198,21 @@ const StaffAnalytics = () => {
           </ResponsiveContainer>
         </Card>
 
-        {/* Temperature Trend Chart */}
-        <Card title="Temperature Trend (24 Hours)">
+        {/* Turbidity Trend Chart */}
+        <Card title="Turbidity Trend (24 Hours)">
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={temperatureData}>
+            <LineChart data={turbidityData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" />
-              <YAxis domain={[20, 30]} />
+              <YAxis domain={[0, 10]} />
               <Tooltip />
               <Legend />
               <Line
                 type="monotone"
-                dataKey="temp"
-                stroke={token.colorInfo}
+                dataKey="turbidity"
+                stroke={token.colorWarning}
                 strokeWidth={2}
-                name="Temperature (°C)"
+                name="Turbidity (NTU)"
               />
             </LineChart>
           </ResponsiveContainer>
@@ -169,8 +228,8 @@ const StaffAnalytics = () => {
               <Tooltip />
               <Legend />
               <Bar dataKey="ph" fill={token.colorSuccess} name="pH" />
-              <Bar dataKey="temp" fill={token.colorInfo} name="Temperature" />
-              <Bar dataKey="turbidity" fill={token.colorWarning} name="Turbidity" />
+              <Bar dataKey="tds" fill={token.colorInfo} name="TDS (ppm)" />
+              <Bar dataKey="turbidity" fill={token.colorWarning} name="Turbidity (NTU)" />
             </BarChart>
           </ResponsiveContainer>
         </Card>
