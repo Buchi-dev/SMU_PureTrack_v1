@@ -353,3 +353,158 @@ The User Management Page includes an activity log or audit trail showing recent 
 Some implementations of the User Management Page include email functionality allowing administrators to send messages to users directly from this interface. For example, administrators might send a welcome email to newly approved users, send instructions to pending users if additional information is needed, or send notifications to suspended users explaining why their access was revoked.
 
 The interface is fully responsive and works well on various screen sizes. The page includes proper error handling for scenarios such as network failures during user updates, attempts to delete users who still have associated active sessions, or conflicts when multiple administrators try to modify the same user simultaneously. Success and error messages provide clear feedback about the results of administrative actions.
+
+---
+
+## 11. Admin Reports Page
+
+**File Location**: `client/src/pages/admin/ManageReports/ManageReports.tsx`  
+**Route**: `/admin/reports` or `/admin/manage-reports`  
+**Access**: Approved Admin users only
+
+The Admin Reports Page provides the functionality to generate summarized reports covering water quality data, system activity, and alert history. This page serves as the centralized reporting hub where administrators can create comprehensive documentation of the system's performance, water quality conditions, and operational metrics. These reports are essential for tracking compliance with water quality standards, documenting system performance for stakeholders, supporting data-driven decision-making, and maintaining records for auditing and regulatory purposes.
+
+When administrators access the Reports Page, they are presented with a report generation interface that allows them to customize the type, scope, and content of the reports they want to create. The page is organized into two main sections: the report configuration panel on the left or top, and a report history list showing previously generated reports on the right or bottom.
+
+The report configuration panel begins with a report type selector, offering several predefined report templates. The "Water Quality Report" is the most commonly used type, focusing on sensor readings, water parameter trends, and water quality compliance over a specified time period. The "Device Status Report" summarizes device performance, uptime statistics, connectivity issues, and maintenance history. The "Alert Summary Report" provides a comprehensive overview of all alerts generated, organized by severity, device location, and parameter, along with response times and resolution statistics. The "System Activity Report" documents user logins, administrative actions, configuration changes, and overall system usage patterns.
+
+After selecting a report type, administrators specify the time range for the report data. A date range picker allows selecting start and end dates, with preset options for common periods such as "Yesterday", "Last 7 Days", "Last 30 Days", "This Month", "Last Month", "This Quarter", "This Year", or "Custom Range". The selected time range determines which sensor readings, alerts, and system events are included in the report.
+
+Device selection options allow administrators to choose whether the report should cover all devices system-wide, a specific subset of devices (such as all devices in a particular building or department), or a single device. Multi-select checkboxes or a transfer list component enables selecting multiple specific devices if needed. This flexibility allows generating both broad system-wide overview reports and targeted reports focusing on specific locations or problem areas.
+
+The report configuration includes parameter selection checkboxes allowing administrators to choose which water quality parameters to include in the report. Options typically include TDS (Total Dissolved Solids), pH level, Turbidity, and Temperature if available. Administrators might generate a comprehensive report including all parameters, or a focused report examining only TDS trends if that's the primary concern for a particular location or investigation.
+
+Content options allow customizing the level of detail included in the report. Administrators can check or uncheck boxes to include or exclude specific sections such as: Executive Summary (high-level overview of key findings), Statistical Analysis (mean, median, min, max, standard deviation for each parameter), Trend Charts (graphical visualization of parameter values over time), Threshold Violations (list of times when readings exceeded safe limits), Alert Summary (table of all alerts generated during the period), Device Status Overview (uptime percentages and connectivity statistics), Data Completeness Analysis (percentage of expected readings actually received), and Raw Data Appendix (complete tabular listing of all sensor readings).
+
+Once all configuration options are set, administrators click a "Generate Report" button to create the report. The system displays a progress indicator showing that the report is being generated. Behind the scenes, the system queries Firestore for sensor readings, alerts, and device information within the specified date range. It performs statistical calculations, generates charts using a charting library, and assembles all components into a structured document.
+
+Upon completion, the report is displayed in a preview panel where administrators can review it before downloading or sharing. The preview shows how the report will appear in its final format, allowing administrators to verify that all expected information is included and properly formatted.
+
+The download functionality provides multiple format options. The most common format is PDF, which preserves formatting, includes graphics and charts, and is suitable for printing or sharing with stakeholders. The PDF is generated using a library like jsPDF with the autoTable plugin. Alternatively, administrators can download reports as CSV (Comma-Separated Values) files, which include the raw tabular data without formatting or charts but are ideal for further analysis in spreadsheet applications.
+
+Generated reports can be automatically stored in Firebase Storage, with download URLs saved in Firestore. The Reports Page displays a "Report History" section listing all previously generated reports, showing the report title, type, date range covered, who generated it, when it was generated, file size, and a download button. This history allows administrators to quickly retrieve reports without regenerating them.
+
+Administrators can generate daily, weekly, or monthly reports that include overall system performance, sensor readings, and trend analysis. Some implementations include scheduled automated report generation, where specific reports are automatically generated on a recurring schedule and emailed to designated recipients.
+
+The Reports Page includes report sharing functionality. After generating a report, administrators can email it directly to specified recipients, generate a shareable link, or schedule automatic email distribution on a recurring basis.
+
+The interface is designed for ease of use with clear labels, helpful tooltips, logical grouping of related settings, and sensible default values. The page is fully responsive, working well on desktop computers and tablets.
+
+---
+
+## 12. Admin Settings Page
+
+**File Location**: `client/src/pages/admin/Settings.tsx` and `client/src/pages/admin/Settings/AlertConfiguration.tsx`  
+**Route**: `/admin/settings`  
+**Access**: Approved Admin users only
+
+The Admin Settings Page allows administrators to configure and adjust key parameters of the system, ensuring the platform operates according to organizational requirements and preferences. This page serves as the central configuration hub where all critical system settings can be modified including configuring MQTT broker credentials (HiveMQ connection), setting threshold values for safe water quality measurements, and managing email configurations for automated alert notifications. Admins can also customize department lists, device categories, and other general settings that ensure the flexibility and scalability of the platform across different operational environments.
+
+When administrators open the Settings Page, they see a tabbed or sectioned interface organizing different types of settings into logical groups. The main setting categories include Alert Configuration, MQTT Broker Configuration, Email Notification Settings, Department Management, User Interface Settings, and System Maintenance Options.
+
+**Alert Configuration and Threshold Settings**
+
+The Alert Configuration section is one of the most critical parts of the Settings Page, as it determines when the system generates alerts about water quality issues. For each water quality parameter—TDS (Total Dissolved Solids), pH level, and Turbidity—administrators can set multiple threshold levels.
+
+For TDS measurements, administrators configure a "Warning Maximum" (for example, 500 ppm) and "Critical Maximum" (for example, 1000 ppm). When TDS readings exceed the warning maximum but remain below the critical maximum, the system generates a "Warning" severity alert. When readings exceed the critical maximum, a "Critical" severity alert is generated.
+
+For pH measurements, administrators set both minimum and maximum thresholds. A warning minimum might be set to 6.0 and warning maximum to 8.5, representing the acceptable pH range. Critical minimum might be 5.5 and critical maximum 9.0, representing values requiring immediate attention.
+
+For Turbidity measurements (in NTU), administrators set warning and critical maximum thresholds. A warning maximum might be 5 NTU and critical maximum might be 10 NTU.
+
+The Alert Configuration section also includes settings for trend-based alerting. Administrators can enable or disable trend detection, which generates alerts when water quality parameters show concerning patterns even if they haven't exceeded absolute thresholds. Settings include the percentage change that triggers a trend alert, the time window used for trend calculation, and whether trends should be calculated for increasing values only, decreasing values only, or both directions.
+
+Alert suppression settings help prevent alert fatigue by controlling how frequently alerts are generated for the same issue. Administrators can configure a "quiet period" after an alert is generated, during which additional alerts for the same parameter on the same device are suppressed.
+
+**MQTT Broker Configuration**
+
+This section includes configuring MQTT broker credentials (HiveMQ connection) that enable the system to communicate with IoT devices through the MQTT protocol. Administrators enter the MQTT broker hostname or IP address (such as broker.hivemq.com), the port number (typically 1883 for unencrypted MQTT or 8883 for MQTT over TLS), and authentication credentials if the broker requires them.
+
+Additional MQTT settings might include the topic structure that devices use to publish sensor data, Quality of Service (QoS) levels for message delivery, and connection timeout and keep-alive interval settings.
+
+The Settings Page may include a "Test Connection" button that allows administrators to verify that the entered MQTT configuration is correct and the system can successfully connect to the MQTT broker.
+
+**Email Notification Settings**
+
+Administrators can customize email configurations for automated alert notifications in this section. Settings include the sender email address, SMTP server configuration, and authentication credentials for the email account.
+
+Email notification preferences allow administrators to configure when emails should be sent. Settings include toggles to enable or disable immediate email notifications for Critical alerts, Warning alerts, and Advisory alerts separately. The time for daily alert summary emails can be configured, as well as the day of the week for weekly summaries and the day of the month for monthly summaries.
+
+Recipient management settings allow administrators to configure who receives different types of notifications. A default recipient list might include all users with Admin or Staff roles, but administrators can create custom distribution lists for specific alert types or device locations.
+
+**Department Management**
+
+This section allows administrators to customize department lists that appear throughout the system. When users complete their profile during the Account Completion process, they select their department from a dropdown list. This section allows administrators to add new departments, edit existing department names, reorder departments in the dropdown list, or deactivate departments that are no longer relevant.
+
+**User Interface Settings**
+
+UI customization options allow administrators to adjust the appearance and behavior of the system. Settings might include the default theme (light mode or dark mode), the organization name and logo displayed on the login page, and custom color schemes if supported.
+
+**Saving and Applying Settings**
+
+The Settings Page includes a "Save Changes" or "Apply Settings" button that applies all modified settings. When administrators modify settings, the interface displays a visual indicator showing "Unsaved Changes" to prevent accidentally navigating away before saving.
+
+Upon clicking save, the system updates the corresponding configuration documents in Firestore. A success message confirms that settings have been saved and applied. Some settings take effect immediately throughout the system, while others might require restarting certain services.
+
+The Settings Page includes proper validation to prevent administrators from entering invalid configuration values. Clear error messages appear next to problematic fields explaining what needs to be corrected.
+
+The Settings Page maintains an audit log of configuration changes, recording what settings were modified, what the previous and new values are, which administrator made the change, and when the change occurred.
+
+The interface is fully responsive and includes comprehensive help documentation explaining each section's purpose. Error messages are clear and actionable, guiding administrators toward successful resolution of any issues encountered.
+
+---
+
+## 13. Admin Data Management Page
+
+**File Location**: `client/src/pages/admin/DataManagement/DataManagement.tsx`  
+**Route**: `/admin/data-management`  
+**Access**: Approved Admin users only
+
+The Admin Data Management Page provides administrators with tools to manage, maintain, and organize the system's data. This page serves as a centralized hub for data-related administrative tasks including bulk data operations, data quality maintenance, data archival and cleanup, data import and export, and overall database health monitoring.
+
+When administrators access the Data Management Page, they see several sections organized by data type and operation category. The main sections typically include Sensor Data Management, Alert Data Management, System Logs and Audit Trails, Data Export and Backup, Data Import, and Database Statistics and Health.
+
+**Sensor Data Management**
+
+This section provides tools for managing the large volume of sensor readings stored in the system. A data summary dashboard displays statistics about sensor data storage, including the total number of sensor readings in the database, the earliest and most recent reading timestamps, total data size, readings per device breakdown, and the data growth rate.
+
+Data retention and archival tools allow administrators to identify old sensor data that should be archived or removed to improve database performance and reduce storage costs. Administrators can search for readings older than a specified date, preview how many records would be affected, and execute bulk operations to either export these old readings to a backup file before deletion, move them to cold storage, or permanently delete them if they're no longer needed.
+
+Data quality monitoring identifies potential issues with sensor data, such as devices with gaps in their reading history, readings with impossible values, duplicate readings, or readings from deleted devices. Administrators can review these data quality issues and take corrective actions.
+
+**Alert Data Management**
+
+This section provides tools for managing the alerts stored in the system. Alert statistics show the total number of alerts in each status, alerts broken down by severity level, alerts per device, and alert resolution times.
+
+Bulk alert operations allow administrators to select multiple alerts based on criteria and perform batch operations such as bulk-resolving old alerts, exporting alerts for analysis, or archiving resolved alerts older than a certain date.
+
+**System Logs and Audit Trails**
+
+This section provides access to various system logs that track activities, errors, and security-relevant events. User activity logs show who logged in, what actions they performed, and any errors encountered. Administrative action logs track actions that modify system configuration or data. System error logs record technical errors and exceptions.
+
+Administrators can filter and search logs using various criteria, view detailed information about each log entry, and export logs to files for offline analysis or archival.
+
+**Data Export and Backup**
+
+This section provides comprehensive data export capabilities. Administrators can perform full system data exports, creating complete backups of all users, devices, sensor readings, alerts, reports, and settings. These exports can be scheduled to run automatically on a regular basis or triggered manually on demand.
+
+Export format options include JSON for complete data preservation, CSV for tabular data, and SQL database dumps for directly restoring to a database server. Backup management tools show a list of all backups that have been created, and administrators can download backups, verify backup integrity, restore data from a backup, and delete old backups.
+
+**Data Import**
+
+This section allows administrators to import data into the system from external sources. This might be used when migrating from another system, bulk-loading historical data, or importing configuration information from spreadsheets.
+
+Import format support includes CSV files with predefined column structures and JSON files matching the system's data schema. The import process includes data validation, checking that imported records have all required fields and correct formats.
+
+Import preview functionality allows administrators to review what data will be imported before committing the changes. After import completion, a summary report shows how many records were successfully imported and detailed error logs for any failed records.
+
+**Database Statistics and Health**
+
+This section provides insights into overall database health, performance metrics, and storage utilization. Statistics include total database size, number of documents in each collection, recent query performance metrics, and index usage statistics.
+
+Database health checks automatically identify potential issues such as collections growing unusually fast, orphaned records, missing indexes, or storage approaching configured limits. Each identified issue includes a description, its potential impact, and recommended actions.
+
+The Data Management Page includes comprehensive security controls ensuring that only authorized administrators can perform potentially dangerous operations. Critical operations require confirmation dialogs, and all major data management actions are logged to the audit trail.
+
+The interface is designed with safeguards against accidental data loss. Before performing deletions, the system automatically creates backup snapshots. Preview and dry-run modes allow administrators to see what would happen without actually modifying data.
+
