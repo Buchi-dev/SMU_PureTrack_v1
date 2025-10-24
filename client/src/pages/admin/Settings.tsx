@@ -1,7 +1,8 @@
 import { AdminLayout } from '../../components/layouts';
 import { Card, Typography, Space, Tabs } from 'antd';
-import { SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined, BellOutlined, SafetyOutlined, LockOutlined, ControlOutlined } from '@ant-design/icons';
 import AlertConfiguration from './Settings/AlertConfiguration';
+import NotificationSettings from './Settings/NotificationSettings';
 
 const { Title, Paragraph } = Typography;
 const { TabPane } = Tabs;
@@ -20,8 +21,8 @@ const Settings = () => {
         </div>
 
         <Card>
-          <Tabs defaultActiveKey="general">
-            <TabPane tab="General" key="general">
+          <Tabs defaultActiveKey="notifications">
+            <TabPane tab={<span><ControlOutlined /> General</span>} key="general">
               <div style={{ padding: '20px' }}>
                 <Title level={4}>General Settings</Title>
                 <Paragraph type="secondary">
@@ -29,24 +30,19 @@ const Settings = () => {
                 </Paragraph>
               </div>
             </TabPane>
-            <TabPane tab="Alerts" key="alerts">
+            <TabPane tab={<span><SafetyOutlined /> Alerts</span>} key="alerts">
               <div style={{ padding: '20px' }}>
                 <AlertConfiguration />
               </div>
             </TabPane>
-            <TabPane tab="Security" key="security">
+            <TabPane tab={<span><BellOutlined /> Notifications</span>} key="notifications">
+              <NotificationSettings />
+            </TabPane>
+            <TabPane tab={<span><LockOutlined /> Security</span>} key="security">
               <div style={{ padding: '20px' }}>
                 <Title level={4}>Security Settings</Title>
                 <Paragraph type="secondary">
                   Security settings configuration coming soon...
-                </Paragraph>
-              </div>
-            </TabPane>
-            <TabPane tab="Notifications" key="notifications">
-              <div style={{ padding: '20px' }}>
-                <Title level={4}>Notification Settings</Title>
-                <Paragraph type="secondary">
-                  Notification settings configuration coming soon...
                 </Paragraph>
               </div>
             </TabPane>

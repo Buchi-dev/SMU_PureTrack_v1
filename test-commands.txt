@@ -1,0 +1,50 @@
+# Email Alert Testing Commands for hed-tjyuzon@smu.edu.ph
+
+# ============================================
+# STEP 1: Check existing notification preferences
+# ============================================
+curl -X GET "https://us-central1-my-app-da530.cloudfunctions.net/listNotificationPreferences"
+
+# PowerShell version:
+Invoke-RestMethod -Uri "https://us-central1-my-app-da530.cloudfunctions.net/listNotificationPreferences" -Method GET
+
+# ============================================
+# STEP 2: Create notification preference for your email
+# ============================================
+curl -X POST "https://us-central1-my-app-da530.cloudfunctions.net/setupNotificationPreferences" -H "Content-Type: application/json" -d "{\"userId\": \"admin-hed-tjyuzon\", \"email\": \"hed-tjyuzon@smu.edu.ph\"}"
+
+# PowerShell version:
+$body = @{
+    userId = "admin-hed-tjyuzon"
+    email = "hed-tjyuzon@smu.edu.ph"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "https://us-central1-my-app-da530.cloudfunctions.net/setupNotificationPreferences" -Method POST -ContentType "application/json" -Body $body
+
+# ============================================
+# STEP 3: Send test alert directly to your email
+# ============================================
+curl -X POST "https://us-central1-my-app-da530.cloudfunctions.net/testAlertNotification" -H "Content-Type: application/json" -d "{\"userEmail\": \"hed-tjyuzon@smu.edu.ph\", \"severity\": \"Critical\", \"parameter\": \"ph\"}"
+
+# PowerShell version:
+$testBody = @{
+    userEmail = "hed-tjyuzon@smu.edu.ph"
+    severity = "Critical"
+    parameter = "ph"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "https://us-central1-my-app-da530.cloudfunctions.net/testAlertNotification" -Method POST -ContentType "application/json" -Body $testBody
+
+# ============================================
+# STEP 4: Send test alert using notification preferences
+# (Only after STEP 2 is complete)
+# ============================================
+curl -X POST "https://us-central1-my-app-da530.cloudfunctions.net/testAlertNotification" -H "Content-Type: application/json" -d "{\"severity\": \"Warning\", \"parameter\": \"tds\"}"
+
+# PowerShell version:
+$testBody2 = @{
+    severity = "Warning"
+    parameter = "tds"
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "https://us-central1-my-app-da530.cloudfunctions.net/testAlertNotification" -Method POST -ContentType "application/json" -Body $testBody2
