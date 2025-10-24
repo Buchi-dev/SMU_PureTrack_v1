@@ -10,7 +10,7 @@ import { Form, Input, Button, Card, Typography, Space, Alert, message, Divider, 
 import { PhoneOutlined, BankOutlined, UserOutlined } from "@ant-design/icons";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../core/config/firebase.config";
 
 const { Title, Text } = Typography;
 

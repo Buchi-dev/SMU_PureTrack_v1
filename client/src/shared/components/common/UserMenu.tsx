@@ -13,8 +13,8 @@ import {
   SettingOutlined,
   IdcardOutlined,
 } from "@ant-design/icons";
-import { useAuth } from "../contexts/AuthContext";
-import { logout, getUserDisplayName, getUserInitials, getStatusColor } from "../utils/authUtils";
+import { useAuth } from "../../../core/providers/AuthContext";
+import { logout, getUserDisplayName, getUserInitials, getStatusColor } from "../../utils/auth.utils";
 
 const { Text } = Typography;
 

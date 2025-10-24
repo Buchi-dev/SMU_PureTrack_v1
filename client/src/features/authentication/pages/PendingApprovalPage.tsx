@@ -16,7 +16,7 @@ import {
 } from "@ant-design/icons";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../core/config/firebase.config";
 
 const { Title, Text } = Typography;
 

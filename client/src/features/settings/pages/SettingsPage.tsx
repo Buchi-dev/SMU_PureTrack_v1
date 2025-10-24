@@ -1,8 +1,8 @@
-import { AdminLayout } from '../../components/layouts';
+import { AdminLayout } from '../../../shared/components/layouts';
 import { Card, Typography, Space, Tabs } from 'antd';
 import { SettingOutlined, BellOutlined, SafetyOutlined, LockOutlined, ControlOutlined } from '@ant-design/icons';
-import AlertConfiguration from './Settings/AlertConfiguration';
-import NotificationSettings from './Settings/NotificationSettings';
+import AlertConfiguration from '../../alerts/components/ThresholdConfiguration';
+import NotificationSettings from '../../alerts/components/NotificationSettings';
 
 const { Title, Paragraph } = Typography;
 const { TabPane } = Tabs;

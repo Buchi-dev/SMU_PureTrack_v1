@@ -4,7 +4,7 @@
  */
 
 import { signOut } from "firebase/auth";
-import { auth } from "../config/firebase";
+import { auth } from "../../core/config/firebase.config";
 
 /**
  * Sign out the current user

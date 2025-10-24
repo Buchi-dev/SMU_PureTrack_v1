@@ -21,9 +21,9 @@ import {
   ApiOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
-import { ROUTES } from '../../router';
-import UserMenu from '../UserMenu';
-import AlertNotificationCenter from '../AlertNotificationCenter';
+import { ROUTES } from '../../../core/router/routes';
+import UserMenu from '../common/UserMenu';
+import AlertNotificationCenter from '../feedback/AlertNotificationCenter';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;

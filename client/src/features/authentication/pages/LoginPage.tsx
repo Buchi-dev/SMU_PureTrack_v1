@@ -10,7 +10,7 @@ import { Button, Card, Alert, Typography, Space, theme } from "antd";
 import { GoogleOutlined, LoadingOutlined } from "@ant-design/icons";
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../core/config/firebase.config";
 
 const { Title, Text } = Typography;
 

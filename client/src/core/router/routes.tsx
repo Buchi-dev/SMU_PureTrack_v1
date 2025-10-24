@@ -256,7 +256,7 @@ export const router = createBrowserRouter([
     path: '/dashboard',
     element: (
       <ApprovedRoute>
-        <StaffDashboard />
+        <StaffDashboardPage />
       </ApprovedRoute>
     ),
   },

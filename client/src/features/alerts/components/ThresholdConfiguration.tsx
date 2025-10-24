@@ -24,7 +24,7 @@ import {
   SaveOutlined,
 } from '@ant-design/icons';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { db } from '../../../core/config/firebase.config';
 import { DEFAULT_THRESHOLDS } from '../../../types/alerts';
 import type { AlertThresholds, NotificationPreferences } from '../../../types/alerts';
 

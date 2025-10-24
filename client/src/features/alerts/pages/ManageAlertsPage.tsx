@@ -38,7 +38,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { collection, query, orderBy, getDocs, doc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { db } from '../../../core/config/firebase.config';
 import type {
   WaterQualityAlert,
   AlertSeverity,

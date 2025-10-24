@@ -37,7 +37,7 @@ import {
   CalendarOutlined,
 } from '@ant-design/icons';
 import { collection, query, getDocs, doc, updateDoc, orderBy, Timestamp } from 'firebase/firestore';
-import { db } from '../../../config/firebase';
+import { db } from '../../../core/config/firebase.config';
 import type { UserProfile, UserStatus, UserRole } from '../../../contexts';
 import type { ColumnsType } from 'antd/es/table';
 

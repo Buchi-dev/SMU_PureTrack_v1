@@ -4,7 +4,7 @@
  */
 
 import { CheckCircleOutlined, WarningOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { useThemeToken } from '../theme';
+import { useThemeToken } from '../../../core/config';
 
 interface StatusIconProps {
   status: 'good' | 'warning' | 'critical';

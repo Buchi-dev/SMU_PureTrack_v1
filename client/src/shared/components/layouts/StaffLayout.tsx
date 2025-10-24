@@ -20,8 +20,8 @@ import {
   ApiOutlined,
   LineChartOutlined,
 } from '@ant-design/icons';
-import { ROUTES } from '../../router';
-import UserMenu from '../UserMenu';
+import { ROUTES } from '../../../core/router/routes';
+import UserMenu from '../common/UserMenu';
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text } = Typography;

@@ -36,9 +36,9 @@ import { api } from '../../../services/api';
 import type { Device, DeviceStatus } from '../../../schemas';
 import { isDeviceRegistered } from '../../../schemas';
 import { AdminLayout } from '../../../components/layouts';
-import { AddEditDeviceModal } from './AddEditDeviceModal';
-import { ViewDeviceModal } from './ViewDeviceModal';
-import { RegisterDeviceModal } from './RegisterDeviceModal';
+import { AddEditDeviceModal } from '../components/AddEditDeviceModal';
+import { ViewDeviceModal } from '../components/ViewDeviceModal';
+import { RegisterDeviceModal } from '../components/RegisterDeviceModal';
 import type { ReactNode } from 'react';
 import { useThemeToken } from '../../../theme';
 
