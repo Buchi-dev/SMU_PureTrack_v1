@@ -1,8 +1,7 @@
 import { RouterProvider } from 'react-router-dom';
-import { router } from './router';
-import { AuthProvider } from './contexts/AuthContext';
-import { useResponsiveTheme } from './theme';
-import { themeConfig } from './theme/themeConfig';
+import { router } from './core/router/routes';
+import { AuthProvider } from './core/providers/AuthContext';
+import { useResponsiveTheme, themeConfig } from './core/config';
 import { ConfigProvider } from 'antd';
 import './App.css';
 

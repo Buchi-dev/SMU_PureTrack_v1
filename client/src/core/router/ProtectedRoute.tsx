@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { Spin, Result, Button } from "antd";
 import { LoadingOutlined, LockOutlined } from "@ant-design/icons";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../providers/AuthContext";
 
 /**
  * Loading Spinner Component

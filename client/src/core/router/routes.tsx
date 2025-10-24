@@ -3,28 +3,47 @@ import { Result, Button, theme } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 
 // Protected Route Components
-import { PublicRoute, ApprovedRoute, AdminRoute } from '../components/ProtectedRoute';
-import { RootRedirect } from '../components/RootRedirect';
+import { PublicRoute, ApprovedRoute, AdminRoute } from './ProtectedRoute';
+import { RootRedirect } from './RootRedirect';
 
-// Admin Pages
-import AdminDashboard from '../pages/admin/AdminDashboard';
-import { DeviceManagement } from '../pages/admin/DeviceManagement';
-import { DeviceReadings } from '../pages/admin/DeviceReadings';
-import { DataManagement } from '../pages/admin/DataManagement';
-import { ManageReports } from '../pages/admin/ManageReports';
-import ManageAlerts from '../pages/admin/ManageAlerts';
-import Analytics from '../pages/admin/Analytics/Analytics';
-import UserManagement from '../pages/admin/UserManagement/UserManagement';
-import Settings from '../pages/admin/Settings';
+// Authentication Pages
+import {
+  LoginPage,
+  AccountCompletionPage,
+  PendingApprovalPage,
+  AccountInactivePage,
+} from '../../features/authentication';
 
-// Staff Pages
-import { StaffDashboard, StaffDevices, StaffReadings, StaffAnalytics } from '../pages/staff';
+// Dashboard Pages
+import {
+  AdminDashboardPage,
+  StaffDashboardPage,
+  StaffDevicesPage,
+  StaffReadingsPage,
+} from '../../features/dashboard';
 
-// Auth Pages
-import GoogleAuth from '../pages/auth/GoogleAuth';
-import AccountCompletion from '../pages/auth/AccountCompletion';
-import PendingApproval from '../pages/auth/PendingApproval';
-import AccountInactive from '../pages/auth/AccountInactive';
+// Device Management Pages
+import { DeviceManagementPage } from '../../features/device-management';
+
+// Device Readings Pages  
+import DataManagementPage from '../../features/device-readings/pages/DataManagementPage';
+import DeviceReadingsPage from '../../features/device-readings/pages/DeviceReadingsPage';
+
+// Alerts Pages
+import ManageAlertsPage from '../../features/alerts/pages/ManageAlertsPage';
+
+// Analytics Pages
+import AdminAnalyticsPage from '../../features/analytics/pages/AdminAnalyticsPage';
+import StaffAnalyticsPage from '../../features/analytics/pages/StaffAnalyticsPage';
+
+// Reports Pages
+import { ManageReportsPage } from '../../features/reports';
+
+// User Management Pages
+import UserManagementPage from '../../features/user-management/pages/UserManagementPage';
+
+// Settings Pages
+import SettingsPage from '../../features/settings/pages/SettingsPage';
 
 /**
  * 404 Not Found Component with Theme Support
@@ -81,21 +100,21 @@ export const router = createBrowserRouter([
     path: '/auth/login',
     element: (
       <PublicRoute>
-        <GoogleAuth />
+        <LoginPage />
       </PublicRoute>
     ),
   },
   {
     path: '/auth/complete-account',
-    element: <AccountCompletion />,
+    element: <AccountCompletionPage />,
   },
   {
     path: '/auth/pending-approval',
-    element: <PendingApproval />,
+    element: <PendingApprovalPage />,
   },
   {
     path: '/auth/account-inactive',
-    element: <AccountInactive />,
+    element: <AccountInactivePage />,
   },
 
   // ==================== ADMIN ROUTES ====================
@@ -108,7 +127,7 @@ export const router = createBrowserRouter([
     path: '/admin/dashboard',
     element: (
       <AdminRoute>
-        <AdminDashboard />
+        <AdminDashboardPage />
       </AdminRoute>
     ),
   },
@@ -116,7 +135,7 @@ export const router = createBrowserRouter([
     path: '/admin/devices',
     element: (
       <AdminRoute>
-        <DeviceManagement />
+        <DeviceManagementPage />
       </AdminRoute>
     ),
   },
@@ -124,7 +143,7 @@ export const router = createBrowserRouter([
     path: '/admin/devices/:deviceId/readings',
     element: (
       <AdminRoute>
-        <DeviceReadings />
+        <DeviceReadingsPage />
       </AdminRoute>
     ),
   },
@@ -132,7 +151,7 @@ export const router = createBrowserRouter([
     path: '/admin/readings',
     element: (
       <AdminRoute>
-        <DeviceReadings />
+        <DeviceReadingsPage />
       </AdminRoute>
     ),
   },
@@ -140,7 +159,7 @@ export const router = createBrowserRouter([
     path: '/admin/data',
     element: (
       <AdminRoute>
-        <DataManagement />
+        <DataManagementPage />
       </AdminRoute>
     ),
   },
@@ -148,7 +167,7 @@ export const router = createBrowserRouter([
     path: '/admin/analytics',
     element: (
       <AdminRoute>
-        <Analytics />
+        <AdminAnalyticsPage />
       </AdminRoute>
     ),
   },
@@ -156,7 +175,7 @@ export const router = createBrowserRouter([
     path: '/admin/users',
     element: (
       <AdminRoute>
-        <UserManagement />
+        <UserManagementPage />
       </AdminRoute>
     ),
   },
@@ -164,7 +183,7 @@ export const router = createBrowserRouter([
     path: '/admin/reports',
     element: (
       <AdminRoute>
-        <ManageReports />
+        <ManageReportsPage />
       </AdminRoute>
     ),
   },
@@ -172,7 +191,7 @@ export const router = createBrowserRouter([
     path: '/admin/alerts',
     element: (
       <AdminRoute>
-        <ManageAlerts />
+        <ManageAlertsPage />
       </AdminRoute>
     ),
   },
@@ -180,7 +199,7 @@ export const router = createBrowserRouter([
     path: '/admin/settings',
     element: (
       <AdminRoute>
-        <Settings />
+        <SettingsPage />
       </AdminRoute>
     ),
   },
@@ -195,7 +214,7 @@ export const router = createBrowserRouter([
     path: '/staff/dashboard',
     element: (
       <ApprovedRoute>
-        <StaffDashboard />
+        <StaffDashboardPage />
       </ApprovedRoute>
     ),
   },
@@ -203,7 +222,7 @@ export const router = createBrowserRouter([
     path: '/staff/devices',
     element: (
       <ApprovedRoute>
-        <StaffDevices />
+        <StaffDevicesPage />
       </ApprovedRoute>
     ),
   },
@@ -211,7 +230,7 @@ export const router = createBrowserRouter([
     path: '/staff/devices/:deviceId/readings',
     element: (
       <ApprovedRoute>
-        <StaffReadings />
+        <StaffReadingsPage />
       </ApprovedRoute>
     ),
   },
@@ -219,7 +238,7 @@ export const router = createBrowserRouter([
     path: '/staff/readings',
     element: (
       <ApprovedRoute>
-        <StaffReadings />
+        <StaffReadingsPage />
       </ApprovedRoute>
     ),
   },
@@ -227,7 +246,7 @@ export const router = createBrowserRouter([
     path: '/staff/analytics',
     element: (
       <ApprovedRoute>
-        <StaffAnalytics />
+        <StaffAnalyticsPage />
       </ApprovedRoute>
     ),
   },
