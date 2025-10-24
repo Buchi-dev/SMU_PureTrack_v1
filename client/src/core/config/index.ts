@@ -18,7 +18,3 @@ export {
   getResponsiveSiderProps,
   mediaQueries,
 } from './responsiveTheme';
-
-// Responsive Theme Examples
-export { default as ResponsiveThemeExamples } from './ResponsiveThemeExample';
-
