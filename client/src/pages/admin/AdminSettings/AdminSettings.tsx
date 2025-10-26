@@ -1,54 +1,26 @@
 import { AdminLayout } from '../../../components/layouts';
-import { Card, Typography, Space, Tabs } from 'antd';
-import { SettingOutlined, BellOutlined, SafetyOutlined, LockOutlined, ControlOutlined } from '@ant-design/icons';
-import AlertConfiguration from './AlertConfiguration';
+import { Typography } from 'antd';
+import { BellOutlined } from '@ant-design/icons';
 import NotificationSettings from './NotificationSettings';
 
 const { Title, Paragraph } = Typography;
-const { TabPane } = Tabs;
 
 export const AdminSettings = () => {
   return (
     <AdminLayout>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <div>
-          <Title level={2}>
-            <SettingOutlined /> Settings
+      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <Title level={2} style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <BellOutlined style={{ color: '#1890ff' }} />
+            Notification Settings
           </Title>
-          <Paragraph type="secondary">
-            Configure system settings and preferences
+          <Paragraph type="secondary" style={{ fontSize: '16px', marginBottom: 0 }}>
+            Manage your notification preferences and alerts for water quality monitoring
           </Paragraph>
         </div>
 
-        <Card>
-          <Tabs defaultActiveKey="notifications">
-            <TabPane tab={<span><ControlOutlined /> General</span>} key="general">
-              <div style={{ padding: '20px' }}>
-                <Title level={4}>General Settings</Title>
-                <Paragraph type="secondary">
-                  General settings configuration coming soon...
-                </Paragraph>
-              </div>
-            </TabPane>
-            <TabPane tab={<span><SafetyOutlined /> Alerts</span>} key="alerts">
-              <div style={{ padding: '20px' }}>
-                <AlertConfiguration />
-              </div>
-            </TabPane>
-            <TabPane tab={<span><BellOutlined /> Notifications</span>} key="notifications">
-              <NotificationSettings />
-            </TabPane>
-            <TabPane tab={<span><LockOutlined /> Security</span>} key="security">
-              <div style={{ padding: '20px' }}>
-                <Title level={4}>Security Settings</Title>
-                <Paragraph type="secondary">
-                  Security settings configuration coming soon...
-                </Paragraph>
-              </div>
-            </TabPane>
-          </Tabs>
-        </Card>
-      </Space>
+        <NotificationSettings />
+      </div>
     </AdminLayout>
   );
 };
