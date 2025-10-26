@@ -12,7 +12,7 @@ import {
   Col,
   Statistic,
   message,
-  Spin,
+  Skeleton,
 } from 'antd';
 import {
   ApiOutlined,
@@ -221,12 +221,6 @@ export const StaffDevices = () => {
 
   return (
     <StaffLayout>
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin size="large" />
-          <p>Loading devices...</p>
-        </div>
-      ) : (
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
         <div>
@@ -238,6 +232,38 @@ export const StaffDevices = () => {
           </Text>
         </div>
 
+        {loading ? (
+          <>
+            {/* Statistics Skeleton */}
+            <Row gutter={[16, 16]}>
+              {[1, 2, 3, 4].map((i) => (
+                <Col xs={24} sm={12} lg={6} key={i}>
+                  <Card>
+                    <Skeleton active paragraph={{ rows: 1 }} />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+
+            {/* Filters Skeleton */}
+            <Card>
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Skeleton.Input active style={{ width: '100%' }} />
+                </Col>
+                <Col xs={24} md={8}>
+                  <Skeleton.Input active style={{ width: '100%' }} />
+                </Col>
+              </Row>
+            </Card>
+
+            {/* Table Skeleton */}
+            <Card>
+              <Skeleton active paragraph={{ rows: 8 }} />
+            </Card>
+          </>
+        ) : (
+          <>
         {/* Statistics */}
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}>
@@ -325,8 +351,9 @@ export const StaffDevices = () => {
             }}
           />
         </Card>
+        </>
+        )}
       </Space>
-      )}
     </StaffLayout>
   );
 };

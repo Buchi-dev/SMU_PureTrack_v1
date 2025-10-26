@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Space, Statistic, Spin, message } from 'antd';
+import { Card, Typography, Row, Col, Space, Statistic, Skeleton, message } from 'antd';
 import {
   BarChartOutlined,
   RiseOutlined,
@@ -115,10 +115,40 @@ export const StaffAnalytics = () => {
   if (loading) {
     return (
       <StaffLayout>
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin size="large" />
-          <p>Loading analytics...</p>
-        </div>
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          {/* Header Skeleton */}
+          <div>
+            <Skeleton.Input active style={{ width: 250, height: 32 }} />
+            <div style={{ marginTop: 8 }}>
+              <Skeleton.Input active style={{ width: 400, height: 20 }} />
+            </div>
+          </div>
+
+          {/* Summary Statistics Skeleton */}
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Col xs={24} sm={12} lg={8} key={i}>
+                <Card>
+                  <Skeleton active paragraph={{ rows: 1 }} />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+
+          {/* Charts Skeleton */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title={<Skeleton.Input active style={{ width: 200 }} />}>
+                <Skeleton active paragraph={{ rows: 6 }} />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title={<Skeleton.Input active style={{ width: 200 }} />}>
+                <Skeleton active paragraph={{ rows: 6 }} />
+              </Card>
+            </Col>
+          </Row>
+        </Space>
       </StaffLayout>
     );
   }

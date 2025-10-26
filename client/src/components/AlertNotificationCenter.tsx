@@ -22,7 +22,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 // --- Inlined alert types & helpers (copied from src/types/alerts.ts) ---

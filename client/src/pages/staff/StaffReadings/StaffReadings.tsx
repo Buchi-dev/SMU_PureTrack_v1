@@ -13,7 +13,7 @@ import {
   Statistic,
   Alert,
   message,
-  Spin,
+  Skeleton,
 } from 'antd';
 import {
   LineChartOutlined,
@@ -227,12 +227,6 @@ export const StaffReadings = () => {
 
   return (
     <StaffLayout>
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <Spin size="large" />
-          <p>Loading sensor readings...</p>
-        </div>
-      ) : (
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
         <div>
@@ -244,6 +238,36 @@ export const StaffReadings = () => {
           </Text>
         </div>
 
+        {loading ? (
+          <>
+            {/* Alert Skeleton */}
+            <Card>
+              <Skeleton active paragraph={{ rows: 1 }} />
+            </Card>
+
+            {/* Statistics Skeleton */}
+            <Row gutter={[16, 16]}>
+              {[1, 2, 3, 4].map((i) => (
+                <Col xs={24} sm={12} lg={6} key={i}>
+                  <Card>
+                    <Skeleton active paragraph={{ rows: 1 }} />
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+
+            {/* Filters Skeleton */}
+            <Card>
+              <Skeleton active paragraph={{ rows: 2 }} />
+            </Card>
+
+            {/* Table Skeleton */}
+            <Card>
+              <Skeleton active paragraph={{ rows: 8 }} />
+            </Card>
+          </>
+        ) : (
+          <>
         {/* Alerts */}
         {stats.critical > 0 && (
           <Alert
@@ -385,8 +409,9 @@ export const StaffReadings = () => {
             }}
           />
         </Card>
+        </>
+        )}
       </Space>
-      )}
     </StaffLayout>
   );
 };

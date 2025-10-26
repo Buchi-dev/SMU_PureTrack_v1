@@ -5,25 +5,24 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Layout,
   Menu,
-  Button,
-  Badge,
   theme,
   Typography,
+  Space,
+  Breadcrumb,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   DashboardOutlined,
-  BellOutlined,
   BarChartOutlined,
   ApiOutlined,
   LineChartOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { ROUTES } from '../../router';
 import UserMenu from '../UserMenu';
+import AlertNotificationCenter from '../AlertNotificationCenter';
 
-const { Header, Sider, Content, Footer } = Layout;
+const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
 
 interface StaffLayoutProps {
@@ -31,21 +30,12 @@ interface StaffLayoutProps {
 }
 
 export const StaffLayout = ({ children }: StaffLayoutProps) => {
-  const [collapsed, setCollapsed] = useState(() => {
-    const saved = localStorage.getItem('staffSidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
   const [selectedKeys, setSelectedKeys] = useState<string[]>(['dashboard']);
   const navigate = useNavigate();
   const location = useLocation();
   const {
-    token: { colorBgContainer, borderRadiusLG },
+    token: { colorBgContainer, colorPrimary },
   } = theme.useToken();
-
-  // Persist collapsed state to localStorage
-  useEffect(() => {
-    localStorage.setItem('staffSidebarCollapsed', JSON.stringify(collapsed));
-  }, [collapsed]);
 
   // Update selected menu item based on current route
   useEffect(() => {
@@ -61,26 +51,26 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
     }
   }, [location.pathname]);
 
-  // Sidebar menu items for staff (limited access)
+  // Header menu items for staff
   const menuItems: MenuProps['items'] = [
     {
       key: 'dashboard',
-      icon: <DashboardOutlined />,
+      icon: <DashboardOutlined style={{ fontSize: '16px' }} />,
       label: 'Dashboard',
     },
     {
       key: 'devices',
-      icon: <ApiOutlined />,
-      label: 'View Devices',
+      icon: <ApiOutlined style={{ fontSize: '16px' }} />,
+      label: 'Devices',
     },
     {
       key: 'readings',
-      icon: <LineChartOutlined />,
+      icon: <LineChartOutlined style={{ fontSize: '16px' }} />,
       label: 'Sensor Data',
     },
     {
       key: 'analytics',
-      icon: <BarChartOutlined />,
+      icon: <BarChartOutlined style={{ fontSize: '16px' }} />,
       label: 'Analytics',
     },
   ];
@@ -100,132 +90,169 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
     }
   };
 
+  // Generate breadcrumb items
+  const getBreadcrumbItems = () => {
+    const path = location.pathname;
+    const items: { title: string | React.ReactNode }[] = [
+      {
+        title: (
+          <Space>
+            <HomeOutlined />
+            <span>Staff Portal</span>
+          </Space>
+        ),
+      },
+    ];
+
+    if (path.includes('/staff/devices')) {
+      items.push({ title: 'Devices' });
+    } else if (path.includes('/staff/readings')) {
+      items.push({ title: 'Sensor Data' });
+    } else if (path.includes('/staff/analytics')) {
+      items.push({ title: 'Analytics' });
+    } else if (path.includes('/staff/dashboard')) {
+      items.push({ title: 'Dashboard' });
+    }
+
+    return items;
+  };
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        breakpoint="lg"
-        onBreakpoint={(broken) => {
-          console.log('Breakpoint:', broken);
-        }}
+    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+      {/* Main Header with Navigation */}
+      <Header
         style={{
-          overflow: 'auto',
-          height: '100vh',
-          position: 'fixed',
-          left: 0,
+          padding: '0 32px',
+          background: colorBgContainer,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          position: 'sticky',
           top: 0,
-          bottom: 0,
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          borderBottom: `1px solid ${colorPrimary}15`,
         }}
       >
-        {/* Logo */}
-        <div
-          style={{
-            height: 64,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-            gap: '12px',
-          }}
-        >
-          <img 
-            src="/system_logo.svg" 
-            alt="PureTrack Logo" 
-            style={{ 
-              width: collapsed ? 32 : 40,
-              height: collapsed ? 32 : 40,
-              transition: 'all 0.2s',
-            }} 
-          />
-          {!collapsed && (
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-              <Text strong style={{ color: '#fff', fontSize: '16px' }}>
+        {/* Left side - Logo and Navigation */}
+        <Space size="large" style={{ flex: 1 }}>
+          {/* Logo and Branding */}
+          <div
+            onClick={() => navigate(ROUTES.STAFF.DASHBOARD)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              cursor: 'pointer',
+              paddingRight: '24px',
+              borderRight: '1px solid #f0f0f0',
+            }}
+          >
+            <img 
+              src="/system_logo.svg" 
+              alt="PureTrack Logo" 
+              style={{ 
+                width: 36,
+                height: 36,
+              }} 
+            />
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+              <Text 
+                strong 
+                style={{ 
+                  fontSize: '18px',
+                  color: colorPrimary,
+                  fontWeight: 600,
+                }}
+              >
                 PureTrack
               </Text>
-              <Text style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '12px' }}>
+              <Text 
+                style={{ 
+                  fontSize: '12px',
+                  color: '#8c8c8c',
+                }}
+              >
                 Staff Portal
               </Text>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Menu */}
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={selectedKeys}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ marginTop: 8 }}
-        />
-      </Sider>
-
-      {/* Main Layout */}
-      <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'all 0.2s' }}>
-        {/* Header */}
-        <Header
-          style={{
-            padding: '0 24px',
-            background: colorBgContainer,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          }}
-        >
-          {/* Left side - Toggle button */}
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
+          {/* Main Navigation Menu */}
+          <Menu
+            mode="horizontal"
+            selectedKeys={selectedKeys}
+            items={menuItems}
+            onClick={handleMenuClick}
             style={{
-              fontSize: '16px',
-              width: 64,
-              height: 64,
+              flex: 1,
+              border: 'none',
+              background: 'transparent',
+              fontSize: '14px',
+              fontWeight: 500,
             }}
           />
+        </Space>
 
-          {/* Right side - Notifications & User */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Notifications */}
-            <Badge count={3} size="small">
-              <Button
-                type="text"
-                icon={<BellOutlined style={{ fontSize: '18px' }} />}
-                size="large"
-              />
-            </Badge>
+        {/* Right side - Actions and User Menu */}
+        <Space size="middle">
+          {/* Alert Notifications */}
+          <AlertNotificationCenter />
 
-            {/* User Profile Menu */}
-            <UserMenu />
-          </div>
-        </Header>
+          {/* User Profile Menu */}
+          <UserMenu />
+        </Space>
+      </Header>
 
-        {/* Content */}
-        <Content
+      {/* Breadcrumb Navigation */}
+      <div
+        style={{
+          background: colorBgContainer,
+          padding: '12px 32px',
+          borderBottom: '1px solid #f0f0f0',
+        }}
+      >
+        <Breadcrumb items={getBreadcrumbItems()} />
+      </div>
+
+      {/* Main Content Area */}
+      <Content
+        style={{
+          margin: '24px 32px',
+          minHeight: 'calc(100vh - 240px)',
+        }}
+      >
+        <div
           style={{
-            margin: '24px 16px',
-            padding: 24,
-            minHeight: 280,
+            padding: '32px',
             background: colorBgContainer,
-            borderRadius: borderRadiusLG,
+            borderRadius: '8px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+            border: '1px solid #f0f0f0',
           }}
         >
           {children}
-        </Content>
+        </div>
+      </Content>
 
-        {/* Footer */}
-        <Footer style={{ textAlign: 'center' }}>
-          Staff Portal ©{new Date().getFullYear()} • Water Quality Monitoring System
-        </Footer>
-      </Layout>
+      {/* Footer */}
+      <Footer 
+        style={{ 
+          textAlign: 'center',
+          background: colorBgContainer,
+          borderTop: '1px solid #f0f0f0',
+          padding: '20px 32px',
+        }}
+      >
+        <Space direction="vertical" size={4}>
+          <Text strong style={{ fontSize: '13px' }}>
+            PureTrack Staff Portal
+          </Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>
+            Water Quality Monitoring System © {new Date().getFullYear()}
+          </Text>
+        </Space>
+      </Footer>
     </Layout>
   );
 };
