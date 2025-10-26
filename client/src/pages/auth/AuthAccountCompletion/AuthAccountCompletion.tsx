@@ -10,7 +10,7 @@ import { Form, Input, Button, Card, Typography, Space, Alert, message, Divider, 
 import { PhoneOutlined, BankOutlined, UserOutlined } from "@ant-design/icons";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../config/firebase";
 
 const { Title, Text } = Typography;
 
@@ -22,7 +22,7 @@ interface ProfileFormData {
   phoneNumber: string;
 }
 
-export default function AccountCompletion() {
+export const AuthAccountCompletion = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);

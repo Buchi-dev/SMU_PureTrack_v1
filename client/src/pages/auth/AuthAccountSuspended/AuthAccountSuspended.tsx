@@ -17,11 +17,11 @@ import {
 } from "@ant-design/icons";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../config/firebase";
 
 const { Title, Text } = Typography;
 
-export default function AccountInactive() {
+export const AuthAccountSuspended = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);

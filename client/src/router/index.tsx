@@ -19,13 +19,20 @@ import {
 } from '../pages/admin';
 
 // Staff Pages
-import { StaffDashboard, StaffDevices, StaffReadings, StaffAnalytics } from '../pages/staff';
+import { 
+  StaffDashboard, 
+  StaffDevices, 
+  StaffReadings, 
+  StaffAnalytics 
+} from '../pages/staff';
 
 // Auth Pages
-import GoogleAuth from '../pages/auth/GoogleAuth';
-import AccountCompletion from '../pages/auth/AccountCompletion';
-import PendingApproval from '../pages/auth/PendingApproval';
-import AccountInactive from '../pages/auth/AccountInactive';
+import {
+  AuthGoogleAuth,
+  AuthAccountCompletion,
+  AuthPendingApproval,
+  AuthAccountSuspended
+} from '../pages/auth';
 
 /**
  * 404 Not Found Component with Theme Support
@@ -82,21 +89,21 @@ export const router = createBrowserRouter([
     path: '/auth/login',
     element: (
       <PublicRoute>
-        <GoogleAuth />
+        <AuthGoogleAuth />
       </PublicRoute>
     ),
   },
   {
     path: '/auth/complete-account',
-    element: <AccountCompletion />,
+    element: <AuthAccountCompletion />,
   },
   {
     path: '/auth/pending-approval',
-    element: <PendingApproval />,
+    element: <AuthPendingApproval />,
   },
   {
     path: '/auth/account-inactive',
-    element: <AccountInactive />,
+    element: <AuthAccountSuspended />,
   },
 
   // ==================== ADMIN ROUTES ====================

@@ -10,11 +10,11 @@ import { Button, Card, Alert, Typography, Space, theme } from "antd";
 import { GoogleOutlined, LoadingOutlined } from "@ant-design/icons";
 import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../../config/firebase";
+import { auth, db } from "../../../config/firebase";
 
 const { Title, Text } = Typography;
 
-export default function GoogleAuth() {
+export const AuthGoogleAuth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; solution?: string; canRetry?: boolean } | null>(null);
   const navigate = useNavigate();
