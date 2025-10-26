@@ -42,7 +42,7 @@ interface Reading {
   status: 'normal' | 'warning' | 'critical';
 }
 
-const StaffReadings = () => {
+export const StaffReadings = () => {
   const token = useThemeToken();
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -390,5 +390,3 @@ const StaffReadings = () => {
     </StaffLayout>
   );
 };
-
-export default StaffReadings;

@@ -42,7 +42,7 @@ interface Device {
   sensors: string[];
 }
 
-const StaffDevices = () => {
+export const StaffDevices = () => {
   const navigate = useNavigate();
   const token = useThemeToken();
   const [searchText, setSearchText] = useState('');
@@ -331,4 +331,3 @@ const StaffDevices = () => {
   );
 };
 
-export default StaffDevices;

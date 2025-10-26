@@ -56,7 +56,7 @@ interface RecentAlert {
   severity: 'high' | 'medium' | 'low';
 }
 
-const StaffDashboard = () => {
+export const StaffDashboard = () => {
   const navigate = useNavigate();
   const { userProfile } = useAuth();
   const token = useThemeToken();
@@ -507,4 +507,3 @@ const StaffDashboard = () => {
   );
 };
 
-export default StaffDashboard;

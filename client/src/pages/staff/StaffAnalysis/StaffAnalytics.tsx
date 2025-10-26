@@ -23,7 +23,7 @@ import {
 
 const { Title, Text } = Typography;
 
-const StaffAnalytics = () => {
+export const StaffAnalytics = () => {
   const token = useThemeToken();
   const [loading, setLoading] = useState(true);
   const [phData, setPhData] = useState<any[]>([]);
@@ -285,5 +285,3 @@ const StaffAnalytics = () => {
     </StaffLayout>
   );
 };
-
-export default StaffAnalytics;
