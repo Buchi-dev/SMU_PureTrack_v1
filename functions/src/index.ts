@@ -9,6 +9,11 @@ export {beforeSignIn} from "./auth/beforeSignIn";
 // HTTP Functions
 export {deviceManagement} from "./http/deviceManagement";
 export {generateReport} from "./http/generateReport";
+export {
+  listNotificationPreferences,
+  setupNotificationPreferences,
+  deleteNotificationPreferences,
+} from "./http/notificationPreferences";
 
 // Pub/Sub Functions
 export {processSensorData} from "./pubsub/processSensorData";
