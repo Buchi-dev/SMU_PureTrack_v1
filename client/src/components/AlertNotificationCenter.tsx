@@ -315,7 +315,7 @@ export default function AlertNotificationCenter() {
 
   return (
     <Dropdown
-      dropdownRender={() => dropdownContent}
+      popupRender={() => dropdownContent}
       trigger={['click']}
       open={dropdownOpen}
       onOpenChange={setDropdownOpen}

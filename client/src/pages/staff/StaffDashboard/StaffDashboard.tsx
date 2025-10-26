@@ -33,6 +33,9 @@ import {
   ExperimentOutlined,
   ReloadOutlined,
   ArrowRightOutlined,
+  EnvironmentOutlined,
+  SmileOutlined,
+  AlertOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
@@ -41,6 +44,7 @@ import { useThemeToken } from '../../../theme';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { deviceApi } from '../../../services/api';
+import { RealtimeAlertMonitor } from '../../../components/RealtimeAlertMonitor';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -225,7 +229,8 @@ export const StaffDashboard = () => {
         <Space direction="vertical" size={0}>
           <Text strong style={{ fontSize: '14px' }}>{text}</Text>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            📍 {record.location}
+            <EnvironmentOutlined style={{ marginRight: '4px' }} />
+            {record.location}
           </Text>
         </Space>
       ),
@@ -382,15 +387,27 @@ export const StaffDashboard = () => {
       ],
       onFilter: (value, record) => record.severity === value,
       render: (severity: string) => {
-        const config = { 
-          high: { color: 'error', icon: '🔴', text: 'HIGH' },
-          medium: { color: 'warning', icon: '🟡', text: 'MEDIUM' },
-          low: { color: 'default', icon: '🟢', text: 'LOW' },
-        };
-        const cfg = config[severity as keyof typeof config];
+        let icon = null;
+        let color = 'default';
+        let text = severity.toUpperCase();
+
+        if (severity === 'high') {
+          icon = <AlertOutlined />;
+          color = 'error';
+          text = 'HIGH';
+        } else if (severity === 'medium') {
+          icon = <WarningOutlined />;
+          color = 'warning';
+          text = 'MEDIUM';
+        } else if (severity === 'low') {
+          icon = <CheckCircleOutlined />;
+          color = 'default';
+          text = 'LOW';
+        }
+
         return (
-          <Tag color={cfg.color} style={{ fontWeight: 600 }}>
-            {cfg.icon} {cfg.text}
+          <Tag color={color} style={{ fontWeight: 600 }}>
+            {icon} {text}
           </Tag>
         );
       },
@@ -511,7 +528,8 @@ export const StaffDashboard = () => {
               <Col>
                 <Space direction="vertical" size={4}>
                   <Title level={3} style={{ margin: 0 }}>
-                    👋 Welcome back, {userProfile?.firstname || 'Staff Member'}!
+                    <SmileOutlined style={{ marginRight: '8px' }} />
+                    Welcome back, {userProfile?.firstname || 'Staff Member'}!
                   </Title>
                   <Text type="secondary">
                     Here's what's happening with your water quality monitoring system today
@@ -700,6 +718,9 @@ export const StaffDashboard = () => {
               style={{ marginBottom: 0 }}
             />
           )}
+
+          {/* Real-Time Alert Monitor - Devices Arranged by Alert Severity */}
+          <RealtimeAlertMonitor />
 
           {/* Main Content Grid */}
           <Row gutter={[16, 16]}>
