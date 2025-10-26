@@ -13,7 +13,6 @@ import {
   MenuUnfoldOutlined,
   DashboardOutlined,
   SettingOutlined,
-  DatabaseOutlined,
   BellOutlined,
   TeamOutlined,
   BarChartOutlined,
@@ -56,8 +55,6 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       setSelectedKeys(['devices']);
     } else if (path.includes('/readings')) {
       setSelectedKeys(['readings']);
-    } else if (path.includes('/data')) {
-      setSelectedKeys(['data']);
     } else if (path.includes('/dashboard')) {
       setSelectedKeys(['dashboard']);
     } else if (path.includes('/analytics')) {
@@ -111,11 +108,6 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       label: 'Reports',
     },
     {
-      key: 'data',
-      icon: <DatabaseOutlined />,
-      label: 'Data Management',
-    },
-    {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
@@ -128,7 +120,6 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
       dashboard: ROUTES.ADMIN.DASHBOARD,
       devices: ROUTES.ADMIN.DEVICES,
       readings: ROUTES.ADMIN.READINGS,
-      data: ROUTES.ADMIN.DATA,
       analytics: ROUTES.ADMIN.ANALYTICS,
       alerts: ROUTES.ADMIN.ALERTS,
       users: ROUTES.ADMIN.USERS,

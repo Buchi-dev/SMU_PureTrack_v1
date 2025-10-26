@@ -125,7 +125,7 @@ interface DeviceSensorData {
 // MAIN COMPONENT
 // ============================================================================
 
-const AdminDashboard = () => {
+export const AdminDashboard = () => {
   const token = useThemeToken();
   const rtdb = getDatabase();
 
@@ -663,5 +663,3 @@ const AdminDashboard = () => {
     </AdminLayout>
   );
 };
-
-export default AdminDashboard;

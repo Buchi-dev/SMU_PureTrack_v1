@@ -7,15 +7,16 @@ import { PublicRoute, ApprovedRoute, AdminRoute } from '../components/ProtectedR
 import { RootRedirect } from '../components/RootRedirect';
 
 // Admin Pages
-import AdminDashboard from '../pages/admin/AdminDashboard/AdminDashboard';
-import { DeviceManagement } from '../pages/admin/AdminDeviceManagement';
-import { DeviceReadings } from '../pages/admin/AdminDeviceReadings';
-import { DataManagement } from '../pages/admin/AdminDataManagement';
-import { ManageReports } from '../pages/admin/AdminReports';
-import ManageAlerts from '../pages/admin/AdminAlerts';
-import Analytics from '../pages/admin/AdminAnalytics/Analytics';
-import UserManagement from '../pages/admin/AdminUserManagement/UserManagement';
-import Settings from '../pages/admin/AdminSettings/AdminSettings';
+import { 
+  AdminDashboard, 
+  AdminDeviceManagement,
+  AdminDeviceReadings,
+  AdminReports,
+  AdminAlerts,
+  AdminAnalytics,
+  AdminUserManagement,
+  AdminSettings
+} from '../pages/admin';
 
 // Staff Pages
 import { StaffDashboard, StaffDevices, StaffReadings, StaffAnalytics } from '../pages/staff';
@@ -116,7 +117,7 @@ export const router = createBrowserRouter([
     path: '/admin/devices',
     element: (
       <AdminRoute>
-        <DeviceManagement />
+        <AdminDeviceManagement />
       </AdminRoute>
     ),
   },
@@ -124,7 +125,7 @@ export const router = createBrowserRouter([
     path: '/admin/devices/:deviceId/readings',
     element: (
       <AdminRoute>
-        <DeviceReadings />
+        <AdminDeviceReadings />
       </AdminRoute>
     ),
   },
@@ -132,15 +133,15 @@ export const router = createBrowserRouter([
     path: '/admin/readings',
     element: (
       <AdminRoute>
-        <DeviceReadings />
+        <AdminDeviceReadings />
       </AdminRoute>
     ),
   },
   {
-    path: '/admin/data',
+    path: '/admin/readings',
     element: (
       <AdminRoute>
-        <DataManagement />
+        <AdminDeviceReadings />
       </AdminRoute>
     ),
   },
@@ -148,7 +149,7 @@ export const router = createBrowserRouter([
     path: '/admin/analytics',
     element: (
       <AdminRoute>
-        <Analytics />
+        <AdminAnalytics />
       </AdminRoute>
     ),
   },
@@ -156,7 +157,7 @@ export const router = createBrowserRouter([
     path: '/admin/users',
     element: (
       <AdminRoute>
-        <UserManagement />
+        <AdminUserManagement />
       </AdminRoute>
     ),
   },
@@ -164,7 +165,7 @@ export const router = createBrowserRouter([
     path: '/admin/reports',
     element: (
       <AdminRoute>
-        <ManageReports />
+        <AdminReports />
       </AdminRoute>
     ),
   },
@@ -172,7 +173,7 @@ export const router = createBrowserRouter([
     path: '/admin/alerts',
     element: (
       <AdminRoute>
-        <ManageAlerts />
+        <AdminAlerts />
       </AdminRoute>
     ),
   },
@@ -180,7 +181,7 @@ export const router = createBrowserRouter([
     path: '/admin/settings',
     element: (
       <AdminRoute>
-        <Settings />
+        <AdminSettings />
       </AdminRoute>
     ),
   },
@@ -259,7 +260,6 @@ export const ROUTES = {
     DASHBOARD: '/admin/dashboard',
     DEVICES: '/admin/devices',
     READINGS: '/admin/readings',
-    DATA: '/admin/data',
     ANALYTICS: '/admin/analytics',
     USERS: '/admin/users',
     REPORTS: '/admin/reports',

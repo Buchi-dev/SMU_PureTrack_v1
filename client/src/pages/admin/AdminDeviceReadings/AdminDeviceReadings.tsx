@@ -56,7 +56,7 @@ const REFRESH_INTERVALS = [
   { label: '5 minutes', value: 300000 },
 ];
 
-const DeviceReadings = () => {
+export const AdminDeviceReadings = () => {
   const token = useThemeToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -576,5 +576,3 @@ const DeviceReadings = () => {
     </AdminLayout>
   );
 };
-
-export default DeviceReadings;

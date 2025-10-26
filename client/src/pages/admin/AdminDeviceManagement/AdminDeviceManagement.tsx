@@ -51,7 +51,7 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
   maintenance: { color: 'warning', icon: <ToolOutlined /> },
 };
 
-const DeviceManagement = () => {
+export const AdminDeviceManagement = () => {
   const token = useThemeToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(false);
@@ -939,5 +939,3 @@ const DeviceManagement = () => {
     </AdminLayout>
   );
 };
-
-export default DeviceManagement;

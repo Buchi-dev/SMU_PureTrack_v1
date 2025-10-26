@@ -1,10 +1,11 @@
-export { AdminAlerts } from './AdminAlerts';
-export { AdminDevices } from './AdminDevices';
-export { AdminDeviceTypes } from './AdminDeviceTypes';
-export { AdminLocations } from './AdminLocations';
-export { AdminSettings } from './AdminSettings';
-export { AdminManageUsers } from './AdminUsers';
-export { AdminReports } from './AdminReports';
-export { AdminAnalytics } from './AdminAnalytics';
-export { AdminDeviceReadings } from './AdminDeviceReadings';
- 
+export { AdminAlerts } from './AdminAlerts/AdminAlerts';
+export { AdminAnalytics } from './AdminAnalytics/AdminAnalytics';
+export { AdminDashboard } from './AdminDashboard/AdminDashboard';
+export { AdminDeviceManagement } from './AdminDeviceManagement/AdminDeviceManagement';
+export { AdminDeviceReadings } from './AdminDeviceReadings/AdminDeviceReadings';
+export { AdminReports } from './AdminReports/AdminReports';
+export { AdminSettings } from './AdminSettings/AdminSettings';
+export { AdminUserManagement } from './AdminUserManagement/AdminUserManagement';
+
+
+

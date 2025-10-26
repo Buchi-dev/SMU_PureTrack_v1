@@ -47,7 +47,7 @@ interface UserWithId extends UserProfile {
   id: string;
 }
 
-const UserManagement = () => {
+export const AdminUserManagement = () => {
   const { token } = theme.useToken();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserWithId[]>([]);
@@ -639,5 +639,3 @@ const UserManagement = () => {
     </AdminLayout>
   );
 };
-
-export default UserManagement;

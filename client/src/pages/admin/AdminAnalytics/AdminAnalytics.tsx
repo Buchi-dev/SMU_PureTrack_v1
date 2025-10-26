@@ -108,7 +108,7 @@ interface AlertData {
   value: string;
 }
 
-const Analytics = () => {
+export const AdminAnalytics = () => {
   const token = useThemeToken();
   const [loading, setLoading] = useState(true);
   const [waterQualityData, setWaterQualityData] = useState<any>(null);
@@ -799,4 +799,4 @@ const Analytics = () => {
   );
 };
 
-export default Analytics;
+

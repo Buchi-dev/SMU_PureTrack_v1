@@ -58,7 +58,7 @@ import { AdminLayout } from '../../../components/layouts/AdminLayout';
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-export default function ManageAlerts() {
+export const AdminAlerts = () => {
   const token = useThemeToken();
   const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<WaterQualityAlert[]>([]);
@@ -660,4 +660,5 @@ export default function ManageAlerts() {
       </div>
     </AdminLayout>
   );
-}
+
+};
