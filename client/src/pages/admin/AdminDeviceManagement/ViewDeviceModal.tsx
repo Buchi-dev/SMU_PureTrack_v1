@@ -258,7 +258,9 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
           >
             {loading ? (
               <div style={{ textAlign: 'center', padding: '40px' }}>
-                <Spin size="large" tip="Loading sensor data..." />
+                <Spin size="large" tip="Loading sensor data...">
+                  <div style={{ padding: '30px' }} />
+                </Spin>
               </div>
             ) : sensorData ? (
               <Space direction="vertical" size="middle" style={{ width: '100%' }}>

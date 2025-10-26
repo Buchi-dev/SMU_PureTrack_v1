@@ -87,25 +87,31 @@ export default function AlertNotificationCenter() {
 
   useEffect(() => {
     // Subscribe to active alerts (most recent 10)
+    // Modified query to avoid composite index requirement
     const alertsRef = collection(db, 'alerts');
     const q = query(
       alertsRef,
-      where('status', 'in', ['Active', 'Acknowledged']),
       orderBy('createdAt', 'desc'),
-      limit(10)
+      limit(50) // Get more to filter client-side
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const alertsData = snapshot.docs.map((doc) => ({
-          ...doc.data(),
-          alertId: doc.id,
-          createdAt: doc.data().createdAt as Timestamp,
-        })) as WaterQualityAlert[];
+        const alertsData = snapshot.docs
+          .map((doc) => ({
+            ...doc.data(),
+            alertId: doc.id,
+            createdAt: doc.data().createdAt as Timestamp,
+          })) as WaterQualityAlert[];
 
-        setAlerts(alertsData);
-        setUnreadCount(alertsData.filter((a) => a.status === 'Active').length);
+        // Filter for active/acknowledged alerts client-side
+        const filteredAlerts = alertsData
+          .filter((a) => a.status === 'Active' || a.status === 'Acknowledged')
+          .slice(0, 10); // Limit to 10 after filtering
+
+        setAlerts(filteredAlerts);
+        setUnreadCount(filteredAlerts.filter((a) => a.status === 'Active').length);
         setLoading(false);
       },
       (error) => {

@@ -134,12 +134,12 @@ export const StaffDashboard = () => {
         );
 
         // Fetch recent alerts from Firestore
+        // Modified query to avoid composite index requirement
         const alertsRef = collection(db, 'alerts');
         const alertsQuery = query(
           alertsRef,
-          where('resolved', '==', false),
           orderBy('createdAt', 'desc'),
-          limit(5)
+          limit(20) // Get more to filter client-side
         );
         
         const alertsSnapshot = await new Promise((resolve) => {
@@ -149,18 +149,25 @@ export const StaffDashboard = () => {
           });
         }) as any;
 
-        const alerts = alertsSnapshot.docs.map((doc: any) => {
-          const data = doc.data();
-          return {
-            key: doc.id,
-            device: data.deviceName || data.deviceId || 'Unknown Device',
-            parameter: data.parameter || 'Unknown',
-            value: data.currentValue || 0,
-            threshold: data.threshold || 0,
-            time: data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleString() : 'Unknown',
-            severity: data.severity || 'medium',
-          };
-        });
+        const alerts = alertsSnapshot.docs
+          .filter((doc: any) => {
+            const data = doc.data();
+            // Filter for unresolved alerts client-side
+            return data.resolved === false || data.status === 'Active' || data.status === 'Acknowledged';
+          })
+          .slice(0, 5) // Limit to 5 after filtering
+          .map((doc: any) => {
+            const data = doc.data();
+            return {
+              key: doc.id,
+              device: data.deviceName || data.deviceId || 'Unknown Device',
+              parameter: data.parameter || 'Unknown',
+              value: data.currentValue || 0,
+              threshold: data.threshold || 0,
+              time: data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleString() : 'Unknown',
+              severity: data.severity || 'medium',
+            };
+          });
 
         setRecentReadings(devicesWithReadings);
         setRecentAlerts(alerts);
@@ -309,8 +316,17 @@ export const StaffDashboard = () => {
   if (loading) {
     return (
       <StaffLayout>
-        <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <Spin size="large" tip="Loading dashboard..." />
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '100px 0',
+          minHeight: '400px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Spin size="large" tip="Loading dashboard...">
+            <div style={{ padding: '50px' }} />
+          </Spin>
         </div>
       </StaffLayout>
     );
