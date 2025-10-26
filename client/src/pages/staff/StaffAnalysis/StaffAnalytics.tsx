@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Card, Typography, Row, Col, Space, Statistic, Skeleton, message } from 'antd';
+import { Row, Col, Space, Divider, message } from 'antd';
 import {
   BarChartOutlined,
   RiseOutlined,
   FallOutlined,
+  LineChartOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
 import { deviceApi } from '../../../services/api';
+import { PageHeader, StatsCard, PageContainer, DataCard } from '../../../components/staff';
+import { Typography } from 'antd';
 import {
   LineChart,
   Line,
@@ -21,7 +25,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export const StaffAnalytics = () => {
   const token = useThemeToken();
@@ -35,221 +39,198 @@ export const StaffAnalytics = () => {
     avgTds: 0,
   });
 
-  // Fetch analytics data
-  useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      setLoading(true);
-      try {
-        const devicesList = await deviceApi.listDevices();
-        
-        const phDataPoints: any[] = [];
-        const turbidityDataPoints: any[] = [];
-        const deviceStats: any[] = [];
-        
-        let totalPh = 0, totalTurbidity = 0, totalTds = 0;
-        let count = 0;
-        
-        for (const device of devicesList) {
-          try {
-            const history = await deviceApi.getSensorHistory(device.deviceId, 24);
+  const handleRefresh = async () => {
+    setLoading(true);
+    await fetchAnalyticsData();
+  };
+
+  const fetchAnalyticsData = async () => {
+    setLoading(true);
+    try {
+      const devicesList = await deviceApi.listDevices();
+      
+      const phDataPoints: any[] = [];
+      const turbidityDataPoints: any[] = [];
+      const deviceStats: any[] = [];
+      
+      let totalPh = 0, totalTurbidity = 0, totalTds = 0;
+      let count = 0;
+      
+      for (const device of devicesList) {
+        try {
+          const history = await deviceApi.getSensorHistory(device.deviceId, 24);
+          
+          // Aggregate data for device comparison
+          if (history.length > 0) {
+            const devicePh = history.reduce((sum, r) => sum + (r.ph || 0), 0) / history.length;
+            const deviceTurb = history.reduce((sum, r) => sum + (r.turbidity || 0), 0) / history.length;
+            const deviceTds = history.reduce((sum, r) => sum + (r.tds || 0), 0) / history.length;
             
-            // Aggregate data for device comparison
-            if (history.length > 0) {
-              const devicePh = history.reduce((sum, r) => sum + (r.ph || 0), 0) / history.length;
-              const deviceTurb = history.reduce((sum, r) => sum + (r.turbidity || 0), 0) / history.length;
-              const deviceTds = history.reduce((sum, r) => sum + (r.tds || 0), 0) / history.length;
-              
-              deviceStats.push({
-                device: device.name || device.deviceId,
-                ph: Number(devicePh.toFixed(2)),
-                turbidity: Number(deviceTurb.toFixed(2)),
-                tds: Number(deviceTds.toFixed(2)),
-              });
-              
-              totalPh += devicePh;
-              totalTurbidity += deviceTurb;
-              totalTds += deviceTds;
-              
-              count++;
-            }
-            
-            // Create time-series data (last 24 hours)
-            history.forEach((reading, index) => {
-              const timeLabel = `${index}h`;
-              if (reading.ph) {
-                phDataPoints.push({ time: timeLabel, ph: reading.ph });
-              }
-              if (reading.turbidity) {
-                turbidityDataPoints.push({ time: timeLabel, turbidity: reading.turbidity });
-              }
+            deviceStats.push({
+              device: device.name || device.deviceId,
+              ph: Number(devicePh.toFixed(2)),
+              turbidity: Number(deviceTurb.toFixed(2)),
+              tds: Number(deviceTds.toFixed(2)),
             });
             
-          } catch (error) {
-            console.error(`Error fetching analytics for device ${device.deviceId}:`, error);
+            totalPh += devicePh;
+            totalTurbidity += deviceTurb;
+            totalTds += deviceTds;
+            
+            count++;
           }
-        }
-        
-        setPhData(phDataPoints.slice(-24)); // Last 24 data points
-        setTurbidityData(turbidityDataPoints.slice(-24));
-        setDeviceComparison(deviceStats);
-        
-        if (count > 0) {
-          setStats({
-            avgPh: Number((totalPh / count).toFixed(1)),
-            avgTurbidity: Number((totalTurbidity / count).toFixed(1)),
-            avgTds: Number((totalTds / count).toFixed(1)),
+          
+          // Create time-series data (last 24 hours)
+          history.forEach((reading, index) => {
+            const timeLabel = `${index}h`;
+            if (reading.ph) {
+              phDataPoints.push({ time: timeLabel, ph: reading.ph });
+            }
+            if (reading.turbidity) {
+              turbidityDataPoints.push({ time: timeLabel, turbidity: reading.turbidity });
+            }
           });
+          
+        } catch (error) {
+          console.error(`Error fetching analytics for device ${device.deviceId}:`, error);
         }
-        
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-        message.error('Failed to load analytics data');
-      } finally {
-        setLoading(false);
       }
-    };
+      
+      setPhData(phDataPoints.slice(-24)); // Last 24 data points
+      setTurbidityData(turbidityDataPoints.slice(-24));
+      setDeviceComparison(deviceStats);
+      
+      if (count > 0) {
+        setStats({
+          avgPh: Number((totalPh / count).toFixed(1)),
+          avgTurbidity: Number((totalTurbidity / count).toFixed(1)),
+          avgTds: Number((totalTds / count).toFixed(1)),
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      message.error('Failed to load analytics data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchAnalyticsData();
   }, []);
   
   if (loading) {
     return (
       <StaffLayout>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {/* Header Skeleton */}
-          <div>
-            <Skeleton.Input active style={{ width: 250, height: 32 }} />
-            <div style={{ marginTop: 8 }}>
-              <Skeleton.Input active style={{ width: 400, height: 20 }} />
-            </div>
-          </div>
-
-          {/* Summary Statistics Skeleton */}
-          <Row gutter={[16, 16]}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Col xs={24} sm={12} lg={8} key={i}>
-                <Card>
-                  <Skeleton active paragraph={{ rows: 1 }} />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-
-          {/* Charts Skeleton */}
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <Card title={<Skeleton.Input active style={{ width: 200 }} />}>
-                <Skeleton active paragraph={{ rows: 6 }} />
-              </Card>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Card title={<Skeleton.Input active style={{ width: 200 }} />}>
-                <Skeleton active paragraph={{ rows: 6 }} />
-              </Card>
-            </Col>
-          </Row>
-        </Space>
+        <PageContainer loading={loading} spacing="large" />
       </StaffLayout>
     );
   }
 
   return (
     <StaffLayout>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        {/* Header */}
-        <div>
-          <Title level={2}>
-            <BarChartOutlined /> Analytics
-          </Title>
-          <Text type="secondary">
-            Water quality trends and device performance analytics
-          </Text>
-        </div>
+      <PageContainer spacing="large">
+        {/* Page Header */}
+        <PageHeader
+          title="Analytics"
+          subtitle="Water quality trends and device performance analytics"
+          icon={<BarChartOutlined />}
+          loading={loading}
+          onRefresh={handleRefresh}
+        />
 
-        {/* Summary Statistics */}
+        {/* Statistics Cards */}
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Average pH"
-                value={stats.avgPh}
-                precision={1}
-                valueStyle={{ color: token.colorSuccess }}
-                prefix={<RiseOutlined />}
-                suffix="units"
-              />
-              <Text type="secondary">Last 24 hours</Text>
-            </Card>
+          <Col xs={24} sm={12} lg={8}>
+            <StatsCard
+              title="Average pH"
+              value={stats.avgPh}
+              icon={<RiseOutlined />}
+              color={token.colorSuccess}
+              suffix="units"
+              description="Last 24 hours"
+              trend="neutral"
+            />
           </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Avg TDS"
-                value={stats.avgTds}
-                precision={1}
-                valueStyle={{ color: token.colorInfo }}
-                suffix="ppm"
-              />
-              <Text type="secondary">Last 24 hours</Text>
-            </Card>
+          <Col xs={24} sm={12} lg={8}>
+            <StatsCard
+              title="Avg TDS"
+              value={stats.avgTds}
+              color={token.colorInfo}
+              suffix="ppm"
+              description="Last 24 hours"
+              trend="neutral"
+            />
           </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card>
-              <Statistic
-                title="Avg Turbidity"
-                value={stats.avgTurbidity}
-                precision={1}
-                valueStyle={{ color: token.colorWarning }}
-                prefix={<FallOutlined />}
-                suffix="NTU"
-              />
-              <Text type="secondary">Last 24 hours</Text>
-            </Card>
+          <Col xs={24} sm={12} lg={8}>
+            <StatsCard
+              title="Avg Turbidity"
+              value={stats.avgTurbidity}
+              icon={<FallOutlined />}
+              color={token.colorWarning}
+              suffix="NTU"
+              description="Last 24 hours"
+              trend="neutral"
+            />
           </Col>
         </Row>
 
-        {/* pH Trend Chart */}
-        <Card title="pH Level Trend (24 Hours)">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={phData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis domain={[6, 9]} />
-              <Tooltip />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="ph"
-                stroke={token.colorSuccess}
-                strokeWidth={2}
-                name="pH Level"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
-
-        {/* Turbidity Trend Chart */}
-        <Card title="Turbidity Trend (24 Hours)">
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={turbidityData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="time" />
-              <YAxis domain={[0, 10]} />
-              <Tooltip />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="turbidity"
-                stroke={token.colorWarning}
-                strokeWidth={2}
-                name="Turbidity (NTU)"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Card>
+        {/* Charts */}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={12}>
+            <DataCard
+              title="pH Level Trend (24 Hours)"
+              icon={<LineChartOutlined />}
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={phData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis domain={[6, 9]} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="ph"
+                    stroke={token.colorSuccess}
+                    strokeWidth={2}
+                    name="pH Level"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </DataCard>
+          </Col>
+          <Col xs={24} lg={12}>
+            <DataCard
+              title="Turbidity Trend (24 Hours)"
+              icon={<LineChartOutlined />}
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={turbidityData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis domain={[0, 10]} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="turbidity"
+                    stroke={token.colorWarning}
+                    strokeWidth={2}
+                    name="Turbidity (NTU)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </DataCard>
+          </Col>
+        </Row>
 
         {/* Device Comparison */}
-        <Card title="Device Comparison (Current Readings)">
+        <DataCard
+          title="Device Comparison (Current Readings)"
+          icon={<BarChartOutlined />}
+        >
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={deviceComparison}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -262,56 +243,68 @@ export const StaffAnalytics = () => {
               <Bar dataKey="turbidity" fill={token.colorWarning} name="Turbidity (NTU)" />
             </BarChart>
           </ResponsiveContainer>
-        </Card>
+        </DataCard>
 
         {/* Information Cards */}
         <Row gutter={[16, 16]}>
           <Col xs={24} md={12}>
-            <Card title="Water Quality Status">
-              <Space direction="vertical" style={{ width: '100%' }}>
+            <DataCard
+              title="Water Quality Status"
+              icon={<CheckCircleOutlined />}
+            >
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Overall Quality:</Text>
                   <Text strong style={{ color: token.colorSuccess }}>Good</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>pH Status:</Text>
                   <Text strong style={{ color: token.colorSuccess }}>Normal</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Temperature:</Text>
                   <Text strong style={{ color: token.colorSuccess }}>Normal</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Turbidity:</Text>
                   <Text strong style={{ color: token.colorWarning }}>Moderate</Text>
                 </div>
               </Space>
-            </Card>
+            </DataCard>
           </Col>
           <Col xs={24} md={12}>
-            <Card title="System Performance">
-              <Space direction="vertical" style={{ width: '100%' }}>
+            <DataCard
+              title="System Performance"
+              icon={<CheckCircleOutlined />}
+            >
+              <Space direction="vertical" style={{ width: '100%' }} size="small">
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Active Devices:</Text>
                   <Text strong>4 / 5</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Data Collection Rate:</Text>
                   <Text strong>98.5%</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Average Uptime:</Text>
                   <Text strong>99.2%</Text>
                 </div>
+                <Divider style={{ margin: '8px 0' }} />
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Active Alerts:</Text>
                   <Text strong style={{ color: token.colorWarning }}>2</Text>
                 </div>
               </Space>
-            </Card>
+            </DataCard>
           </Col>
         </Row>
-      </Space>
+      </PageContainer>
     </StaffLayout>
   );
 };
