@@ -17,6 +17,7 @@ import {
   ApiOutlined,
   LineChartOutlined,
   HomeOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { ROUTES } from '../../router';
 import UserMenu from '../UserMenu';
@@ -46,6 +47,8 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       setSelectedKeys(['readings']);
     } else if (path.includes('/staff/analytics')) {
       setSelectedKeys(['analytics']);
+    } else if (path.includes('/staff/settings')) {
+      setSelectedKeys(['settings']);
     } else if (path.includes('/staff/dashboard')) {
       setSelectedKeys(['dashboard']);
     }
@@ -73,6 +76,11 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       icon: <BarChartOutlined style={{ fontSize: '16px' }} />,
       label: 'Analytics',
     },
+    {
+      key: 'settings',
+      icon: <SettingOutlined style={{ fontSize: '16px' }} />,
+      label: 'Settings',
+    },
   ];
 
   // Handle menu navigation
@@ -82,6 +90,7 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       devices: ROUTES.STAFF.DEVICES,
       readings: ROUTES.STAFF.READINGS,
       analytics: ROUTES.STAFF.ANALYTICS,
+      settings: ROUTES.STAFF.SETTINGS,
     };
 
     const route = routeMap[e.key];
@@ -110,6 +119,8 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       items.push({ title: 'Sensor Data' });
     } else if (path.includes('/staff/analytics')) {
       items.push({ title: 'Analytics' });
+    } else if (path.includes('/staff/settings')) {
+      items.push({ title: 'Settings' });
     } else if (path.includes('/staff/dashboard')) {
       items.push({ title: 'Dashboard' });
     }

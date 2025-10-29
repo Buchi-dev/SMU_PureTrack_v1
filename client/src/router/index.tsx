@@ -23,7 +23,8 @@ import {
   StaffDashboard, 
   StaffDevices, 
   StaffReadings, 
-  StaffAnalytics 
+  StaffAnalytics,
+  StaffSettings
 } from '../pages/staff';
 
 // Auth Pages
@@ -239,8 +240,14 @@ export const router = createBrowserRouter([
       </ApprovedRoute>
     ),
   },
-  
-  // Legacy dashboard route (redirect based on role)
+  {
+    path: '/staff/settings',
+    element: (
+      <ApprovedRoute>
+        <StaffSettings />
+      </ApprovedRoute>
+    ),
+  },
   {
     path: '/dashboard',
     element: (
@@ -279,6 +286,7 @@ export const ROUTES = {
     DEVICES: '/staff/devices',
     READINGS: '/staff/readings',
     ANALYTICS: '/staff/analytics',
+    SETTINGS: '/staff/settings',
   },
   AUTH: {
     LOGIN: '/auth/login',
