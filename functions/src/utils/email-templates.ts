@@ -31,7 +31,7 @@ export async function sendEmailNotification(
 
     const paramName = getParameterName(alert.parameter!);
     const mailOptions = {
-      from: process.env.EMAIL_USER || "noreply@puretrack.com",
+      from: "noreply@puretrack.com",
       to: recipient.email,
       subject: `[${alert.severity}] Water Quality Alert${subLoc} - ${paramName}`,
       html: generateAlertEmailHTML(alert, severityColor, locStr),
@@ -437,4 +437,36 @@ function generateDailyAnalyticsHTML(
     </body>
     </html>
   `;
+}
+
+/**
+ * Create email transporter for alert digests
+ * Uses environment variables for credentials
+ */
+export async function createTransporter(): Promise<any> {
+  // Re-use existing emailTransporter from config
+  return emailTransporter;
+}
+
+/**
+ * Send email using transporter
+ * @param transporter - Nodemailer transporter
+ * @param options - Email options (to, subject, html)
+ */
+export async function sendEmail(
+  transporter: any,
+  options: {
+    to: string;
+    subject: string;
+    html: string;
+  }
+): Promise<void> {
+  const mailOptions = {
+    from: "noreply@smu.edu.ph",
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+  };
+
+  await transporter.sendMail(mailOptions);
 }

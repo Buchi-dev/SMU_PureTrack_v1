@@ -19,7 +19,12 @@ export {
 export {processSensorData} from "./pubsub/processSensorData";
 export {autoRegisterDevice} from "./pubsub/autoRegisterDevice";
 export {monitorDeviceStatus} from "./pubsub/monitorDeviceStatus";
+export {aggregateAlertsToDigest} from "./pubsub/aggregateAlertsToDigest";
 
 // Scheduler Functions
 export {checkStaleAlerts} from "./scheduler/checkStaleAlerts";
 export {sendDailyAnalytics} from "./scheduler/sendDailyAnalytics";
+export {sendAlertDigests} from "./scheduler/sendAlertDigests";
+
+// HTTP Functions - Alert Management
+export {acknowledgeDigest} from "./http/acknowledgeDigest";
