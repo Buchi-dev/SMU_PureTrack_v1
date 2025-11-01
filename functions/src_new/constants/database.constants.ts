@@ -19,6 +19,8 @@ export const COLLECTIONS = {
   BUSINESS_LOGS: "business_logs",
   ALERTS: "alerts",
   NOTIFICATION_PREFERENCES: "notification_preferences",
+  DEVICES: "devices",
+  SENSOR_READINGS: "sensor_readings",
 } as const;
 
 /**

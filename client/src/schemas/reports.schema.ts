@@ -102,11 +102,14 @@ export const WaterQualityReportDataSchema = z.object({
  * Device Status Summary Schema
  */
 export const DeviceStatusSummarySchema = z.object({
-  online: z.number(),
-  offline: z.number(),
-  error: z.number(),
-  maintenance: z.number(),
-  total: z.number(),
+  totalDevices: z.number(),
+  statusBreakdown: z.object({
+    online: z.number(),
+    offline: z.number(),
+    error: z.number(),
+    maintenance: z.number(),
+  }),
+  healthScore: z.string(),
 });
 
 /**

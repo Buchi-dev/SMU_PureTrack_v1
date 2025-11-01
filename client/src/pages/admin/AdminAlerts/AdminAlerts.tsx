@@ -40,101 +40,19 @@ import type { ColumnsType } from 'antd/es/table';
 import { collection, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
 import { alertsService } from '../../../services/alerts.Service';
-
-// --- Inlined from alerts.ts ---
-// Timestamp is imported above as a value
-export type AlertSeverity = 'Advisory' | 'Warning' | 'Critical';
-export type AlertStatus = 'Active' | 'Acknowledged' | 'Resolved';
-export type WaterParameter = 'tds' | 'ph' | 'turbidity';
-export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
-export type AlertType = 'threshold' | 'trend';
-export interface WaterQualityAlert {
-  alertId: string;
-  deviceId: string;
-  deviceName?: string;
-  deviceBuilding?: string;
-  deviceFloor?: string;
-  parameter: WaterParameter;
-  alertType: AlertType;
-  severity: AlertSeverity;
-  status: AlertStatus;
-  currentValue: number;
-  thresholdValue?: number;
-  trendDirection?: TrendDirection;
-  message: string;
-  recommendedAction: string;
-  createdAt: Timestamp;
-  acknowledgedAt?: Timestamp;
-  acknowledgedBy?: string;
-  resolvedAt?: Timestamp;
-  resolvedBy?: string;
-  notificationsSent: string[];
-  metadata?: {
-    previousValue?: number;
-    changeRate?: number;
-    location?: string;
-    [key: string]: any;
-  };
-}
-export interface AlertFilters {
-  severity?: AlertSeverity[];
-  status?: AlertStatus[];
-  parameter?: WaterParameter[];
-  deviceId?: string[];
-  dateFrom?: Date;
-  dateTo?: Date;
-  searchTerm?: string;
-}
-export const getParameterUnit = (parameter: WaterParameter): string => {
-  switch (parameter) {
-    case 'tds':
-      return 'ppm';
-    case 'ph':
-      return '';
-    case 'turbidity':
-      return 'NTU';
-    default:
-      return '';
-  }
-};
-export const getParameterName = (parameter: WaterParameter): string => {
-  switch (parameter) {
-    case 'tds':
-      return 'TDS (Total Dissolved Solids)';
-    case 'ph':
-      return 'pH Level';
-    case 'turbidity':
-      return 'Turbidity';
-    default:
-      return parameter;
-  }
-};
-export const getSeverityColor = (severity: AlertSeverity): string => {
-  switch (severity) {
-    case 'Critical':
-      return 'error';
-    case 'Warning':
-      return 'warning';
-    case 'Advisory':
-      return 'processing';
-    default:
-      return 'default';
-  }
-};
-export const getStatusColor = (status: AlertStatus): string => {
-  switch (status) {
-    case 'Active':
-      return 'error';
-    case 'Acknowledged':
-      return 'warning';
-    case 'Resolved':
-      return 'success';
-    default:
-      return 'default';
-  }
-};
-// --- End inlined section ---
-
+import type {
+  WaterQualityAlert,
+  WaterQualityAlertStatus as AlertStatus,
+  WaterQualityAlertSeverity as AlertSeverity,
+  WaterQualityParameter as WaterParameter,
+  AlertFiltersExtended as AlertFilters,
+} from '../../../schemas';
+import {
+  getParameterUnit,
+  getParameterName,
+  getSeverityColor,
+  getStatusColor,
+} from '../../../schemas';
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
 
 const { Title, Text } = Typography;

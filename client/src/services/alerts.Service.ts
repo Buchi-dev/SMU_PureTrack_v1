@@ -10,63 +10,16 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import type {
   WaterQualityAlert,
-  WaterQualityAlertStatus,
-  WaterQualityAlertSeverity,
-  WaterQualityParameter,
+  AlertFilters,
+  AcknowledgeAlertRequest,
+  ResolveAlertRequest,
+  ListAlertsRequest,
+  AlertResponse,
 } from '../schemas';
 
 // ============================================================================
-// TYPE DEFINITIONS
+// ERROR RESPONSE TYPE
 // ============================================================================
-
-/**
- * Alert filters for listing
- */
-export interface AlertFilters {
-  severity?: WaterQualityAlertSeverity[];
-  status?: WaterQualityAlertStatus[];
-  parameter?: WaterQualityParameter[];
-  deviceId?: string[];
-}
-
-/**
- * Request for acknowledging an alert
- */
-export interface AcknowledgeAlertRequest {
-  action: 'acknowledgeAlert';
-  alertId: string;
-}
-
-/**
- * Request for resolving an alert
- */
-export interface ResolveAlertRequest {
-  action: 'resolveAlert';
-  alertId: string;
-  notes?: string;
-}
-
-/**
- * Request for listing alerts
- */
-export interface ListAlertsRequest {
-  action: 'listAlerts';
-  filters?: AlertFilters;
-}
-
-/**
- * Response for alert operations
- */
-export interface AlertResponse {
-  success: boolean;
-  message?: string;
-  alert?: {
-    alertId: string;
-    status: WaterQualityAlertStatus;
-  };
-  alerts?: WaterQualityAlert[];
-  error?: string;
-}
 
 /**
  * Generic error response

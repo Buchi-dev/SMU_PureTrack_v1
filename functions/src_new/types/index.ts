@@ -17,3 +17,9 @@ export * from "./alertManagement.types";
 
 // Export notification preferences types
 export * from "./notificationPreferences.types";
+
+// Export report generation types
+export * from "./reportGeneration.types";
+
+// Export device management types
+export * from "./deviceManagement.types";

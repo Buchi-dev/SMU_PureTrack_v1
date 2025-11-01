@@ -8,144 +8,16 @@
  */
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import type {
+  GenerateReportRequest,
+  WaterQualityReportData,
+  DeviceStatusReportData,
+  ReportResponse,
+} from '../schemas';
 
 // ============================================================================
-// TYPE DEFINITIONS
+// ERROR RESPONSE TYPE
 // ============================================================================
-
-/**
- * Available report types
- */
-export type ReportType = 'water_quality' | 'device_status' | 'data_summary' | 'compliance';
-
-/**
- * Request for generating a report
- */
-export interface GenerateReportRequest {
-  reportType: ReportType;
-  deviceIds?: string[];
-  startDate?: number;
-  endDate?: number;
-  includeCharts?: boolean;
-  [key: string]: any;
-}
-
-/**
- * Device metrics in water quality report
- */
-export interface DeviceMetrics {
-  avgPH: number;
-  minPH: number;
-  maxPH: number;
-  avgTDS: number;
-  minTDS: number;
-  maxTDS: number;
-  avgTurbidity: number;
-  minTurbidity: number;
-  maxTurbidity: number;
-  totalReadings: number;
-}
-
-/**
- * Sensor reading data
- */
-export interface SensorReading {
-  deviceId: string;
-  ph: number;
-  tds: number;
-  turbidity: number;
-  timestamp: number;
-  receivedAt: number;
-}
-
-/**
- * Alert data in reports
- */
-export interface AlertData {
-  severity: string;
-  parameter: string;
-  message: string;
-  value: string;
-}
-
-/**
- * Device data in water quality report
- */
-export interface WaterQualityDeviceData {
-  deviceId: string;
-  deviceName: string;
-  metrics: DeviceMetrics;
-  readings: SensorReading[];
-  alerts: AlertData[];
-}
-
-/**
- * Water quality report response
- */
-export interface WaterQualityReportData {
-  reportType: 'water_quality';
-  period?: {
-    start: string;
-    end: string;
-  };
-  devices: WaterQualityDeviceData[];
-  summary?: {
-    totalDevices: number;
-    totalReadings: number;
-    averagePH: number;
-    averageTDS: number;
-    averageTurbidity: number;
-  };
-}
-
-/**
- * Device status breakdown
- */
-export interface DeviceStatusBreakdown {
-  online: number;
-  offline: number;
-  error: number;
-  maintenance: number;
-}
-
-/**
- * Device status summary
- */
-export interface DeviceStatusSummary {
-  totalDevices: number;
-  statusBreakdown: DeviceStatusBreakdown;
-  healthScore: string;
-}
-
-/**
- * Device info in device status report
- */
-export interface DeviceStatusInfo {
-  deviceId: string;
-  deviceName: string;
-  status: string;
-  lastSeen: string;
-  uptime?: string;
-}
-
-/**
- * Device status report response
- */
-export interface DeviceStatusReportData {
-  reportType: 'device_status';
-  summary: DeviceStatusSummary;
-  devices: DeviceStatusInfo[];
-}
-
-/**
- * Generic report response
- */
-export interface ReportResponse<T = any> {
-  success: boolean;
-  message?: string;
-  data: T;
-  timestamp: number;
-}
 
 /**
  * Generic error response

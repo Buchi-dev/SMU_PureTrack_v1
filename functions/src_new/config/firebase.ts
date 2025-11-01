@@ -6,6 +6,7 @@
  */
 
 import * as admin from "firebase-admin";
+import {PubSub} from "@google-cloud/pubsub";
 import {setGlobalOptions} from "firebase-functions/v2";
 
 // ===========================
@@ -29,6 +30,18 @@ if (!admin.apps.length) {
  * Used for structured document-based data storage
  */
 export const db = admin.firestore();
+
+/**
+ * Realtime Database instance
+ * Used for real-time sensor data and device status
+ */
+export const rtdb = admin.database();
+
+/**
+ * Pub/Sub client instance
+ * Used for device command publishing and MQTT bridge
+ */
+export const pubsub = new PubSub();
 
 // ===========================
 // GLOBAL FUNCTION SETTINGS

@@ -19,7 +19,6 @@ export const ALERT_MANAGEMENT_ERRORS = {
   
   // Authentication errors
   UNAUTHENTICATED: "Authentication required to manage alerts",
-  PERMISSION_DENIED: "You do not have permission to manage alerts",
   
   // Business logic errors
   ALERT_NOT_FOUND: "Alert not found",

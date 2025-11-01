@@ -49,6 +49,11 @@ import {
 } from 'recharts';
 import { useThemeToken } from '../../../theme';
 import { reportsService } from '../../../services/reports.Service';
+import type { 
+  DeviceStatusSummary as DeviceStatusData,
+  AlertData,
+} from '../../../schemas';
+import type { SensorReading } from '../../../schemas/deviceManagement.schema';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -79,34 +84,6 @@ const WATER_QUALITY_THRESHOLDS = {
     description: 'Maximum recommended for drinking water',
   },
 };
-
-// Types
-interface DeviceStatusData {
-  totalDevices: number;
-  statusBreakdown: {
-    online: number;
-    offline: number;
-    error: number;
-    maintenance: number;
-  };
-  healthScore: string;
-}
-
-interface SensorReading {
-  deviceId: string;
-  ph: number;
-  tds: number;
-  turbidity: number;
-  timestamp: number;
-  receivedAt: number;
-}
-
-interface AlertData {
-  severity: string;
-  parameter: string;
-  message: string;
-  value: string;
-}
 
 export const AdminAnalytics = () => {
   const token = useThemeToken();

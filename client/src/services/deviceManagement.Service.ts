@@ -8,45 +8,17 @@
  */
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import type { Device, SensorReading } from '../schemas';
+import type { 
+  Device, 
+  SensorReading, 
+  DeviceData, 
+  CommandParams, 
+  DeviceResponse 
+} from '../schemas';
 
 // ============================================================================
-// TYPE DEFINITIONS
+// ERROR RESPONSE TYPE
 // ============================================================================
-
-/**
- * Device data for add/update operations
- */
-export interface DeviceData {
-  name?: string;
-  type?: string;
-  firmwareVersion?: string;
-  macAddress?: string;
-  ipAddress?: string;
-  sensors?: string[];
-  status?: 'online' | 'offline' | 'error' | 'maintenance';
-  metadata?: Record<string, any>;
-}
-
-/**
- * Command parameters for device commands
- */
-export interface CommandParams {
-  [key: string]: any;
-}
-
-/**
- * Response for device operations
- */
-export interface DeviceResponse {
-  success: boolean;
-  message?: string;
-  device?: Device;
-  devices?: Device[];
-  count?: number;
-  sensorData?: SensorReading;
-  history?: SensorReading[];
-}
 
 /**
  * Generic error response

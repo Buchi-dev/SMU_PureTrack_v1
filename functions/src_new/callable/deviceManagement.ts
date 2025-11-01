@@ -9,52 +9,25 @@
 import {HttpsError} from "firebase-functions/v2/https";
 import type {CallableRequest} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import {db} from "../config/firebase";
-// Import device types from src (original location)
-import {db as srcDb, rtdb, pubsub} from "../../src/config/firebase";
+import {db, rtdb, pubsub} from "../config/firebase";
 import type {
   Device,
   DeviceData,
   DeviceStatus,
   CommandMessage,
   SensorReading,
-} from "../../src/types";
+  DeviceManagementRequest,
+  DeviceManagementResponse,
+} from "../types";
+import {
+  DEVICE_MANAGEMENT_ERRORS,
+  DEVICE_MANAGEMENT_MESSAGES,
+  DEVICE_DEFAULTS,
+  MQTT_TOPICS,
+  PUBSUB_TOPICS,
+} from "../constants";
 import {createRoutedFunction} from "../utils";
 import type {ActionHandler, ActionHandlers} from "../utils/switchCaseRouting";
-
-/**
- * Device Management Request Interface
- */
-interface DeviceManagementRequest {
-  action:
-    | "discoverDevices"
-    | "sendCommand"
-    | "addDevice"
-    | "getDevice"
-    | "updateDevice"
-    | "deleteDevice"
-    | "listDevices"
-    | "getSensorReadings"
-    | "getSensorHistory";
-  deviceId?: string;
-  deviceData?: DeviceData;
-  command?: string;
-  params?: Record<string, unknown>;
-  limit?: number;
-}
-
-/**
- * Device Management Response Interface
- */
-interface DeviceManagementResponse {
-  success: boolean;
-  message?: string;
-  device?: Device;
-  devices?: Device[];
-  count?: number;
-  sensorData?: SensorReading;
-  history?: SensorReading[];
-}
 
 /**
  * Handler: Discover Devices
@@ -71,16 +44,16 @@ const handleDiscoverDevices: ActionHandler<
   };
 
   // Publish to Pub/Sub - Bridge will forward to MQTT
-  await pubsub.topic("device-commands").publishMessage({
+  await pubsub.topic(PUBSUB_TOPICS.DEVICE_COMMANDS).publishMessage({
     json: discoveryMessage,
     attributes: {
-      mqtt_topic: "device/discovery/request",
+      mqtt_topic: MQTT_TOPICS.DISCOVERY_REQUEST,
     },
   });
 
   return {
     success: true,
-    message: "Discovery message sent to devices",
+    message: DEVICE_MANAGEMENT_MESSAGES.DISCOVERY_SENT,
   };
 };
 
@@ -95,7 +68,7 @@ const handleSendCommand: ActionHandler<
   const {deviceId, command, params} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const commandMessage: CommandMessage = {
@@ -106,17 +79,17 @@ const handleSendCommand: ActionHandler<
   };
 
   // Publish command to Pub/Sub
-  await pubsub.topic("device-commands").publishMessage({
+  await pubsub.topic(PUBSUB_TOPICS.DEVICE_COMMANDS).publishMessage({
     json: commandMessage,
     attributes: {
-      mqtt_topic: `device/command/${deviceId}`,
+      mqtt_topic: `${MQTT_TOPICS.COMMAND_PREFIX}${deviceId}`,
       device_id: deviceId,
     },
   });
 
   return {
     success: true,
-    message: `Command sent to device: ${deviceId}`,
+    message: DEVICE_MANAGEMENT_MESSAGES.COMMAND_SENT,
   };
 };
 
@@ -131,25 +104,25 @@ const handleAddDevice: ActionHandler<
   const {deviceId, deviceData} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const deviceRef = db.collection("devices").doc(deviceId);
   const doc = await deviceRef.get();
 
   if (doc.exists) {
-    throw new HttpsError("already-exists", "Device already exists");
+    throw new HttpsError("already-exists", DEVICE_MANAGEMENT_ERRORS.DEVICE_ALREADY_EXISTS);
   }
 
   const newDevice: Device = {
     deviceId: deviceId,
     name: deviceData?.name || `Device-${deviceId}`,
-    type: deviceData?.type || "Arduino UNO R4 WiFi",
-    firmwareVersion: deviceData?.firmwareVersion || "1.0.0",
+    type: deviceData?.type || DEVICE_DEFAULTS.TYPE,
+    firmwareVersion: deviceData?.firmwareVersion || DEVICE_DEFAULTS.FIRMWARE_VERSION,
     macAddress: deviceData?.macAddress || "",
     ipAddress: deviceData?.ipAddress || "",
-    sensors: deviceData?.sensors || ["turbidity", "tds", "ph"],
-    status: (deviceData?.status as DeviceStatus) || "online",
+    sensors: deviceData?.sensors || DEVICE_DEFAULTS.SENSORS,
+    status: (deviceData?.status as DeviceStatus) || DEVICE_DEFAULTS.STATUS,
     registeredAt: admin.firestore.FieldValue.serverTimestamp(),
     lastSeen: admin.firestore.FieldValue.serverTimestamp(),
     metadata: deviceData?.metadata || {},
@@ -166,7 +139,7 @@ const handleAddDevice: ActionHandler<
 
   return {
     success: true,
-    message: "Device added successfully",
+    message: DEVICE_MANAGEMENT_MESSAGES.DEVICE_ADDED,
     device: newDevice,
   };
 };
@@ -182,14 +155,14 @@ const handleGetDevice: ActionHandler<
   const {deviceId} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const deviceRef = db.collection("devices").doc(deviceId);
   const doc = await deviceRef.get();
 
   if (!doc.exists) {
-    throw new HttpsError("not-found", "Device not found");
+    throw new HttpsError("not-found", DEVICE_MANAGEMENT_ERRORS.DEVICE_NOT_FOUND);
   }
 
   return {
@@ -209,14 +182,14 @@ const handleUpdateDevice: ActionHandler<
   const {deviceId, deviceData} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const deviceRef = db.collection("devices").doc(deviceId);
   const doc = await deviceRef.get();
 
   if (!doc.exists) {
-    throw new HttpsError("not-found", "Device not found");
+    throw new HttpsError("not-found", DEVICE_MANAGEMENT_ERRORS.DEVICE_NOT_FOUND);
   }
 
   const updateData = {
@@ -229,7 +202,7 @@ const handleUpdateDevice: ActionHandler<
 
   return {
     success: true,
-    message: "Device updated successfully",
+    message: DEVICE_MANAGEMENT_MESSAGES.DEVICE_UPDATED,
   };
 };
 
@@ -244,14 +217,14 @@ const handleDeleteDevice: ActionHandler<
   const {deviceId} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const deviceRef = db.collection("devices").doc(deviceId);
   const doc = await deviceRef.get();
 
   if (!doc.exists) {
-    throw new HttpsError("not-found", "Device not found");
+    throw new HttpsError("not-found", DEVICE_MANAGEMENT_ERRORS.DEVICE_NOT_FOUND);
   }
 
   await deviceRef.delete();
@@ -261,7 +234,7 @@ const handleDeleteDevice: ActionHandler<
 
   return {
     success: true,
-    message: "Device deleted successfully",
+    message: DEVICE_MANAGEMENT_MESSAGES.DEVICE_DELETED,
   };
 };
 
@@ -275,10 +248,8 @@ const handleListDevices: ActionHandler<
 > = async (req: CallableRequest<DeviceManagementRequest>) => {
   const devicesSnapshot = await db.collection("devices").get();
 
-  const devices: Device[] = [];
-  devicesSnapshot.forEach((doc) => {
-    const deviceData = doc.data() as Device;
-    devices.push({...deviceData, id: doc.id} as any);
+  const devices: Device[] = devicesSnapshot.docs.map((doc) => {
+    return doc.data() as Device;
   });
 
   return {
@@ -299,7 +270,7 @@ const handleGetSensorReadings: ActionHandler<
   const {deviceId} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
   const snapshot = await rtdb
@@ -309,7 +280,7 @@ const handleGetSensorReadings: ActionHandler<
   if (!snapshot.exists()) {
     throw new HttpsError(
       "not-found",
-      "No sensor readings found for this device"
+      DEVICE_MANAGEMENT_ERRORS.NO_SENSOR_READINGS
     );
   }
 
@@ -332,10 +303,10 @@ const handleGetSensorHistory: ActionHandler<
   const {deviceId, limit} = req.data;
 
   if (!deviceId) {
-    throw new HttpsError("invalid-argument", "Device ID is required");
+    throw new HttpsError("invalid-argument", DEVICE_MANAGEMENT_ERRORS.MISSING_DEVICE_ID);
   }
 
-  const historyLimit = limit || 50;
+  const historyLimit = limit || DEVICE_DEFAULTS.HISTORY_LIMIT;
   const snapshot = await rtdb
     .ref(`sensorReadings/${deviceId}/history`)
     .orderByChild("timestamp")
@@ -345,7 +316,7 @@ const handleGetSensorHistory: ActionHandler<
   if (!snapshot.exists()) {
     throw new HttpsError(
       "not-found",
-      "No sensor history found for this device"
+      DEVICE_MANAGEMENT_ERRORS.NO_SENSOR_HISTORY
     );
   }
 
