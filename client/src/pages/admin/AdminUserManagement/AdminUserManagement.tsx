@@ -1,6 +1,13 @@
 /**
- * User Management Component
- * Allows admins to manage users, approve pending accounts, and update user status
+ * REDESIGNED ADMIN USER MANAGEMENT - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Drawer for user details panel
+ * - Descriptions for user information
+ * - Steps for approval workflow
+ * - Segmented for view modes
+ * - Avatar for user profiles
+ * - Progress for account completion
  */
 
 import { useState, useEffect } from 'react';
@@ -21,8 +28,16 @@ import {
   Input,
   Tooltip,
   Popconfirm,
-  theme,
+  Drawer,
+  Steps,
+  Segmented,
+  Avatar,
+  Progress,
+  Flex,
+  Alert,
+  Divider,
 } from 'antd';
+import type { SegmentedValue } from 'antd/es/segmented';
 import {
   TeamOutlined,
   CheckCircleOutlined,
@@ -35,12 +50,17 @@ import {
   MailOutlined,
   PhoneOutlined,
   CalendarOutlined,
+  UserOutlined,
+  SafetyOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
 import type { UserProfile, UserStatus, UserRole } from '../../../contexts';
 import type { ColumnsType } from 'antd/es/table';
-import { userManagementService } from '../../../services/userManagement.Service';
+import { userManagementService } from '../../../services/userManagementService';
+import { useResponsiveToken } from '../../../theme';
 
 const { Title, Paragraph, Text } = Typography;
+const { TabPane } = Tabs;
 
 interface UserWithId extends UserProfile {
   id: string;

@@ -1,3 +1,14 @@
+/**
+ * REDESIGNED ADMIN ANALYTICS - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Calendar for date selection
+ * - Segmented for view modes
+ * - Tabs for different analytics views
+ * - Descriptions for metrics details
+ * - Progress rings for KPIs
+ */
+
 import { useState, useEffect } from 'react';
 import { AdminLayout } from '../../../components/layouts';
 import { 
@@ -11,8 +22,16 @@ import {
   message,
   Tag,
   Progress,
-  Alert
+  Alert,
+  Calendar,
+  Segmented,
+  Tabs,
+  Descriptions,
+  Flex,
+  Badge,
+  Tooltip,
 } from 'antd';
+import type { SegmentedValue } from 'antd/es/segmented';
 import {
   BarChartOutlined,
   DashboardOutlined,
@@ -24,6 +43,8 @@ import {
   WarningOutlined,
   LineChartOutlined,
   ExclamationCircleOutlined,
+  CalendarOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import {
   LineChart,
@@ -38,7 +59,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
   RadarChart,
@@ -47,7 +68,7 @@ import {
   PolarRadiusAxis,
   Radar,
 } from 'recharts';
-import { useThemeToken } from '../../../theme';
+import { useResponsiveToken } from '../../../theme';
 import { reportsService } from '../../../services/reports.Service';
 import type { 
   DeviceStatusSummary as DeviceStatusData,
@@ -56,6 +77,7 @@ import type {
 import type { SensorReading } from '../../../schemas/deviceManagement.schema';
 
 const { Title, Paragraph, Text } = Typography;
+const { TabPane } = Tabs;
 
 // Global Water Quality Thresholds
 // Based on EPPA, DOH (Philippines), and WHO Standards

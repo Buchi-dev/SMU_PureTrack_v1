@@ -1,3 +1,14 @@
+/**
+ * REDESIGNED ADMIN REPORTS - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Steps for report generation wizard
+ * - Transfer for data selection
+ * - Collapse for report sections
+ * - Descriptions for report details
+ * - Timeline for report history
+ */
+
 import { useState, useEffect } from 'react';
 import {
   Card,
@@ -17,7 +28,16 @@ import {
   Statistic,
   List,
   Empty,
+  Steps,
+  Transfer,
+  Collapse,
+  Descriptions,
+  Timeline,
+  Segmented,
+  Flex,
+  Progress,
 } from 'antd';
+import type { SegmentedValue } from 'antd/es/segmented';
 import {
   FileTextOutlined,
   FilePdfOutlined,
@@ -28,6 +48,8 @@ import {
   DatabaseOutlined,
   ExperimentOutlined,
   HistoryOutlined,
+  RocketOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
 import { deviceManagementService } from '../../../services/deviceManagement.Service';
@@ -36,7 +58,7 @@ import type { Device, SensorReading, ReportType, ReportConfig, ReportHistory } f
 import dayjs from 'dayjs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useThemeToken } from '../../../theme';
+import { useResponsiveToken } from '../../../theme';
 
 // Type extension for jsPDF with autoTable plugin
 interface jsPDFWithAutoTable extends jsPDF {
@@ -48,6 +70,7 @@ interface jsPDFWithAutoTable extends jsPDF {
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
+const { Panel } = Collapse;
 
 // Utility function to calculate statistics from sensor readings
 const calculateStatistics = (data: number[]) => {

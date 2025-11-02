@@ -1,9 +1,46 @@
-import { AdminLayout } from '../../../components/layouts';
-import { Typography } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
-import NotificationSettings from './NotificationSettings';
+/**
+ * REDESIGNED ADMIN SETTINGS - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Collapse for settings sections
+ * - Switch for toggles
+ * - Slider for numeric values
+ * - Segmented for choices
+ * - Descriptions for settings info
+ * - Card for organized sections
+ */
 
-const { Title, Paragraph } = Typography;
+import { AdminLayout } from '../../../components/layouts';
+import { 
+  Typography, 
+  Card,
+  Collapse,
+  Switch,
+  Slider,
+  Segmented,
+  Descriptions,
+  Divider,
+  Space,
+  Flex,
+  Alert,
+  Tag,
+  Tooltip,
+  Button,
+} from 'antd';
+import type { SegmentedValue } from 'antd/es/segmented';
+import { 
+  BellOutlined,
+  SettingOutlined,
+  SafetyOutlined,
+  DashboardOutlined,
+  ThunderboltOutlined,
+  NotificationOutlined,
+} from '@ant-design/icons';
+import NotificationSettings from './NotificationSettings';
+import { useResponsiveToken } from '../../../theme';
+
+const { Title, Paragraph, Text } = Typography;
+const { Panel } = Collapse;
 
 export const AdminSettings = () => {
   return (

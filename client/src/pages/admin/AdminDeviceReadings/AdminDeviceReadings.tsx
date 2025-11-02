@@ -1,3 +1,13 @@
+/**
+ * REDESIGNED ADMIN DEVICE READINGS - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Calendar for date/time selection
+ * - Timeline for data chronology
+ * - Segmented for view modes
+ * - Descriptions for reading details
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
@@ -17,8 +27,15 @@ import {
   Badge,
   message,
   Empty,
+  Calendar,
+  Timeline,
+  Segmented,
+  Descriptions,
+  Flex,
+  Tooltip,
 } from 'antd';
-import { useThemeToken } from '../../../theme';
+import type { SegmentedValue } from 'antd/es/segmented';
+import { useResponsiveToken } from '../../../theme';
 import {
   ReloadOutlined,
   DownloadOutlined,
@@ -31,6 +48,8 @@ import {
   ExperimentOutlined,
   ThunderboltOutlined,
   FireOutlined,
+  CalendarOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
 import { deviceManagementService } from '../../../services/deviceManagement.Service';
