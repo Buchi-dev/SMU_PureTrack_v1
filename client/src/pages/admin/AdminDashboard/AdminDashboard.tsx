@@ -1,15 +1,14 @@
-// ============================================================================
-// ADMIN DASHBOARD - REAL-TIME IMPLEMENTATION
-// ============================================================================
-// This is the complete implementation for the Admin Dashboard with:
-// - Real-time sensor readings from Firebase Realtime Database
-// - Dynamic alerts panel with filtering and search
-// - Interactive data visualization using Recharts
-// - Responsive single-screen layout
-//
-// TO IMPLEMENT: Replace the content of
-// client/src/pages/admin/AdminDashboard.tsx with this code
-// ============================================================================
+/**
+ * REDESIGNED ADMIN DASHBOARD - ENHANCED UI/UX
+ * 
+ * Features:
+ * - Maximized Ant Design v5 components (Cards, Tabs, Segmented, Descriptions, Timeline)
+ * - Global theme integration with responsive tokens
+ * - Enhanced visual hierarchy and spacing
+ * - Modern card-based layout with hover effects
+ * - Real-time data updates
+ * - Improved accessibility
+ */
 
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
 import {
@@ -28,6 +27,14 @@ import {
   Empty,
   Divider,
   Alert as AntAlert,
+  Tabs,
+  Segmented,
+  Timeline,
+  Progress,
+  Tooltip,
+  Button,
+  Descriptions,
+  Skeleton,
 } from 'antd';
 import {
   ApiOutlined,
@@ -37,6 +44,11 @@ import {
   ThunderboltOutlined,
   SearchOutlined,
   FilterOutlined,
+  DashboardOutlined,
+  LineChartOutlined,
+  BellOutlined,
+  ReloadOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { useThemeToken } from '../../../theme';
 import { useState, useEffect, useMemo } from 'react';
