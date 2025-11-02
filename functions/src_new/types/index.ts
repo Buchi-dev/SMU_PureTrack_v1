@@ -23,3 +23,6 @@ export * from "./reportGeneration.types";
 
 // Export device management types
 export * from "./deviceManagement.types";
+
+// Export digest types
+export * from "./digest.types";

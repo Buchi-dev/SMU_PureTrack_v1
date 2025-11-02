@@ -25,7 +25,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { deviceApi } from '../../../services/api';
+import { deviceManagementService } from '../../../services/deviceManagement.Service';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -55,13 +55,13 @@ export const StaffDevices = () => {
     const fetchDevices = async () => {
       setLoading(true);
       try {
-        const devicesList = await deviceApi.listDevices();
+        const devicesList = await deviceManagementService.listDevices();
         
         // Transform API data to match component interface
         const transformedDevices = await Promise.all(
           devicesList.map(async (device) => {
             try {
-              const readings = await deviceApi.getSensorReadings(device.deviceId);
+              const readings = await deviceManagementService.getSensorReadings(device.deviceId);
               
               // Determine status
               let status: 'online' | 'offline' | 'warning' = 'offline';

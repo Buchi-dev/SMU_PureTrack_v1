@@ -21,6 +21,7 @@ export interface NotificationPreferences {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts: boolean;
   alertSeverities: string[];
   parameters: string[];
   devices: string[];
@@ -39,6 +40,7 @@ export interface PreferencesData {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts: boolean;
   alertSeverities: string[];
   parameters: string[];
   devices: string[];
@@ -330,6 +332,7 @@ export class NotificationPreferencesService {
       email,
       emailNotifications: true,
       pushNotifications: currentPrefs?.pushNotifications || false,
+      sendScheduledAlerts: currentPrefs?.sendScheduledAlerts ?? true,
       alertSeverities: currentPrefs?.alertSeverities || ["Critical", "Warning", "Advisory"],
       parameters: currentPrefs?.parameters || [],
       devices: currentPrefs?.devices || [],
@@ -363,6 +366,7 @@ export class NotificationPreferencesService {
       email,
       emailNotifications: false,
       pushNotifications: currentPrefs?.pushNotifications || false,
+      sendScheduledAlerts: currentPrefs?.sendScheduledAlerts ?? true,
       alertSeverities: currentPrefs?.alertSeverities || ["Critical", "Warning", "Advisory"],
       parameters: currentPrefs?.parameters || [],
       devices: currentPrefs?.devices || [],

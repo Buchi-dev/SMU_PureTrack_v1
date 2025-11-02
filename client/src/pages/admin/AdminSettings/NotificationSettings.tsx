@@ -40,6 +40,7 @@ interface NotificationPreferences {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts: boolean;
   alertSeverities: string[];
   parameters: string[];
   devices: string[];
@@ -75,6 +76,7 @@ const NotificationSettings: React.FC = () => {
         form.setFieldsValue({
           emailNotifications: userPrefs.emailNotifications,
           pushNotifications: userPrefs.pushNotifications,
+          sendScheduledAlerts: userPrefs.sendScheduledAlerts ?? true,
           alertSeverities: userPrefs.alertSeverities || [],
           parameters: userPrefs.parameters || [],
           devices: userPrefs.devices || [],
@@ -89,6 +91,7 @@ const NotificationSettings: React.FC = () => {
         form.setFieldsValue({
           emailNotifications: true,
           pushNotifications: false,
+          sendScheduledAlerts: true,
           alertSeverities: ['Critical', 'Warning', 'Advisory'],
           parameters: [],
           devices: [],
@@ -134,6 +137,7 @@ const NotificationSettings: React.FC = () => {
         email: user.email,
         emailNotifications: values.emailNotifications,
         pushNotifications: values.pushNotifications,
+        sendScheduledAlerts: values.sendScheduledAlerts ?? true,
         alertSeverities: values.alertSeverities || [],
         parameters: values.parameters || [],
         devices: values.devices || [],
@@ -172,6 +176,7 @@ const NotificationSettings: React.FC = () => {
         initialValues={{
           emailNotifications: true,
           pushNotifications: false,
+          sendScheduledAlerts: true,
           alertSeverities: ['Critical', 'Warning', 'Advisory'],
           parameters: [],
           devices: [],
@@ -183,8 +188,8 @@ const NotificationSettings: React.FC = () => {
           message={preferences ? "Notification Preferences Active" : "Set Up Your Notifications"}
           description={
             preferences
-              ? `You're receiving water quality alerts at ${user?.email}. Daily analytics reports are automatically sent every morning at 6:00 AM (Manila Time).`
-              : `Configure your notification preferences to start receiving real-time water quality alerts and daily reports at ${user?.email}.`
+              ? `You're receiving water quality alerts at ${user?.email}. Customize your notification channels and scheduled report preferences below.`
+              : `Configure your notification preferences to start receiving real-time water quality alerts and scheduled analytics reports at ${user?.email}.`
           }
           type={preferences ? "success" : "info"}
           showIcon
@@ -231,7 +236,35 @@ const NotificationSettings: React.FC = () => {
                           Email Notifications
                         </div>
                         <Text type="secondary" style={{ fontSize: 13 }}>
-                          Receive alerts and daily reports via email
+                          Receive real-time alerts and scheduled reports via email
+                        </Text>
+                      </div>
+                    </Space>
+                    <Switch size="default" />
+                  </div>
+                </Form.Item>
+
+                <Form.Item
+                  name="sendScheduledAlerts"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '16px',
+                    background: '#fafafa',
+                    borderRadius: '8px',
+                  }}>
+                    <Space size="middle">
+                      <MailOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                      <div>
+                        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                          Scheduled Analytics Reports
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 13 }}>
+                          Receive daily, weekly, and monthly analytics via email
                         </Text>
                       </div>
                     </Space>
@@ -489,20 +522,22 @@ const NotificationSettings: React.FC = () => {
           </Row>
         </Card>
 
-        {/* Daily Analytics Info */}
+        {/* Scheduled Analytics Info */}
         <Alert
-          message="Automated Daily Analytics Report"
+          message="Scheduled Analytics Reports"
           description={
             <Space direction="vertical" size={4}>
               <Text>
-                Every morning at <strong>6:00 AM (Manila Time)</strong>, you'll automatically receive a comprehensive email report including:
+                When enabled, you'll receive automated analytics reports via email at the following times (Manila Time - UTC+8):
               </Text>
               <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                <li>Device status and health summary</li>
-                <li>Recent alerts and critical events</li>
-                <li>Water quality trends and statistics</li>
-                <li>24-hour activity overview</li>
+                <li><strong>Daily Report</strong>: Every day at 6:00 AM (24-hour summary)</li>
+                <li><strong>Weekly Report</strong>: Every Monday at 7:00 AM (7-day summary)</li>
+                <li><strong>Monthly Report</strong>: 1st of each month at 8:00 AM (30-day summary)</li>
               </ul>
+              <Text type="secondary" style={{ fontSize: '13px' }}>
+                Each report includes device health, alert statistics, water quality trends, and recent events.
+              </Text>
             </Space>
           }
           type="info"

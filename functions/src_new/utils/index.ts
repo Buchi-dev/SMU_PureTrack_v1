@@ -13,3 +13,6 @@ export * from "./userManagementHelpers";
 
 // Export switch case routing utility
 export * from "./switchCaseRouting";
+
+// Export analytics helpers
+export * from "./analyticsHelpers";

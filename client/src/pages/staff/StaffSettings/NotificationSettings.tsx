@@ -28,6 +28,8 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../../contexts/AuthContext';
+import { notificationPreferencesService } from '../../../services/notificationPreferences.Service';
+import { deviceManagementService } from '../../../services/deviceManagement.Service';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -38,6 +40,7 @@ interface NotificationPreferences {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts?: boolean;
   alertSeverities: string[];
   parameters: string[];
   devices: string[];
@@ -54,8 +57,6 @@ const NotificationSettings: React.FC = () => {
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [devices, setDevices] = useState<any[]>([]);
 
-  const CLOUD_FUNCTIONS_URL = 'https://us-central1-my-app-da530.cloudfunctions.net';
-
   useEffect(() => {
     loadPreferences();
     loadDevices();
@@ -67,43 +68,39 @@ const NotificationSettings: React.FC = () => {
     try {
       setLoading(true);
       
-      // Try to get existing preferences
-      const response = await fetch(`${CLOUD_FUNCTIONS_URL}/listNotificationPreferences`);
-      const data = await response.json();
+      // Get user preferences using service layer
+      const userPrefs = await notificationPreferencesService.getUserPreferences(user.uid);
 
-      if (data.success && data.data) {
-        // Find preferences for current user
-        const userPrefs = data.data.find((p: any) => p.userId === user.uid);
-
-        if (userPrefs) {
-          setPreferences(userPrefs);
-          form.setFieldsValue({
-            emailNotifications: userPrefs.emailNotifications,
-            pushNotifications: userPrefs.pushNotifications,
-            alertSeverities: userPrefs.alertSeverities || [],
-            parameters: userPrefs.parameters || [],
-            devices: userPrefs.devices || [],
-            quietHoursEnabled: userPrefs.quietHoursEnabled,
-            quietHours: userPrefs.quietHoursStart && userPrefs.quietHoursEnd ? [
-              dayjs(userPrefs.quietHoursStart, 'HH:mm'),
-              dayjs(userPrefs.quietHoursEnd, 'HH:mm'),
-            ] : undefined,
-          });
-        } else {
-          // Set defaults for new user
-          form.setFieldsValue({
-            emailNotifications: true,
-            pushNotifications: false,
-            alertSeverities: ['Critical', 'Warning', 'Advisory'],
-            parameters: [],
-            devices: [],
-            quietHoursEnabled: false,
-          });
-        }
+      if (userPrefs) {
+        setPreferences(userPrefs);
+        form.setFieldsValue({
+          emailNotifications: userPrefs.emailNotifications,
+          pushNotifications: userPrefs.pushNotifications,
+          sendScheduledAlerts: userPrefs.sendScheduledAlerts ?? true,
+          alertSeverities: userPrefs.alertSeverities || [],
+          parameters: userPrefs.parameters || [],
+          devices: userPrefs.devices || [],
+          quietHoursEnabled: userPrefs.quietHoursEnabled,
+          quietHours: userPrefs.quietHoursStart && userPrefs.quietHoursEnd ? [
+            dayjs(userPrefs.quietHoursStart, 'HH:mm'),
+            dayjs(userPrefs.quietHoursEnd, 'HH:mm'),
+          ] : undefined,
+        });
+      } else {
+        // Set defaults for new user
+        form.setFieldsValue({
+          emailNotifications: true,
+          pushNotifications: false,
+          sendScheduledAlerts: true,
+          alertSeverities: ['Critical', 'Warning', 'Advisory'],
+          parameters: [],
+          devices: [],
+          quietHoursEnabled: false,
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading preferences:', error);
-      message.error('Failed to load notification preferences');
+      message.error(error.message || 'Failed to load notification preferences');
     } finally {
       setLoading(false);
     }
@@ -111,24 +108,17 @@ const NotificationSettings: React.FC = () => {
 
   const loadDevices = async () => {
     try {
-      const response = await fetch(`${CLOUD_FUNCTIONS_URL}/deviceManagement`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'LIST_DEVICES' }),
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.devices) {
-        setDevices(data.devices);
-      }
-    } catch (error) {
+      // Get devices using service layer
+      const devicesList = await deviceManagementService.listDevices();
+      setDevices(devicesList);
+    } catch (error: any) {
       console.error('Error loading devices:', error);
+      // Don't show error message as devices are optional
     }
   };
 
   const handleSave = async (values: any) => {
-    if (!user) return;
+    if (!user || !user.email) return;
 
     try {
       setSaving(true);
@@ -141,33 +131,23 @@ const NotificationSettings: React.FC = () => {
         ? values.quietHours[1].format('HH:mm')
         : undefined;
 
-      const requestBody = {
+      // Save preferences using service layer
+      const savedPreferences = await notificationPreferencesService.setupPreferences({
         userId: user.uid,
         email: user.email,
         emailNotifications: values.emailNotifications,
         pushNotifications: values.pushNotifications,
+        sendScheduledAlerts: values.sendScheduledAlerts ?? true,
         alertSeverities: values.alertSeverities || [],
         parameters: values.parameters || [],
         devices: values.devices || [],
         quietHoursEnabled: values.quietHoursEnabled,
         quietHoursStart,
         quietHoursEnd,
-      };
-
-      const response = await fetch(`${CLOUD_FUNCTIONS_URL}/setupNotificationPreferences`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
-
-      if (data.success) {
-        message.success('Notification preferences saved successfully');
-        setPreferences(data.data);
-      } else {
-        throw new Error(data.error || 'Failed to save preferences');
-      }
+      message.success('Notification preferences saved successfully');
+      setPreferences(savedPreferences);
     } catch (error: any) {
       console.error('Error saving preferences:', error);
       message.error(error.message || 'Failed to save notification preferences');
@@ -196,6 +176,7 @@ const NotificationSettings: React.FC = () => {
         initialValues={{
           emailNotifications: true,
           pushNotifications: false,
+          sendScheduledAlerts: true,
           alertSeverities: ['Critical', 'Warning', 'Advisory'],
           parameters: [],
           devices: [],
@@ -207,8 +188,8 @@ const NotificationSettings: React.FC = () => {
           message={preferences ? "Notification Preferences Active" : "Set Up Your Notifications"}
           description={
             preferences
-              ? `You're receiving water quality alerts at ${user?.email}. Daily analytics reports are automatically sent every morning at 6:00 AM (Manila Time).`
-              : `Configure your notification preferences to start receiving real-time water quality alerts and daily reports at ${user?.email}.`
+              ? `You're receiving water quality alerts at ${user?.email}. Customize your notification channels and scheduled report preferences below.`
+              : `Configure your notification preferences to start receiving real-time water quality alerts and scheduled analytics reports at ${user?.email}.`
           }
           type={preferences ? "success" : "info"}
           showIcon
@@ -255,7 +236,35 @@ const NotificationSettings: React.FC = () => {
                           Email Notifications
                         </div>
                         <Text type="secondary" style={{ fontSize: 13 }}>
-                          Receive alerts and daily reports via email
+                          Receive real-time alerts and scheduled reports via email
+                        </Text>
+                      </div>
+                    </Space>
+                    <Switch size="default" />
+                  </div>
+                </Form.Item>
+
+                <Form.Item
+                  name="sendScheduledAlerts"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '16px',
+                    background: '#fafafa',
+                    borderRadius: '8px',
+                  }}>
+                    <Space size="middle">
+                      <MailOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                      <div>
+                        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                          Scheduled Analytics Reports
+                        </div>
+                        <Text type="secondary" style={{ fontSize: 13 }}>
+                          Receive daily, weekly, and monthly analytics via email
                         </Text>
                       </div>
                     </Space>
@@ -513,20 +522,22 @@ const NotificationSettings: React.FC = () => {
           </Row>
         </Card>
 
-        {/* Daily Analytics Info */}
+        {/* Scheduled Analytics Info */}
         <Alert
-          message="Automated Daily Analytics Report"
+          message="Scheduled Analytics Reports"
           description={
             <Space direction="vertical" size={4}>
               <Text>
-                Every morning at <strong>6:00 AM (Manila Time)</strong>, you'll automatically receive a comprehensive email report including:
+                When enabled, you'll receive automated analytics reports via email at the following times (Manila Time - UTC+8):
               </Text>
               <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                <li>Device status and health summary</li>
-                <li>Recent alerts and critical events</li>
-                <li>Water quality trends and statistics</li>
-                <li>24-hour activity overview</li>
+                <li><strong>Daily Report</strong>: Every day at 6:00 AM (24-hour summary)</li>
+                <li><strong>Weekly Report</strong>: Every Monday at 7:00 AM (7-day summary)</li>
+                <li><strong>Monthly Report</strong>: 1st of each month at 8:00 AM (30-day summary)</li>
               </ul>
+              <Text type="secondary" style={{ fontSize: '13px' }}>
+                Each report includes device health, alert statistics, water quality trends, and recent events.
+              </Text>
             </Space>
           }
           type="info"

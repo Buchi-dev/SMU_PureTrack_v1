@@ -17,6 +17,7 @@ export interface NotificationPreferences {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts: boolean; // NEW: Enable/disable scheduled analytics reports
   alertSeverities: string[];
   parameters: string[];
   devices: string[];
@@ -55,6 +56,7 @@ export interface SetupPreferencesRequest {
   email: string;
   emailNotifications: boolean;
   pushNotifications: boolean;
+  sendScheduledAlerts: boolean; // NEW: Enable/disable scheduled analytics
   alertSeverities: string[];
   parameters: string[];
   devices: string[];

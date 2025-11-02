@@ -24,7 +24,7 @@ import {
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { deviceApi } from '../../../services/api';
+import { deviceManagementService } from '../../../services/deviceManagement.Service';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
@@ -57,7 +57,7 @@ export const StaffReadings = () => {
       setLoading(true);
       try {
         // Fetch devices
-        const devicesList = await deviceApi.listDevices();
+        const devicesList = await deviceManagementService.listDevices();
         const deviceNames = devicesList.map(d => d.name || d.deviceId);
         setDevices(deviceNames);
         
@@ -66,7 +66,7 @@ export const StaffReadings = () => {
         
         for (const device of devicesList) {
           try {
-            const history = await deviceApi.getSensorHistory(device.deviceId, 50);
+            const history = await deviceManagementService.getSensorHistory(device.deviceId, 50);
             
             history.forEach((reading, index) => {
               // Determine status based on parameter values

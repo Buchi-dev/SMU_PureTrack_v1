@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { deviceApi } from '../../../services/api';
+import { deviceManagementService } from '../../../services/deviceManagement.Service';
 import { PageHeader, StatsCard, PageContainer, DataCard } from '../../../components/staff';
 import { Typography } from 'antd';
 import {
@@ -47,7 +47,7 @@ export const StaffAnalytics = () => {
   const fetchAnalyticsData = async () => {
     setLoading(true);
     try {
-      const devicesList = await deviceApi.listDevices();
+      const devicesList = await deviceManagementService.listDevices();
       
       const phDataPoints: any[] = [];
       const turbidityDataPoints: any[] = [];
@@ -58,7 +58,7 @@ export const StaffAnalytics = () => {
       
       for (const device of devicesList) {
         try {
-          const history = await deviceApi.getSensorHistory(device.deviceId, 24);
+          const history = await deviceManagementService.getSensorHistory(device.deviceId, 24);
           
           // Aggregate data for device comparison
           if (history.length > 0) {

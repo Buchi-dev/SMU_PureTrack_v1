@@ -43,7 +43,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useThemeToken } from '../../../theme';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../config/firebase';
-import { deviceApi } from '../../../services/api';
+import { deviceManagementService } from '../../../services/deviceManagement.Service';
 import { RealtimeAlertMonitor } from '../../../components/RealtimeAlertMonitor';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -94,13 +94,13 @@ export const StaffDashboard = () => {
       
       try {
         // Fetch devices from Firebase API
-        const devices = await deviceApi.listDevices();
+        const devices = await deviceManagementService.listDevices();
         
         // Fetch recent sensor readings for each device
         const devicesWithReadings = await Promise.all(
           devices.map(async (device) => {
             try {
-              const readings = await deviceApi.getSensorReadings(device.deviceId);
+              const readings = await deviceManagementService.getSensorReadings(device.deviceId);
               const lastUpdate = readings?.timestamp 
                 ? new Date(readings.timestamp).toLocaleString()
                 : 'No data';

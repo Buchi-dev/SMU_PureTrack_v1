@@ -191,6 +191,7 @@ async function handleSetupPreferences(
     email,
     emailNotifications,
     pushNotifications,
+    sendScheduledAlerts,
     alertSeverities,
     parameters,
     devices,
@@ -242,6 +243,7 @@ async function handleSetupPreferences(
       email,
       emailNotifications: emailNotifications ?? false,
       pushNotifications: pushNotifications ?? false,
+      sendScheduledAlerts: sendScheduledAlerts ?? true, // Default to true for new users
       alertSeverities: alertSeverities ?? ["Critical", "Warning", "Advisory"],
       parameters: parameters ?? [],
       devices: devices ?? [],

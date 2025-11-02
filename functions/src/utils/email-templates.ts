@@ -134,7 +134,7 @@ export async function sendDailyAnalyticsEmail(
   const totalAlerts = alertCounts.Critical + alertCounts.Warning + alertCounts.Advisory;
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || "noreply@puretrack.com",
+    from: "noreply@puretrack.com",
     to: recipient.email,
     subject: `Daily Water Quality Analytics - ${today}`,
     html: generateDailyAnalyticsHTML(
