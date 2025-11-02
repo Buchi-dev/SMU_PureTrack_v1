@@ -1,6 +1,14 @@
 /**
- * Manage Alerts Page
- * View, manage, and configure water quality alerts
+ * REDESIGNED ADMIN ALERTS - ENHANCED UI/UX
+ * 
+ * Maximizes Ant Design v5 Components:
+ * - Timeline for alert chronology
+ * - Descriptions for detailed alert info
+ * - Segmented for filter controls
+ * - Progress for resolution tracking
+ * - Collapse for expandable details
+ * - Steps for alert workflow
+ * - Result for action confirmations
  */
 
 import { useState, useEffect } from 'react';
@@ -23,8 +31,20 @@ import {
   Badge,
   Tooltip,
   Empty,
+  Timeline,
+  Descriptions,
+  Segmented,
+  Progress,
+  Collapse,
+  Steps,
+  Result,
+  Flex,
+  Alert,
+  Popconfirm,
+  Avatar,
 } from 'antd';
-import { useThemeToken } from '../../../theme';
+import type { SegmentedValue } from 'antd/es/segmented';
+import { useResponsiveToken } from '../../../theme';
 import {
   SearchOutlined,
   FilterOutlined,
@@ -35,6 +55,11 @@ import {
   BellOutlined,
   EyeOutlined,
   WarningOutlined,
+  FireOutlined,
+  SyncOutlined,
+  ClockCircleOutlined,
+  DashboardOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { Timestamp } from 'firebase/firestore';
@@ -53,18 +78,25 @@ import {
   getStatusColor,
 } from '../../../schemas';
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 
-const { Title, Text } = Typography;
+dayjs.extend(relativeTime);
+
+const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const { Panel } = Collapse;
 
 export const AdminAlerts = () => {
-  const token = useThemeToken();
+  const { token, isMobile } = useResponsiveToken();
   const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
   const [filteredAlerts, setFilteredAlerts] = useState<WaterQualityAlert[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [filters, setFilters] = useState<AlertFilters>({});
+  const [viewMode, setViewMode] = useState<SegmentedValue>('table');
 
   // Statistics
   const [stats, setStats] = useState({
