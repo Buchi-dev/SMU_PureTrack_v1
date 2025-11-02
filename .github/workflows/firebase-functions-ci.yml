@@ -196,15 +196,11 @@ jobs:
       - name: Deploy to Firebase
         run: |
           echo "Deploying Firebase Functions..."
-          # Uncomment and configure when ready for automated deployment
-          # firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
-          echo "⚠️ Automated deployment disabled - manual deployment required"
-          echo "Run: firebase deploy --only functions"
+          firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
 
-      # Uncomment when ready for production deployment
-      # - name: Deploy Firestore Rules & Indexes
-      #   run: |
-      #     firebase deploy --only firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+      - name: Deploy Firestore Rules & Indexes
+        run: |
+          firebase deploy --only firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
 
   # Notification on failure
   notify-failure:
