@@ -3,42 +3,97 @@
  * Nodemailer setup for sending alert notifications
  *
  * @module config/email
+ *
+ * SECURITY NOTE:
+ * Email credentials MUST be stored in Firebase Secret Manager.
+ * Use Firebase CLI to set secrets:
+ *   firebase functions:secrets:set EMAIL_USER
+ *   firebase functions:secrets:set EMAIL_PASSWORD
+ *
+ * Then update function declarations to include secrets:
+ *   export const myFunction = onSchedule(
+ *     { schedule: '...', secrets: [EMAIL_USER, EMAIL_PASSWORD] },
+ *     async (event) => { ... }
+ *   );
  */
 
 import { logger } from "firebase-functions/v2";
+import { defineSecret } from "firebase-functions/params";
 import * as nodemailer from "nodemailer";
 
 /**
- * Email credentials from environment or config
- * In production, these should be stored in Firebase Secret Manager
+ * Email credentials from Firebase Secret Manager
+ * These secrets must be configured before deploying functions that send emails
  */
-export const EMAIL_USER = "hed-tjyuzon@smu.edu.ph";
-export const EMAIL_PASSWORD = "khjo xjed akne uonm";
+const EMAIL_USER_SECRET = defineSecret("EMAIL_USER");
+const EMAIL_PASSWORD_SECRET = defineSecret("EMAIL_PASSWORD");
 
 /**
- * Nodemailer transporter instance
- * Configured for Gmail SMTP
+ * Get email configuration from secrets
+ * Call this function inside your Cloud Function handlers
  */
-export const emailTransporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASSWORD,
-  },
-});
+export function getEmailCredentials(): { user: string; password: string } {
+  const user = EMAIL_USER_SECRET.value();
+  const password = EMAIL_PASSWORD_SECRET.value();
+
+  if (!user || !password) {
+    throw new Error(
+      "Email credentials not configured. Set EMAIL_USER and EMAIL_PASSWORD secrets using Firebase CLI."
+    );
+  }
+
+  return { user, password };
+}
+
+/**
+ * Export secret references for use in function declarations
+ * Usage in function definition:
+ *   export const sendEmails = onSchedule(
+ *     { schedule: 'every 1 hours', secrets: [EMAIL_USER_SECRET_REF, EMAIL_PASSWORD_SECRET_REF] },
+ *     async (event) => { ... }
+ *   );
+ */
+export const EMAIL_USER_SECRET_REF = EMAIL_USER_SECRET;
+export const EMAIL_PASSWORD_SECRET_REF = EMAIL_PASSWORD_SECRET;
+
+
+/**
+ * Create Nodemailer transporter with credentials
+ * This should be called inside Cloud Function handlers where secrets are available
+ *
+ * @param {Object} credentials - Email credentials from getEmailCredentials()
+ * @return {nodemailer.Transporter} Configured transporter
+ */
+function createEmailTransporter(credentials: {
+  user: string;
+  password: string;
+}): nodemailer.Transporter {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: credentials.user,
+      pass: credentials.password,
+    },
+  });
+
+  return transporter;
+}
 
 /**
  * Verify email transporter connection
- * Logs success or error during initialization
+ *
+ * @param {nodemailer.Transporter} transporter - The transporter to verify
+ * @return {Promise<void>} Promise that resolves when verified
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-emailTransporter.verify((error, _success) => {
-  if (error) {
+async function verifyEmailTransporter(transporter: nodemailer.Transporter): Promise<void> {
+  try {
+    await transporter.verify();
+    logger.info("Email transporter verified successfully");
+  } catch (error) {
     logger.error("Email transporter verification failed:", error);
-  } else {
-    logger.info("Email transporter configured successfully", { user: EMAIL_USER });
+    throw error;
   }
-});
+}
 
 /**
  * Email template for stale alert notifications
@@ -137,6 +192,10 @@ export interface DigestEmailData {
  */
 export async function sendStaleAlertEmail(data: StaleAlertEmailData): Promise<void> {
   const { recipientEmail, recipientName, staleAlerts, totalCount } = data;
+
+  // Get email credentials and create transporter
+  const credentials = getEmailCredentials();
+  const emailTransporter = createEmailTransporter(credentials);
 
   // Generate alert rows HTML
   const alertRows = staleAlerts
@@ -261,7 +320,7 @@ export async function sendStaleAlertEmail(data: StaleAlertEmailData): Promise<vo
   `;
 
   const mailOptions = {
-    from: `"Water Quality Alert System" <${EMAIL_USER}>`,
+    from: `"Water Quality Alert System" <${credentials.user}>`,
     to: recipientEmail,
     subject: `⚠️ URGENT: ${totalCount} Critical Alert(s) Require Attention`,
     html: htmlContent,
@@ -302,6 +361,10 @@ export async function sendAnalyticsEmail(data: AnalyticsEmailData): Promise<void
     topDevices,
     recentAlerts,
   } = data;
+
+  // Get email credentials and create transporter
+  const credentials = getEmailCredentials();
+  const emailTransporter = createEmailTransporter(credentials);
 
   const reportTitle = reportType.charAt(0).toUpperCase() + reportType.slice(1);
   const periodText =
@@ -554,7 +617,7 @@ export async function sendAnalyticsEmail(data: AnalyticsEmailData): Promise<void
   `;
 
   const mailOptions = {
-    from: `"Water Quality Analytics" <${EMAIL_USER}>`,
+    from: `"Water Quality Analytics" <${credentials.user}>`,
     to: recipientEmail,
     subject: `📊 ${reportTitle} Analytics Report - ${periodText}`,
     html: htmlContent,
@@ -596,9 +659,6 @@ function getSeverityColor(severity: string): string {
  *
  * @example
  * await sendDigestEmail({
- *
- * @example
- * await sendDigestEmail({
  *   recipientEmail: 'user@example.com',
  *   category: 'ph_high',
  *   items: [...],
@@ -610,6 +670,10 @@ function getSeverityColor(severity: string): string {
  */
 export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
   const { recipientEmail, category, items, createdAt, sendAttempts, ackToken, digestId } = data;
+
+  // Get email credentials and create transporter
+  const credentials = getEmailCredentials();
+  const emailTransporter = createEmailTransporter(credentials);
 
   const categoryName = category.replace(/_/g, " ").toUpperCase();
   const attemptText = `${sendAttempts + 1}/3`;
@@ -808,7 +872,7 @@ export async function sendDigestEmail(data: DigestEmailData): Promise<void> {
   `;
 
   const mailOptions = {
-    from: `"PureTrack Alerts" <${EMAIL_USER}>`,
+    from: `"PureTrack Alerts" <${credentials.user}>`,
     to: recipientEmail,
     subject: `⚠️ Alert Digest: ${categoryName} (Attempt ${attemptText})`,
     html: htmlContent,

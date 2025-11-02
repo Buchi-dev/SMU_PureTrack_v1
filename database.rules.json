@@ -2,9 +2,14 @@
   "rules": {
     "sensorReadings": {
       "$deviceId": {
-        ".read": true,
-        ".write": false
+        ".read": "auth != null && (auth.token.status == 'Approved' || root.child('serviceAccounts').child(auth.uid).exists())",
+        ".write": "root.child('serviceAccounts').child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['timestamp']) && newData.child('timestamp').isNumber()"
       }
+    },
+    "serviceAccounts": {
+      ".read": false,
+      ".write": false
     }
   }
 }

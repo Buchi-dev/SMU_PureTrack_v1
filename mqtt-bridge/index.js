@@ -5,13 +5,32 @@ const express = require('express');
 // Initialize Pub/Sub client
 const pubsub = new PubSub();
 
-// MQTT Configuration
+// MQTT Configuration - MUST be provided via environment variables
+// Store credentials in Google Secret Manager and inject via Cloud Run
 const MQTT_CONFIG = {
-  broker: process.env.MQTT_BROKER || 'mqtts://36965de434ff42a4a93a697c94a13ad7.s1.eu.hivemq.cloud:8883',
-  username: process.env.MQTT_USERNAME || 'functions2025',
-  password: process.env.MQTT_PASSWORD || 'Jaffmier@0924',
+  broker: process.env.MQTT_BROKER,
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD,
   clientId: `bridge_${Math.random().toString(16).slice(3)}`,
 };
+
+// Validate required environment variables at startup
+function validateEnvironment() {
+  const required = ['MQTT_BROKER', 'MQTT_USERNAME', 'MQTT_PASSWORD'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.error('❌ Missing required environment variables:', missing.join(', '));
+    console.error('Please configure these variables in Cloud Run service settings.');
+    console.error('See .env.example for required configuration.');
+    process.exit(1);
+  }
+  
+  console.log('✓ Environment variables validated');
+}
+
+// Validate environment on startup
+validateEnvironment();
 
 // Topic mappings: MQTT → Pub/Sub
 const TOPIC_MAPPINGS = {
