@@ -12,9 +12,9 @@ import type { Device, SensorReading, WaterQualityAlert } from "../types";
 /**
  * Calculate device uptime percentage
  *
- * @param lastSeenTimestamp - Last seen timestamp in milliseconds
- * @param periodMs - Time period to calculate uptime for (in milliseconds)
- * @return Uptime percentage (0-100)
+ * @param {*} lastSeenTimestamp - Last seen timestamp in milliseconds
+ * @param {*} periodMs - Time period to calculate uptime for (in milliseconds)
+ * @return {number} Uptime percentage (0-100)
  */
 export function calculateUptime(
   lastSeenTimestamp: number,
@@ -39,8 +39,8 @@ export function calculateUptime(
 /**
  * Format uptime as human-readable string
  *
- * @param lastSeenTimestamp - Last seen timestamp in milliseconds
- * @return Formatted uptime string
+ * @param {*} lastSeenTimestamp - Last seen timestamp in milliseconds
+ * @return {string} Formatted uptime string
  */
 export function formatUptime(lastSeenTimestamp: number): string {
   if (!lastSeenTimestamp || lastSeenTimestamp === 0) {
@@ -116,7 +116,7 @@ export interface AlertCounts {
 /**
  * Generate device status report
  *
- * @return Promise<DeviceStatusReport>
+ * @return {Promise<DeviceStatusReport>} Promise resolving to device status report
  */
 export async function generateDeviceStatusReport(): Promise<DeviceStatusReport> {
   const devicesSnapshot = await db.collection(COLLECTIONS.DEVICES).get();
@@ -191,9 +191,9 @@ export async function generateDeviceStatusReport(): Promise<DeviceStatusReport> 
 /**
  * Get alert counts for a time period
  *
- * @param startTime - Start timestamp in milliseconds
- * @param endTime - End timestamp in milliseconds
- * @return Promise<AlertCounts>
+ * @param {*} startTime - Start timestamp in milliseconds
+ * @param {*} endTime - End timestamp in milliseconds
+ * @return {Promise<AlertCounts>} Promise resolving to alert counts
  */
 export async function getAlertCounts(startTime: number, endTime: number): Promise<AlertCounts> {
   const alertsSnapshot = await db
@@ -225,9 +225,9 @@ export async function getAlertCounts(startTime: number, endTime: number): Promis
 /**
  * Get recent alerts for a time period
  *
- * @param startTime - Start timestamp in milliseconds
- * @param limit - Maximum number of alerts to return
- * @return Promise<WaterQualityAlert[]>
+ * @param {*} startTime - Start timestamp in milliseconds
+ * @param {*} limit - Maximum number of alerts to return
+ * @return {Promise<WaterQualityAlert[]>} Promise resolving to array of alerts
  */
 export async function getRecentAlerts(
   startTime: number,
@@ -252,9 +252,9 @@ export async function getRecentAlerts(
 /**
  * Calculate parameter statistics
  *
- * @param readings - Array of sensor readings
- * @param parameter - Parameter to calculate stats for ('ph', 'tds', 'turbidity')
- * @return Statistics object
+ * @param {*} readings - Array of sensor readings
+ * @param {*} parameter - Parameter to calculate stats for ('ph', 'tds', 'turbidity')
+ * @return {object} Statistics object with min, max, avg, count
  */
 export function calculateParameterStats(
   readings: SensorReading[],
@@ -293,10 +293,10 @@ export function calculateParameterStats(
 /**
  * Get device readings for a time period
  *
- * @param deviceId - Device ID
- * @param startTime - Start timestamp in milliseconds
- * @param endTime - End timestamp in milliseconds
- * @return Promise<SensorReading[]>
+ * @param {*} deviceId - Device ID
+ * @param {*} startTime - Start timestamp in milliseconds
+ * @param {*} endTime - End timestamp in milliseconds
+ * @return {Promise<SensorReading[]>} Promise resolving to array of sensor readings
  */
 export async function getDeviceReadings(
   deviceId: string,

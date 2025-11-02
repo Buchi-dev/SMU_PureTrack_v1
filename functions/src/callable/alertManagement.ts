@@ -50,8 +50,8 @@ type AlertManagementRequest =
  * - Requires admin authentication
  * - Records who acknowledged and when
  *
- * @param request - Callable request with alertId
- * @return Success response with updated alert data
+ * @param {CallableRequest<AlertManagementRequest>} request - Callable request with alertId
+ * @return {Promise<AlertResponse>} Success response with updated alert data
  *
  * @throws {HttpsError} not-found - Alert not found
  * @throws {HttpsError} failed-precondition - Alert already acknowledged or resolved
@@ -105,7 +105,7 @@ async function handleAcknowledgeAlert(
         status: "Acknowledged",
       },
     };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -124,8 +124,8 @@ async function handleAcknowledgeAlert(
  * - Requires admin authentication
  * - Records who resolved, when, and optional notes
  *
- * @param request - Callable request with alertId and optional notes
- * @return Success response with updated alert data
+ * @param {CallableRequest<AlertManagementRequest>} request - Callable request with alertId and optional notes
+ * @return {Promise<AlertResponse>} Success response with updated alert data
  *
  * @throws {HttpsError} not-found - Alert not found
  * @throws {HttpsError} failed-precondition - Alert already resolved
@@ -161,7 +161,7 @@ async function handleResolveAlert(
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: Record<string, FirebaseFirestore.FieldValue | string> = {
       status: "Resolved",
       resolvedAt: FieldValue.serverTimestamp(),
       resolvedBy: userId,
@@ -182,7 +182,7 @@ async function handleResolveAlert(
         status: "Resolved",
       },
     };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -201,8 +201,8 @@ async function handleResolveAlert(
  * - parameter: Filter by water parameter (tds, ph, turbidity)
  * - deviceId: Filter by specific device(s)
  *
- * @param request - Callable request with optional filters
- * @return Success response with array of alerts
+ * @param {CallableRequest<AlertManagementRequest>} request - Callable request with optional filters
+ * @return {Promise<AlertResponse>} Success response with array of alerts
  *
  * @throws {HttpsError} internal - Database operation failed
  */
@@ -250,7 +250,7 @@ async function handleListAlerts(
       message: ALERT_MANAGEMENT_MESSAGES.LIST_SUCCESS,
       alerts,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error listing alerts:", error);
     throw new HttpsError("internal", ALERT_MANAGEMENT_ERRORS.LIST_FAILED);
   }
@@ -266,8 +266,8 @@ async function handleListAlerts(
  * - Can be acknowledged multiple times (idempotent)
  * - Does NOT require admin authentication (user self-service)
  *
- * @param request - Callable request with digestId and token
- * @return Success response with acknowledgement confirmation
+ * @param {CallableRequest<AlertManagementRequest>} request - Callable request with digestId and token
+ * @return {Promise<AlertResponse>} Success response with acknowledgement confirmation
  *
  * @throws {HttpsError} invalid-argument - Missing or invalid parameters
  * @throws {HttpsError} not-found - Digest not found
@@ -327,7 +327,7 @@ async function handleAcknowledgeDigest(
       success: true,
       message: DIGEST_MESSAGES.ACKNOWLEDGED,
     };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }

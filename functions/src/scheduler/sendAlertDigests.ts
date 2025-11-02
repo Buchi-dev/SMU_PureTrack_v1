@@ -50,7 +50,7 @@ import type { AlertDigest } from "../types/digest.types";
  * Collection: alerts_digests
  * Fields: isAcknowledged (ASC), cooldownUntil (ASC), sendAttempts (ASC)
  *
- * @returns Promise<void>
+ * @return Promise<void>
  *
  * @example
  * // Deployed automatically via Firebase Functions

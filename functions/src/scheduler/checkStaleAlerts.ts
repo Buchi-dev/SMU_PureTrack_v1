@@ -46,8 +46,8 @@ interface StaleAlertInfo {
 /**
  * Check if current time is within user's quiet hours
  *
- * @param preferences - User notification preferences
- * @return true if within quiet hours, false otherwise
+ * @param {*} preferences - User notification preferences
+ * @return {boolean} true if within quiet hours, false otherwise
  */
 function isWithinQuietHours(preferences: NotificationPreferences): boolean {
   if (
@@ -79,9 +79,9 @@ function isWithinQuietHours(preferences: NotificationPreferences): boolean {
 /**
  * Check if user should receive notifications for given alerts
  *
- * @param preferences - User notification preferences
- * @param alerts - Array of stale alerts
- * @return true if user should be notified, false otherwise
+ * @param {*} preferences - User notification preferences
+ * @param {*} alerts - Array of stale alerts
+ * @return {boolean} true if user should be notified, false otherwise
  */
 function shouldNotifyUser(preferences: NotificationPreferences, alerts: StaleAlertInfo[]): boolean {
   // Check if email notifications are enabled
@@ -129,9 +129,9 @@ function shouldNotifyUser(preferences: NotificationPreferences, alerts: StaleAle
 /**
  * Filter alerts based on user preferences
  *
- * @param preferences - User notification preferences
- * @param alerts - Array of stale alerts
- * @return Filtered array of alerts matching user preferences
+ * @param {*} preferences - User notification preferences
+ * @param {*} alerts - Array of stale alerts
+ * @return {StaleAlertInfo[]} Filtered array of alerts matching user preferences
  */
 function filterAlertsForUser(
   preferences: NotificationPreferences,

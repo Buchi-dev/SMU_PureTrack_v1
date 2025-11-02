@@ -75,7 +75,7 @@ const readingCounters = new Map<string, number>();
  * - Filtered history storage (every 5th reading)
  * - Alert debouncing with cache (5-min cooldown)
  *
- * @param event - Pub/Sub CloudEvent with sensor data
+ * @param {*} event - Pub/Sub CloudEvent with sensor data
  *
  * @example
  * // Published by MQTT bridge:
@@ -148,8 +148,8 @@ export const processSensorData = onMessagePublished(
  * 4. Check thresholds and create alerts with debouncing
  * 5. Analyze trends and create trend alerts
  *
- * @param deviceId - Device ID
- * @param sensorData - Sensor data to process
+ * @param {*} deviceId - Device ID
+ * @param {*} sensorData - Sensor data to process
  */
 async function processSingleReading(deviceId: string, sensorData: SensorData): Promise<void> {
   // Validate sensor reading values
@@ -169,6 +169,7 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
   };
 
   // Store in Realtime Database - Latest Reading (always update for real-time)
+  /* eslint-disable-next-line new-cap */
   await rtdb.ref(RTDB_PATHS.LATEST_READING(deviceId)).set(readingData);
 
   // OPTIMIZATION: Store in Realtime Database - Historical Data (filtered)
@@ -178,6 +179,7 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
   readingCounters.set(deviceId, newCount);
 
   if (newCount % HISTORY_STORAGE_INTERVAL === 0) {
+    /* eslint-disable-next-line new-cap */
     await rtdb.ref(RTDB_PATHS.HISTORY(deviceId)).push(readingData);
     logger.info(`Stored reading #${newCount} in history for device: ${deviceId}`);
   }
@@ -196,7 +198,7 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
  * OPTIMIZATION: Only updates if lastSeen is older than threshold
  * Reduces Firestore writes by 80%
  *
- * @param deviceId - Device ID to update
+ * @param {*} deviceId - Device ID to update
  */
 async function updateDeviceStatus(deviceId: string): Promise<void> {
   try {
@@ -234,7 +236,7 @@ async function updateDeviceStatus(deviceId: string): Promise<void> {
  * 4. Analyze trends and create trend alerts
  * 5. Send notifications to eligible users
  *
- * @param reading - The sensor reading to process
+ * @param {*} reading - The sensor reading to process
  */
 async function processSensorReadingForAlerts(reading: SensorReading): Promise<void> {
   const thresholds = await getThresholdConfig();
@@ -337,8 +339,8 @@ async function processSensorReadingForAlerts(reading: SensorReading): Promise<vo
  * 2. Send email notifications
  * 3. Update alert with notification tracking
  *
- * @param alertId - The alert ID
- * @param alert - The alert data object
+ * @param {*} alertId - The alert ID
+ * @param {*} alert - The alert data object
  */
 async function processNotifications(
   alertId: string,

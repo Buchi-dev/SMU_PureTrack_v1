@@ -32,11 +32,13 @@ import type { ActionHandler, ActionHandlers } from "../utils/switchCaseRouting";
 /**
  * Handler: Discover Devices
  * Broadcasts discovery message via Pub/Sub → MQTT Bridge
+ *
+ * @return {Promise<DeviceManagementResponse>} Success response
  */
 const handleDiscoverDevices: ActionHandler<
   DeviceManagementRequest,
   DeviceManagementResponse
-> = async (req: CallableRequest<DeviceManagementRequest>) => {
+> = async () => {
   const discoveryMessage: CommandMessage = {
     command: "DISCOVER",
     timestamp: Date.now(),
@@ -60,6 +62,9 @@ const handleDiscoverDevices: ActionHandler<
 /**
  * Handler: Send Command to Device
  * Publishes command to specific device via Pub/Sub → MQTT
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId and command
+ * @return {Promise<DeviceManagementResponse>} Success response
  */
 const handleSendCommand: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
   req: CallableRequest<DeviceManagementRequest>
@@ -95,6 +100,9 @@ const handleSendCommand: ActionHandler<DeviceManagementRequest, DeviceManagement
 /**
  * Handler: Add Device
  * Registers a new device in Firestore and initializes Realtime DB
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId and deviceData
+ * @return {Promise<DeviceManagementResponse>} Success response with new device
  */
 const handleAddDevice: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
   req: CallableRequest<DeviceManagementRequest>
@@ -145,6 +153,9 @@ const handleAddDevice: ActionHandler<DeviceManagementRequest, DeviceManagementRe
 /**
  * Handler: Get Device
  * Retrieves a specific device by ID
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId
+ * @return {Promise<DeviceManagementResponse>} Success response with device data
  */
 const handleGetDevice: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
   req: CallableRequest<DeviceManagementRequest>
@@ -171,6 +182,9 @@ const handleGetDevice: ActionHandler<DeviceManagementRequest, DeviceManagementRe
 /**
  * Handler: Update Device
  * Updates device information in Firestore
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId and deviceData
+ * @return {Promise<DeviceManagementResponse>} Success response
  */
 const handleUpdateDevice: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
   req: CallableRequest<DeviceManagementRequest>
@@ -204,7 +218,10 @@ const handleUpdateDevice: ActionHandler<DeviceManagementRequest, DeviceManagemen
 
 /**
  * Handler: Delete Device
- * Removes device from Firestore and Realtime DB
+ * Removes device from Firestore and Realtime Database
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId
+ * @return {Promise<DeviceManagementResponse>} Success response
  */
 const handleDeleteDevice: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
   req: CallableRequest<DeviceManagementRequest>
@@ -236,10 +253,13 @@ const handleDeleteDevice: ActionHandler<DeviceManagementRequest, DeviceManagemen
 /**
  * Handler: List Devices
  * Retrieves all devices from Firestore
+ *
+ * @return {Promise<DeviceManagementResponse>} Success response with devices array
  */
-const handleListDevices: ActionHandler<DeviceManagementRequest, DeviceManagementResponse> = async (
-  req: CallableRequest<DeviceManagementRequest>
-) => {
+const handleListDevices: ActionHandler<
+  DeviceManagementRequest,
+  DeviceManagementResponse
+> = async () => {
   const devicesSnapshot = await db.collection("devices").get();
 
   const devices: Device[] = devicesSnapshot.docs.map((doc) => {
@@ -255,7 +275,10 @@ const handleListDevices: ActionHandler<DeviceManagementRequest, DeviceManagement
 
 /**
  * Handler: Get Sensor Readings
- * Retrieves latest sensor readings from Realtime DB
+ * Retrieves latest sensor readings from Realtime Database
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId
+ * @return {Promise<DeviceManagementResponse>} Success response with sensor data
  */
 const handleGetSensorReadings: ActionHandler<
   DeviceManagementRequest,
@@ -283,7 +306,10 @@ const handleGetSensorReadings: ActionHandler<
 
 /**
  * Handler: Get Sensor History
- * Retrieves historical sensor readings from Realtime DB
+ * Retrieves historical sensor readings from Realtime Database
+ *
+ * @param {CallableRequest<DeviceManagementRequest>} req - Request with deviceId and optional limit
+ * @return {Promise<DeviceManagementResponse>} Success response with history array
  */
 const handleGetSensorHistory: ActionHandler<
   DeviceManagementRequest,

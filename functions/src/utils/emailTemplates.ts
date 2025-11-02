@@ -20,9 +20,9 @@ import type { NotificationPreferences } from "../types/notificationPreferences.t
  * - Create email templates
  * - Handle delivery failures
  *
- * @param recipient - Notification recipient preferences
- * @param alert - Alert data object
- * @return Promise resolving to success status
+ * @param {*} recipient - Notification recipient preferences
+ * @param {*} alert - Alert data object
+ * @return {Promise<void>} Promise that resolves when notification is sent
  *
  * @example
  * const success = await sendEmailNotification(recipient, alertData);

@@ -47,7 +47,7 @@ export interface DeviceStatusMessage {
  * 3. Update device document in Firestore
  * 4. Update lastSeen timestamp
  *
- * @param event - Pub/Sub CloudEvent with device status
+ * @param {*} event - Pub/Sub CloudEvent with device status
  *
  * @example
  * // Published by MQTT bridge or device:

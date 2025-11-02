@@ -31,7 +31,8 @@ export const emailTransporter = nodemailer.createTransport({
  * Verify email transporter connection
  * Logs success or error during initialization
  */
-emailTransporter.verify((error, success) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+emailTransporter.verify((error, _success) => {
   if (error) {
     logger.error("Email transporter verification failed:", error);
   } else {
@@ -123,8 +124,8 @@ export interface DigestEmailData {
 /**
  * Send stale alert notification email
  *
- * @param data - Email data with recipient and alert information
- * @return Promise<void>
+ * @param {*} data - Email data with recipient and alert information
+ * @return {Promise<void>} Promise that resolves when email is sent
  *
  * @example
  * await sendStaleAlertEmail({
@@ -278,8 +279,8 @@ export async function sendStaleAlertEmail(data: StaleAlertEmailData): Promise<vo
 /**
  * Send analytics report email
  *
- * @param data - Email data with analytics information
- * @return Promise<void>
+ * @param {*} data - Email data with analytics information
+ * @return {Promise<void>} Promise that resolves when email is sent
  *
  * @example
  * await sendAnalyticsEmail({
@@ -570,6 +571,9 @@ export async function sendAnalyticsEmail(data: AnalyticsEmailData): Promise<void
 
 /**
  * Helper function to get severity badge color
+ *
+ * @param {string} severity - The severity level
+ * @return {string} The color hex code for the severity badge
  */
 function getSeverityColor(severity: string): string {
   switch (severity) {
@@ -587,8 +591,11 @@ function getSeverityColor(severity: string): string {
 /**
  * Send alert digest email with batched notifications
  *
- * @param data - Email data with digest information
- * @return Promise<void>
+ * @param {*} data - Email data with digest information
+ * @return {Promise<void>} Promise that resolves when email is sent
+ *
+ * @example
+ * await sendDigestEmail({
  *
  * @example
  * await sendDigestEmail({

@@ -123,6 +123,9 @@ export const userManagement = onCall<UserManagementRequest, Promise<UserManageme
 
 /**
  * Handle update user status operation
+ *
+ * @param {CallableRequest<UserManagementRequest>} request - Request with userId and status
+ * @return {Promise<UpdateStatusResponse>} Updated status response
  */
 async function handleUpdateStatus(
   request: CallableRequest<UserManagementRequest>
@@ -152,15 +155,17 @@ async function handleUpdateStatus(
     await userRef.update(updateData);
 
     // Update custom claims for Firebase Auth
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     await updateUserCustomClaims(userId, { status });
 
     return {
       success: true,
+      // eslint-disable-next-line new-cap
       message: USER_MANAGEMENT_MESSAGES.STATUS_UPDATED(status),
       userId: userId,
       status: status,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating user status:", error);
     if (error instanceof HttpsError) {
       throw error;
@@ -171,6 +176,9 @@ async function handleUpdateStatus(
 
 /**
  * Handle update user operation
+ *
+ * @param {CallableRequest<UserManagementRequest>} request - Request with userId and update data
+ * @return {Promise<UpdateUserResponse>} Updated user response
  */
 async function handleUpdateUser(
   request: CallableRequest<UserManagementRequest>
@@ -229,7 +237,7 @@ async function handleUpdateUser(
       userId: userId,
       updates: { status, role },
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error updating user:", error);
     if (error instanceof HttpsError) {
       throw error;
@@ -240,9 +248,13 @@ async function handleUpdateUser(
 
 /**
  * Handle list users operation
+ *
+ * @param {CallableRequest<UserManagementRequest>} _request - The request object (unused)
+ * @return {Promise<ListUsersResponse>} List of users response
  */
 async function handleListUsers(
-  request: CallableRequest<UserManagementRequest>
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _request: CallableRequest<UserManagementRequest>
 ): Promise<ListUsersResponse> {
   try {
     const usersRef = db.collection("users");
@@ -255,7 +267,7 @@ async function handleListUsers(
       users: users,
       count: users.length,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error listing users:", error);
     if (error instanceof HttpsError) {
       throw error;

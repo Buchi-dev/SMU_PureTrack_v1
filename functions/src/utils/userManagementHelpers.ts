@@ -29,6 +29,7 @@ export function validateStatus(status: UserStatus): void {
   if (!VALID_USER_STATUSES.includes(status)) {
     throw new HttpsError(
       "invalid-argument",
+      // eslint-disable-next-line new-cap
       USER_MANAGEMENT_ERRORS.INVALID_STATUS(VALID_USER_STATUSES)
     );
   }
@@ -41,6 +42,7 @@ export function validateStatus(status: UserStatus): void {
  */
 export function validateRole(role: UserRole): void {
   if (!VALID_USER_ROLES.includes(role)) {
+    // eslint-disable-next-line new-cap
     throw new HttpsError("invalid-argument", USER_MANAGEMENT_ERRORS.INVALID_ROLE(VALID_USER_ROLES));
   }
 }
@@ -120,15 +122,17 @@ export function transformUserDocToListData(
 
 /**
  * Builds update data object with standard metadata
+ *
  * @param {string} performedBy - UID of user performing the update
- * @param {Partial<{status: UserStatus; role: UserRole}>} updates - Fields to update
- * @return {object} Update data with metadata
+ * @param {Partial<{status: UserStatus, role: UserRole}>} updates - Fields to update
+ * @return {Record<string, unknown>} Update data with metadata
  */
 export function buildUpdateData(
   performedBy: string,
   updates: Partial<{ status: UserStatus; role: UserRole }>
-): any {
-  const updateData: any = {
+): Record<string, unknown> {
+  const updateData: Record<string, unknown> = {
+    /* eslint-disable-next-line new-cap */
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedBy: performedBy,
   };
@@ -146,15 +150,16 @@ export function buildUpdateData(
 
 /**
  * Updates custom claims for a user in Firebase Auth
+ *
  * @param {string} userId - User ID
- * @param {Partial<{status: UserStatus; role: UserRole}>} claims - Claims to update
- * @return {Promise<void>}
+ * @param {Partial<{status: UserStatus, role: UserRole}>} claims - Claims to update
+ * @return {Promise<void>} Promise
  */
 export async function updateUserCustomClaims(
   userId: string,
   claims: Partial<{ status: UserStatus; role: UserRole }>
 ): Promise<void> {
-  const customClaims: any = {};
+  const customClaims: Record<string, unknown> = {};
 
   if (claims.status) {
     customClaims.status = claims.status;

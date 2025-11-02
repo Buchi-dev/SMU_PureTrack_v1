@@ -58,7 +58,7 @@ import { getThresholdConfig } from "../utils/thresholdHelpers";
  * Digest Document ID Format: {recipientUid}_{category}_{YYYY-MM-DD}
  * Example: "user123_ph_high_2025-11-02"
  *
- * @param event - Firestore document event
+ * @param {*} event - Firestore document event
  *
  * @example
  * // Alert created in Firestore → Triggers this function
@@ -151,10 +151,10 @@ export const aggregateAlertsToDigest = onDocumentWritten(
  * 3. Add item to digest (max 10 items, FIFO)
  * 4. If new, create digest with acknowledgement token
  *
- * @param recipient - Notification preferences for recipient
- * @param category - Alert category for grouping
- * @param item - Digest alert item to add
- * @param eventId - Alert ID for deduplication
+ * @param {*} recipient - Notification preferences for recipient
+ * @param {*} category - Alert category for grouping
+ * @param {*} item - Digest alert item to add
+ * @param {*} eventId - Alert ID for deduplication
  */
 async function aggregateToRecipientDigest(
   recipient: NotificationPreferences,
@@ -232,8 +232,8 @@ async function aggregateToRecipientDigest(
  * - "Warning: TDS 850 ppm at Building A"
  * - "Advisory: Turbidity 7.5 NTU"
  *
- * @param alert - Water quality alert data
- * @return Formatted summary string
+ * @param {*} alert - Water quality alert data
+ * @return {string} Formatted summary string
  */
 function generateAlertSummary(alert: WaterQualityAlert): string {
   // Format parameter name

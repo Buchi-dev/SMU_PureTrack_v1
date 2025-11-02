@@ -48,13 +48,13 @@ export interface AlertContent {
  * 2. Generate message based on alert type (threshold vs trend)
  * 3. Generate recommended action based on severity
  *
- * @param parameter - Water parameter that triggered the alert
- * @param value - Current sensor value
- * @param severity - Alert severity level
- * @param alertType - Type of alert (threshold or trend)
- * @param trendDirection - Optional trend direction for trend alerts
- * @param location - Optional device location information
- * @return Alert content with message and recommended action
+ * @param {*} parameter - Water parameter that triggered the alert
+ * @param {*} value - Current sensor value
+ * @param {*} severity - Alert severity level
+ * @param {*} alertType - Type of alert (threshold or trend)
+ * @param {*} trendDirection - Optional trend direction for trend alerts
+ * @param {*} location - Optional device location information
+ * @return {AlertContent} Alert content with message and recommended action
  *
  * @example
  * const content = generateAlertContent(
@@ -147,15 +147,15 @@ export function generateAlertContent(
  * 3. Create alert document in Firestore
  * 4. Update document with its own ID
  *
- * @param deviceId - Device ID that triggered the alert
- * @param parameter - Water parameter that exceeded threshold
- * @param alertType - Type of alert (threshold or trend)
- * @param severity - Alert severity level
- * @param currentValue - Current sensor reading value
- * @param thresholdValue - Threshold value that was exceeded (null for trend alerts)
- * @param trendDirection - Optional trend direction for trend alerts
- * @param metadata - Optional additional metadata
- * @return Promise resolving to created alert ID
+ * @param {*} deviceId - Device ID that triggered the alert
+ * @param {*} parameter - Water parameter that exceeded threshold
+ * @param {*} alertType - Type of alert (threshold or trend)
+ * @param {*} severity - Alert severity level
+ * @param {*} currentValue - Current sensor reading value
+ * @param {*} thresholdValue - Threshold value that was exceeded (null for trend alerts)
+ * @param {*} trendDirection - Optional trend direction for trend alerts
+ * @param {*} metadata - Optional additional metadata
+ * @return {Promise<string>} Promise resolving to created alert ID
  *
  * @example
  * const alertId = await createAlert(
@@ -212,6 +212,7 @@ export async function createAlert(
   );
 
   // Prepare alert document data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const alertData: Record<string, any> = {
     deviceId,
     deviceName,
@@ -252,8 +253,8 @@ export async function createAlert(
  * 4. Alert device must match user preferences (if specified)
  * 5. Current time must not be in user's quiet hours
  *
- * @param alert - Alert data to determine recipients for
- * @return Promise resolving to array of notification preferences for eligible users
+ * @param {*} alert - Alert data to determine recipients for
+ * @return {Promise<NotificationPreferences[]>} Promise resolving to array of notification preferences for eligible users
  *
  * @example
  * const recipients = await getNotificationRecipients(alertData);
@@ -313,8 +314,8 @@ export async function getNotificationRecipients(
 /**
  * Calculate device uptime based on last seen timestamp
  *
- * @param lastSeenTimestamp - Last seen timestamp in milliseconds
- * @return Human-readable uptime string
+ * @param {*} lastSeenTimestamp - Last seen timestamp in milliseconds
+ * @return {string} Human-readable uptime string
  *
  * @example
  * calculateUptime(Date.now() - 3600000) // "1 hours ago"

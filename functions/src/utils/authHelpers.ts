@@ -77,6 +77,7 @@ export function parseDisplayName(displayName: string): ParsedDisplayName {
  * @param {any} authUser - User object from Firebase Auth event
  * @return {ParsedUserInfo} Parsed user information
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, require-jsdoc
 export function parseUserInfo(authUser: any): ParsedUserInfo {
   const { firstname, lastname } = parseDisplayName(authUser.displayName || "");
 
@@ -116,6 +117,7 @@ export async function logSignInAttempt(
     uid,
     email,
     displayName,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     statusAttempted: statusAttempted as any,
     timestamp: admin.firestore.FieldValue.serverTimestamp(),
     result,

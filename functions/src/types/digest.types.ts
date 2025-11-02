@@ -115,15 +115,20 @@ export interface AcknowledgeDigestResponse {
  * - ph_high: pH above warning threshold
  * - ph_low: pH below warning threshold
  * - tds_high: TDS above warning threshold
+ * @return {string} Alert category string
  * - tds_low: TDS below warning threshold (rare)
  * - turbidity_high: Turbidity above warning threshold
  * - multi_param: Multiple parameters affected
  *
- * @param parameter - Water parameter
- * @param value - Current sensor value
- * @param thresholds - Threshold configuration
- * @return Alert category string
+ * @param {*} parameter - Water parameter
+/**
+ * Categorize alert based on parameter, value, and thresholds
+ * @param {*} parameter - Water parameter
+ * @param {*} value - Current sensor value
+ * @param {*} thresholds - Threshold configuration
+ * @return {string} Alert category string
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, require-jsdoc
 export function categorizeAlert(parameter: WaterParameter, value: number, thresholds: any): string {
   const config = thresholds[parameter];
 

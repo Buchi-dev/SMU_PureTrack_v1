@@ -47,6 +47,7 @@ export interface SensorReading {
   tds: number;
   ph: number;
   timestamp: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   receivedAt?: any;
 }
 
@@ -86,10 +87,9 @@ export const DEFAULT_THRESHOLDS: AlertThresholds = {
  * Get current threshold configuration from Firestore
  * Falls back to default thresholds if database query fails
  *
- * @return Promise resolving to current threshold configuration
- *
  * @example
  * const thresholds = await getThresholdConfig();
+ * @return {Promise<ThresholdConfig>} Promise resolving to current threshold configuration
  * const tdsCritical = thresholds.tds.criticalMax; // 1000
  */
 export async function getThresholdConfig(): Promise<AlertThresholds> {
@@ -125,10 +125,10 @@ export interface ThresholdCheckResult {
  * 2. Warning max/min
  * 3. No violation
  *
- * @param parameter - Water parameter to check
- * @param value - Current sensor reading value
- * @param thresholds - Threshold configuration
- * @return Threshold check result with severity and violated threshold
+ * @param {*} parameter - Water parameter to check
+ * @param {*} value - Current sensor reading value
+ * @param {*} thresholds - Threshold configuration
+ * @return {ThresholdViolation} Threshold check result with severity and violated threshold
  *
  * @example
  * const result = checkThreshold('tds', 1200, thresholds);
@@ -202,11 +202,11 @@ export interface TrendAnalysisResult {
  * - At least 2 historical readings
  * - Trend detection enabled in config
  *
- * @param deviceId - Device ID to analyze
- * @param parameter - Water parameter to check
- * @param currentValue - Current sensor reading
- * @param thresholds - Threshold configuration
- * @return Trend analysis result or null if insufficient data
+ * @param {*} deviceId - Device ID to analyze
+ * @param {*} parameter - Water parameter to check
+ * @param {*} currentValue - Current sensor reading
+ * @param {*} thresholds - Threshold configuration
+ * @return {Promise<TrendAnalysisResult | null>} Promise resolving to trend analysis or null if insufficient data
  *
  * @example
  * const trend = await analyzeTrend('device123', 'ph', 8.5, thresholds);
@@ -277,11 +277,10 @@ export async function analyzeTrend(
 /**
  * Get unit string for water parameter
  *
- * @param parameter - Water parameter
- * @return Unit string (e.g., "ppm", "NTU", "")
- *
+ * @param {*} parameter - Water parameter
  * @example
  * getParameterUnit('tds')       // "ppm"
+ * @return {string} Unit string (e.g., "ppm", "NTU", "")
  * getParameterUnit('turbidity') // "NTU"
  * getParameterUnit('ph')        // ""
  */
@@ -301,11 +300,10 @@ export function getParameterUnit(parameter: WaterParameter): string {
 /**
  * Get display name for water parameter
  *
- * @param parameter - Water parameter
- * @return Human-readable parameter name
- *
+ * @param {*} parameter - Water parameter
  * @example
  * getParameterName('tds')       // "TDS (Total Dissolved Solids)"
+ * @return {string} Human-readable parameter name
  * getParameterName('ph')        // "pH Level"
  * getParameterName('turbidity') // "Turbidity"
  */

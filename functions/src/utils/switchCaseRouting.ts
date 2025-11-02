@@ -31,6 +31,7 @@ import type { CallableRequest } from "firebase-functions/v2/https";
  * @template TRequest - Request data type
  * @template TResponse - Response data type
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ActionHandler<TRequest = any, TResponse = any> = (
   request: CallableRequest<TRequest>
 ) => Promise<TResponse>;
@@ -41,6 +42,7 @@ export type ActionHandler<TRequest = any, TResponse = any> = (
  * @template TRequest - Request data type
  * @template TResponse - Response data type
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ActionHandlers<TRequest = any, TResponse = any> = {
   [action: string]: ActionHandler<TRequest, TResponse>;
 };
@@ -55,9 +57,9 @@ export type ActionHandlers<TRequest = any, TResponse = any> = {
  * @template TRequest - Type of the request data
  * @template TResponse - Type of the response data
  *
- * @param request - Firebase Callable request object
- * @param handlers - Map of action names to handler functions
- * @param actionField - Name of the field in request.data that contains the action (default: 'action')
+ * @param {*} request - Firebase Callable request object
+ * @param {*} handlers - Map of action names to handler functions
+ * @param {*} actionField - Name of the field in request.data that contains the action (default: 'action')
  *
  * @return Promise resolving to the handler's response
  *
@@ -97,13 +99,16 @@ export type ActionHandlers<TRequest = any, TResponse = any> = {
  *     },
  *   });
  * });
+ * @return {Promise<TResponse>} Promise resolving to action response
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, require-jsdoc
 async function routeAction<TRequest = any, TResponse = any>(
   request: CallableRequest<TRequest>,
   handlers: ActionHandlers<TRequest, TResponse>,
   actionField = "action"
 ): Promise<TResponse> {
   // Extract action from request data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const action = (request.data as any)?.[actionField];
 
   // Validate action is provided
@@ -139,14 +144,14 @@ async function routeAction<TRequest = any, TResponse = any>(
  * @template TRequest - Type of the request data
  * @template TResponse - Type of the response data
  *
- * @param handlers - Map of action names to handler functions
- * @param options - Configuration options
- * @param options.actionField - Name of the field containing the action (default: 'action')
- * @param options.requireAuth - Whether to require authentication (default: true)
- * @param options.requireAdmin - Whether to require admin role (default: false)
- * @param options.beforeRoute - Optional function to run before routing (e.g., auth checks)
+ * @param {ActionHandlers<TRequest, TResponse>} handlers - Map of action names to handler functions
+ * @param {object} options - Configuration options
+ * @param {string} options.actionField - Name of the field containing the action (default: 'action')
+ * @param {boolean} options.requireAuth - Whether to require authentication (default: true)
+ * @param {boolean} options.requireAdmin - Whether to require admin role (default: false)
+ * @param {Function} options.beforeRoute - Optional function to run before routing (e.g., auth checks)
  *
- * @return Callable function handler
+ * @return {Function} Callable function handler
  *
  * @example
  * // Basic usage
@@ -185,7 +190,9 @@ async function routeAction<TRequest = any, TResponse = any>(
  *     },
  *   }
  * );
+ * @return {CallableFunction<TRequest, TResponse>} Configured callable function
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, require-jsdoc
 export function createRoutedFunction<TRequest = any, TResponse = any>(
   handlers: ActionHandlers<TRequest, TResponse>,
   options: {

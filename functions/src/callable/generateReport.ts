@@ -11,6 +11,7 @@
  * - generateComplianceReport: Generate regulatory compliance report
  */
 
+import type * as FirebaseFirestore from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import type { CallableRequest } from "firebase-functions/v2/https";
 
@@ -34,8 +35,8 @@ import { createRoutedFunction } from "../utils";
  * Generate Water Quality Report Handler
  * Retrieves water quality metrics, sensor readings, and alerts
  *
- * @param request - Callable request with optional deviceIds and date range
- * @return Water quality report with metrics and readings
+ * @param {CallableRequest<ReportGenerationRequest>} request - Callable request with optional deviceIds and date range
+ * @return {Promise<ReportResponse>} Water quality report with metrics and readings
  *
  * @throws {HttpsError} internal - Database operation failed
  */
@@ -46,9 +47,9 @@ async function handleGenerateWaterQualityReport(
     const { deviceIds, startDate, endDate } = request.data;
 
     // Query devices
-    let devicesQuery = db.collection(COLLECTIONS.DEVICES);
+    let devicesQuery: FirebaseFirestore.Query = db.collection(COLLECTIONS.DEVICES);
     if (deviceIds && deviceIds.length > 0) {
-      devicesQuery = devicesQuery.where("deviceId", "in", deviceIds) as any;
+      devicesQuery = devicesQuery.where("deviceId", "in", deviceIds);
     }
 
     const devicesSnapshot = await devicesQuery.get();
@@ -65,17 +66,17 @@ async function handleGenerateWaterQualityReport(
       const deviceId = deviceData.deviceId;
 
       // Query sensor readings
-      let readingsQuery = db
+      let readingsQuery: FirebaseFirestore.Query = db
         .collection(COLLECTIONS.SENSOR_READINGS)
         .where("deviceId", "==", deviceId)
         .orderBy("timestamp", "desc")
         .limit(100);
 
       if (startDate) {
-        readingsQuery = readingsQuery.where("timestamp", ">=", startDate) as any;
+        readingsQuery = readingsQuery.where("timestamp", ">=", startDate);
       }
       if (endDate) {
-        readingsQuery = readingsQuery.where("timestamp", "<=", endDate) as any;
+        readingsQuery = readingsQuery.where("timestamp", "<=", endDate);
       }
 
       const readingsSnapshot = await readingsQuery.get();
@@ -151,7 +152,7 @@ async function handleGenerateWaterQualityReport(
       data: reportData,
       timestamp: Date.now(),
     };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -164,8 +165,8 @@ async function handleGenerateWaterQualityReport(
  * Generate Device Status Report Handler
  * Retrieves device health metrics and status information
  *
- * @param request - Callable request with optional deviceIds
- * @return Device status report with health metrics
+ * @param {CallableRequest<ReportGenerationRequest>} request - Callable request with optional deviceIds
+ * @return {Promise<ReportResponse>} Device status report with health metrics
  *
  * @throws {HttpsError} internal - Database operation failed
  */
@@ -176,9 +177,9 @@ async function handleGenerateDeviceStatusReport(
     const { deviceIds } = request.data;
 
     // Query devices
-    let devicesQuery = db.collection(COLLECTIONS.DEVICES);
+    let devicesQuery: FirebaseFirestore.Query = db.collection(COLLECTIONS.DEVICES);
     if (deviceIds && deviceIds.length > 0) {
-      devicesQuery = devicesQuery.where("deviceId", "in", deviceIds) as any;
+      devicesQuery = devicesQuery.where("deviceId", "in", deviceIds);
     }
 
     const devicesSnapshot = await devicesQuery.get();
@@ -244,7 +245,7 @@ async function handleGenerateDeviceStatusReport(
       data: reportData,
       timestamp: Date.now(),
     };
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof HttpsError) {
       throw error;
     }
@@ -257,8 +258,8 @@ async function handleGenerateDeviceStatusReport(
  * Generate Data Summary Report Handler
  * Retrieves statistical summaries and aggregated metrics
  *
- * @param request - Callable request with optional deviceIds and date range
- * @return Data summary report with statistics
+ * @param {CallableRequest<ReportGenerationRequest>} request - Callable request with optional deviceIds and date range
+ * @return {Promise<ReportResponse>} Data summary report with statistics
  *
  * @throws {HttpsError} internal - Database operation failed
  */
@@ -282,7 +283,7 @@ async function handleGenerateDataSummaryReport(
       data: reportData,
       timestamp: Date.now(),
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error generating data summary report:", error);
     throw new HttpsError("internal", REPORT_GENERATION_ERRORS.DATA_SUMMARY_FAILED);
   }
@@ -292,8 +293,8 @@ async function handleGenerateDataSummaryReport(
  * Generate Compliance Report Handler
  * Retrieves compliance metrics against regulatory standards
  *
- * @param request - Callable request with optional deviceIds and date range
- * @return Compliance report with regulatory metrics
+ * @param {CallableRequest<ReportGenerationRequest>} request - Callable request with optional deviceIds and date range
+ * @return {Promise<ReportResponse>} Compliance report with regulatory metrics
  *
  * @throws {HttpsError} internal - Database operation failed
  */
@@ -317,7 +318,7 @@ async function handleGenerateComplianceReport(
       data: reportData,
       timestamp: Date.now(),
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error generating compliance report:", error);
     throw new HttpsError("internal", REPORT_GENERATION_ERRORS.COMPLIANCE_FAILED);
   }
@@ -329,6 +330,9 @@ async function handleGenerateComplianceReport(
 
 /**
  * Calculate metrics from sensor readings
+ *
+ * @param {SensorReading[]} readings - Array of sensor readings
+ * @return {DeviceMetrics} Calculated metrics
  */
 function calculateMetrics(readings: SensorReading[]): DeviceMetrics {
   if (readings.length === 0) {
@@ -366,6 +370,9 @@ function calculateMetrics(readings: SensorReading[]): DeviceMetrics {
 
 /**
  * Calculate average of numbers
+ *
+ * @param {number[]} numbers - Array of numbers
+ * @return {number} Average value
  */
 function average(numbers: number[]): number {
   if (numbers.length === 0) return 0;
@@ -374,6 +381,9 @@ function average(numbers: number[]): number {
 
 /**
  * Format uptime duration
+ *
+ * @param {number} ms - Milliseconds
+ * @return {string} Formatted uptime string
  */
 function formatUptime(ms: number): string {
   const seconds = Math.floor(ms / 1000);

@@ -81,8 +81,11 @@ export interface Device {
   ipAddress: string;
   sensors: string[];
   status: DeviceStatus;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   registeredAt: any; // Firestore FieldValue or Timestamp
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   lastSeen: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updatedAt?: any;
   metadata: DeviceMetadata;
 }

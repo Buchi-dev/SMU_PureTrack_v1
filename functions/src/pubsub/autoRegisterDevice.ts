@@ -54,8 +54,11 @@ export interface Device {
   ipAddress?: string;
   sensors?: string[];
   status: "online" | "offline" | "unknown";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   registeredAt: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   lastSeen: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata?: Record<string, any>;
 }
 
@@ -72,7 +75,7 @@ export interface Device {
  * 4. If new, create device profile in Firestore
  * 5. Initialize Realtime Database structure
  *
- * @param event - Pub/Sub CloudEvent with device registration info
+ * @param {*} event - Pub/Sub CloudEvent with device registration info
  *
  * @example
  * // Published by MQTT bridge when device connects:

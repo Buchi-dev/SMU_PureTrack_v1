@@ -54,8 +54,8 @@ type NotificationPreferencesResponse = PreferencesResponse | ListPreferencesResp
  * - User must be authenticated
  * - Users can only access their own preferences (unless admin)
  *
- * @param request - Callable request with userId
- * @return Success response with user's preferences or null if not set
+ * @param {CallableRequest<NotificationPreferencesRequest>} request - Callable request with userId
+ * @return {Promise<NotificationPreferencesResponse>} Success response with user's preferences or null if not set
  *
  * @throws {HttpsError} invalid-argument - Missing userId
  * @throws {HttpsError} permission-denied - User trying to access another user's preferences
@@ -97,7 +97,7 @@ async function handleGetUserPreferences(
       message: NOTIFICATION_PREFERENCES_MESSAGES.GET_SUCCESS,
       data: prefDoc.data() as NotificationPreferences,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error getting user preferences:", error);
     throw new HttpsError("internal", NOTIFICATION_PREFERENCES_ERRORS.GET_FAILED);
   }
@@ -110,8 +110,8 @@ async function handleGetUserPreferences(
  * Business Rules:
  * - Requires admin authentication
  *
- * @param request - Callable request
- * @return Success response with array of all preferences
+ * @param {CallableRequest<NotificationPreferencesRequest>} request - Callable request
+ * @return {Promise<NotificationPreferencesResponse>} Success response with array of all preferences
  *
  * @throws {HttpsError} permission-denied - User is not admin
  * @throws {HttpsError} internal - Database operation failed
@@ -141,7 +141,7 @@ async function handleListAllPreferences(
       message: NOTIFICATION_PREFERENCES_MESSAGES.LIST_SUCCESS,
       data: preferences,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error listing all preferences:", error);
     throw new HttpsError("internal", NOTIFICATION_PREFERENCES_ERRORS.LIST_FAILED);
   }
@@ -157,8 +157,8 @@ async function handleListAllPreferences(
  * - Email is required if emailNotifications is enabled
  * - Sets createdAt on first create, updatedAt on updates
  *
- * @param request - Callable request with preference data
- * @return Success response with saved preferences
+ * @param {CallableRequest<NotificationPreferencesRequest>} request - Callable request with preference data
+ * @return {Promise<NotificationPreferencesResponse>} Success response with saved preferences
  *
  * @throws {HttpsError} invalid-argument - Missing required fields
  * @throws {HttpsError} permission-denied - User trying to update another user's preferences
@@ -210,7 +210,7 @@ async function handleSetupPreferences(
     const prefRef = db.collection(COLLECTIONS.NOTIFICATION_PREFERENCES).doc(userId);
     const existingDoc = await prefRef.get();
 
-    const preferencesData: any = {
+    const preferencesData: Record<string, unknown> = {
       userId,
       email,
       emailNotifications: emailNotifications ?? false,
@@ -242,7 +242,7 @@ async function handleSetupPreferences(
         : NOTIFICATION_PREFERENCES_MESSAGES.CREATE_SUCCESS,
       data: savedDoc.data() as NotificationPreferences,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error setting up preferences:", error);
     throw new HttpsError("internal", NOTIFICATION_PREFERENCES_ERRORS.SETUP_FAILED);
   }
@@ -256,8 +256,8 @@ async function handleSetupPreferences(
  * - User must be authenticated
  * - Users can only delete their own preferences (unless admin)
  *
- * @param request - Callable request with userId
- * @return Success response
+ * @param {CallableRequest<NotificationPreferencesRequest>} request - Callable request with userId
+ * @return {Promise<NotificationPreferencesResponse>} Success response
  *
  * @throws {HttpsError} invalid-argument - Missing userId
  * @throws {HttpsError} permission-denied - User trying to delete another user's preferences
@@ -291,7 +291,7 @@ async function handleDeletePreferences(
       message: NOTIFICATION_PREFERENCES_MESSAGES.DELETE_SUCCESS,
       data: null,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error deleting preferences:", error);
     throw new HttpsError("internal", NOTIFICATION_PREFERENCES_ERRORS.DELETE_FAILED);
   }

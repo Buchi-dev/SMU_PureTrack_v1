@@ -16,8 +16,8 @@
  * - Case-insensitive matching
  * - Used by: deviceManagement, processSensorData, autoRegisterDevice
  *
- * @param deviceId - Device ID to validate
- * @return True if device ID matches format requirements
+ * @param {string} deviceId - Device ID to validate
+ * @return {boolean} True if device ID matches format requirements
  *
  * @example
  * isValidDeviceId('DEVICE_123')      // true
@@ -40,8 +40,8 @@ export function isValidDeviceId(deviceId: string): boolean {
  * - Simple regex validation (not RFC 5322 compliant, but sufficient for most cases)
  * - Used by: userManagement, notificationPreferences
  *
- * @param email - Email address to validate
- * @return True if email matches basic format requirements
+ * @param {string} email - Email address to validate
+ * @return {boolean} True if email matches basic format requirements
  *
  * @example
  * isValidEmail('user@example.com')       // true
@@ -67,8 +67,8 @@ export function isValidEmail(email: string): boolean {
  * - All values must be non-negative numbers
  * - Used by: processSensorData, deviceManagement
  *
- * @param reading - Sensor reading object with optional parameters
- * @return True if all provided sensor values are within acceptable ranges
+ * @param {string} reading - Sensor reading object with optional parameters
+ * @return {boolean} True if all provided sensor values are within acceptable ranges
  *
  * @example
  * isValidSensorReading({ turbidity: 5.2, tds: 250, ph: 7.0 })  // true
@@ -121,8 +121,8 @@ export function isValidSensorReading(reading: {
  * - Case-sensitive validation
  * - Used by: alertManagement, processSensorData
  *
- * @param severity - Severity string to validate
- * @return True if severity is a valid alert level
+ * @param {string} severity - Severity string to validate
+ * @return {boolean} True if severity is a valid alert level
  *
  * @example
  * isValidAlertSeverity('Critical')  // true
@@ -143,8 +143,8 @@ export function isValidAlertSeverity(severity: string): boolean {
  * - Case-sensitive validation
  * - Used by: alertManagement, processSensorData, reportGeneration
  *
- * @param parameter - Parameter string to validate
- * @return True if parameter is a valid water quality metric
+ * @param {string} parameter - Parameter string to validate
+ * @return {boolean} True if parameter is a valid water quality metric
  *
  * @example
  * isValidWaterParameter('tds')        // true
@@ -165,8 +165,8 @@ export function isValidWaterParameter(parameter: string): boolean {
  * - Case-sensitive validation
  * - Used by: alertManagement
  *
- * @param status - Status string to validate
- * @return True if status is a valid alert state
+ * @param {string} status - Status string to validate
+ * @return {boolean} True if status is a valid alert state
  *
  * @example
  * isValidAlertStatus('Active')        // true
@@ -188,8 +188,8 @@ export function isValidAlertStatus(status: string): boolean {
  * - Must be within reasonable range (not too far in past or future)
  * - Used by: processSensorData, reportGeneration
  *
- * @param timestamp - Timestamp in milliseconds since epoch
- * @return True if timestamp is valid and within reasonable range
+ * @param {string} timestamp - Timestamp in milliseconds since epoch
+ * @return {boolean} True if timestamp is valid and within reasonable range
  *
  * @example
  * isValidTimestamp(Date.now())           // true
@@ -217,8 +217,8 @@ export function isValidTimestamp(timestamp: number): boolean {
  * - Case-insensitive matching
  * - Used by: acknowledgeDigest, aggregateAlertsToDigest
  *
- * @param token - Acknowledgement token to validate
- * @return True if token matches the expected format
+ * @param {string} token - Acknowledgement token to validate
+ * @return {boolean} True if token matches the expected format
  *
  * @example
  * isValidAckToken('a1b2c3d4...') // true (if 64 hex chars)

@@ -48,6 +48,7 @@ export interface SensorReading {
   timestamp: number;
 
   /** Server timestamp when reading was received (RTDB ServerValue) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   receivedAt?: any;
 }
 
@@ -82,6 +83,7 @@ export interface DeviceStatus {
       building?: string;
       floor?: string;
     };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any;
   };
 }
