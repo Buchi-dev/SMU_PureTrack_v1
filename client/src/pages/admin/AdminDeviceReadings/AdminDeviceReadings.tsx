@@ -76,7 +76,7 @@ const REFRESH_INTERVALS = [
 ];
 
 export const AdminDeviceReadings = () => {
-  const token = useThemeToken();
+  const { token, isMobile } = useResponsiveToken();
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [latestReading, setLatestReading] = useState<SensorReading | null>(null);

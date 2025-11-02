@@ -67,43 +67,18 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
-// --- Inlined from alerts.ts ---
-import type { Timestamp } from 'firebase/firestore';
-export type AlertSeverity = 'Advisory' | 'Warning' | 'Critical';
-export type AlertStatus = 'Active' | 'Acknowledged' | 'Resolved';
-export type WaterParameter = 'tds' | 'ph' | 'turbidity';
-export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
-export type AlertType = 'threshold' | 'trend';
-export interface WaterQualityAlert {
-  alertId: string;
-  deviceId: string;
-  deviceName?: string;
-  deviceBuilding?: string;
-  deviceFloor?: string;
-  parameter: WaterParameter;
-  alertType: AlertType;
-  severity: AlertSeverity;
-  status: AlertStatus;
-  currentValue: number;
-  thresholdValue?: number;
-  trendDirection?: TrendDirection;
-  message: string;
-  recommendedAction: string;
-  createdAt: Timestamp;
-  acknowledgedAt?: Timestamp;
-  acknowledgedBy?: string;
-  resolvedAt?: Timestamp;
-  resolvedBy?: string;
-  notificationsSent: string[];
-  metadata?: {
-    previousValue?: number;
-    changeRate?: number;
-    location?: string;
-    [key: string]: any;
-  };
-}
-// --- End inlined section ---
-import type { SensorReading } from '../../../schemas';
+import type { 
+  WaterQualityAlert, 
+  WaterQualityAlertSeverity as AlertSeverity,
+  WaterQualityAlertStatus as AlertStatus,
+  WaterQualityParameter as WaterParameter,
+  SensorReading 
+} from '../../../schemas';
+import { 
+  getSeverityColor, 
+  getParameterName, 
+  getParameterUnit 
+} from '../../../schemas';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -111,50 +86,6 @@ dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-/**
- * Get color for alert severity
- */
-const getSeverityColor = (severity: AlertSeverity): string => {
-  switch (severity) {
-    case 'Critical':
-      return '#ff4d4f';
-    case 'Warning':
-      return '#faad14';
-    case 'Advisory':
-      return '#1890ff';
-    default:
-      return '#d9d9d9';
-  }
-};
-
-/**
- * Get display name for water parameter
- */
-const getParameterName = (param: string): string => {
-  const names: Record<string, string> = {
-    tds: 'TDS',
-    ph: 'pH',
-    turbidity: 'Turbidity',
-  };
-  return names[param] || param;
-};
-
-/**
- * Get unit for water parameter
- */
-const getParameterUnit = (param: string): string => {
-  const units: Record<string, string> = {
-    tds: 'ppm',
-    ph: '',
-    turbidity: 'NTU',
-  };
-  return units[param] || '';
-};
 
 // ============================================================================
 // INTERFACES

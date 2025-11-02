@@ -67,7 +67,7 @@ interface UserWithId extends UserProfile {
 }
 
 export const AdminUserManagement = () => {
-  const { token } = theme.useToken();
+  const { token, isMobile } = useResponsiveToken();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserWithId[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithId[]>([]);
