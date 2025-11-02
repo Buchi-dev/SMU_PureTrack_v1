@@ -46,16 +46,6 @@ service cloud.firestore {
     }
     
     /**
-     * Check if user has Approved status
-     * Prevents suspended/pending users from accessing data
-     * 
-     * Related: auth/beforeSignIn.ts
-     */
-    function isApproved() {
-      return isAuthenticated() && request.auth.token.status == 'Approved';
-    }
-    
-    /**
      * Check if user owns the resource
      * Used for user-owned collections
      */

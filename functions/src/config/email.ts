@@ -17,8 +17,8 @@
  *   );
  */
 
-import { logger } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
+import { logger } from "firebase-functions/v2";
 import * as nodemailer from "nodemailer";
 
 /**
@@ -31,6 +31,7 @@ const EMAIL_PASSWORD_SECRET = defineSecret("EMAIL_PASSWORD");
 /**
  * Get email configuration from secrets
  * Call this function inside your Cloud Function handlers
+ * @return {object} Email credentials object with user and password
  */
 export function getEmailCredentials(): { user: string; password: string } {
   const user = EMAIL_USER_SECRET.value();
@@ -56,7 +57,6 @@ export function getEmailCredentials(): { user: string; password: string } {
 export const EMAIL_USER_SECRET_REF = EMAIL_USER_SECRET;
 export const EMAIL_PASSWORD_SECRET_REF = EMAIL_PASSWORD_SECRET;
 
-
 /**
  * Create Nodemailer transporter with credentials
  * This should be called inside Cloud Function handlers where secrets are available
@@ -77,22 +77,6 @@ function createEmailTransporter(credentials: {
   });
 
   return transporter;
-}
-
-/**
- * Verify email transporter connection
- *
- * @param {nodemailer.Transporter} transporter - The transporter to verify
- * @return {Promise<void>} Promise that resolves when verified
- */
-async function verifyEmailTransporter(transporter: nodemailer.Transporter): Promise<void> {
-  try {
-    await transporter.verify();
-    logger.info("Email transporter verified successfully");
-  } catch (error) {
-    logger.error("Email transporter verification failed:", error);
-    throw error;
-  }
 }
 
 /**
