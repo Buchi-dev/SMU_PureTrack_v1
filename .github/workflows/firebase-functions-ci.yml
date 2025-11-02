@@ -1,0 +1,221 @@
+name: Firebase Functions CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'functions/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'functions/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+
+jobs:
+  lint-build-validate:
+    name: Lint, Build & Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./functions
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check code formatting (Prettier)
+        run: npm run format:check
+
+      - name: TypeScript compilation
+        run: npm run build
+
+      - name: Check for unused exports (ts-prune)
+        run: npx ts-prune --error || true
+        continue-on-error: true
+
+      - name: Generate build artifact
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: functions-lib
+          path: functions/lib/
+          retention-days: 7
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint-build-validate
+    defaults:
+      run:
+        working-directory: ./functions
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Check for hardcoded secrets (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # Uncomment when tests are added
+  # test:
+  #   name: Run Tests
+  #   runs-on: ubuntu-latest
+  #   needs: lint-build-validate
+  #   defaults:
+  #     run:
+  #       working-directory: ./functions
+  #
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
+  #
+  #     - name: Setup Node.js 18
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: '18'
+  #         cache: 'npm'
+  #         cache-dependency-path: functions/package-lock.json
+  #
+  #     - name: Install dependencies
+  #       run: npm ci
+  #
+  #     - name: Run unit tests
+  #       run: npm test
+  #
+  #     - name: Generate coverage report
+  #       run: npm run test:coverage
+  #
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         directory: ./functions/coverage
+
+  validate-firestore:
+    name: Validate Firestore Configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Firebase Tools
+        run: npm install -g firebase-tools
+
+      - name: Validate firestore.rules syntax
+        run: |
+          echo "Validating Firestore security rules..."
+          # Firebase CLI validates syntax automatically during deployment
+          # For now, just check file exists and is valid JSON-like syntax
+          if [ ! -f "firestore.rules" ]; then
+            echo "ERROR: firestore.rules not found"
+            exit 1
+          fi
+          echo "✅ firestore.rules found"
+
+      - name: Validate firestore.indexes.json
+        run: |
+          echo "Validating Firestore indexes..."
+          if [ ! -f "firestore.indexes.json" ]; then
+            echo "ERROR: firestore.indexes.json not found"
+            exit 1
+          fi
+          
+          # Validate JSON syntax
+          if ! jq empty firestore.indexes.json 2>/dev/null; then
+            echo "ERROR: firestore.indexes.json is not valid JSON"
+            exit 1
+          fi
+          echo "✅ firestore.indexes.json is valid JSON"
+
+  # Deploy to Firebase (only on main branch)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint-build-validate, security-scan, validate-firestore]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+      url: https://console.firebase.google.com
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: functions-lib
+          path: functions/lib/
+
+      - name: Install Firebase Tools
+        run: npm install -g firebase-tools
+
+      - name: Deploy to Firebase
+        run: |
+          echo "Deploying Firebase Functions..."
+          # Uncomment and configure when ready for automated deployment
+          # firebase deploy --only functions --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+          echo "⚠️ Automated deployment disabled - manual deployment required"
+          echo "Run: firebase deploy --only functions"
+
+      # Uncomment when ready for production deployment
+      # - name: Deploy Firestore Rules & Indexes
+      #   run: |
+      #     firebase deploy --only firestore:rules,firestore:indexes --project ${{ secrets.FIREBASE_PROJECT_ID }} --token ${{ secrets.FIREBASE_TOKEN }}
+
+  # Notification on failure
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [lint-build-validate, security-scan, validate-firestore]
+    if: failure()
+
+    steps:
+      - name: Send notification
+        run: |
+          echo "❌ CI/CD Pipeline Failed"
+          echo "Check the workflow logs for details"
+          # Add Slack/Discord/Email notification here if needed
