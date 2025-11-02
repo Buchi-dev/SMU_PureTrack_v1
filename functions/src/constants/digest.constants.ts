@@ -50,8 +50,8 @@ export const DIGEST_SCHEDULER_CONFIG = {
   /** Number of retries on function failure */
   retryCount: 2,
 
-  /** Keep 1 instance warm to reduce cold starts */
-  minInstances: 1,
+  /** Allow cold starts to minimize costs */
+  minInstances: 0,
 } as const;
 
 /**
