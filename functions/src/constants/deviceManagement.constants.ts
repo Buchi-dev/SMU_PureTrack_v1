@@ -107,11 +107,21 @@ export const MQTT_TOPICS = {
 /**
  * Google Cloud Pub/Sub topics for device management
  * CRITICAL: Must match mqtt-bridge TOPIC_MAPPINGS and pubsub.constants.ts
+ * 
+ * NOTE: These constants are duplicated here for backward compatibility.
+ * The canonical source of truth is pubsub.constants.ts
+ * Import from there if possible: import { PUBSUB_TOPICS } from '../constants/pubsub.constants'
  */
 export const PUBSUB_TOPICS = {
+  /** Topic for sending commands to devices (via MQTT bridge) */
   DEVICE_COMMANDS: "device-commands",
+  
+  /** Topic for device registration messages from MQTT bridge */
   DEVICE_REGISTRATION: "iot-device-registration",
+  
+  /** Topic for device status updates from MQTT bridge */
   DEVICE_STATUS: "iot-device-status",
-  DEVICE_EVENTS: "device-events",
-  SENSOR_DATA: "iot-sensor-readings", // Must match mqtt-bridge mapping
+  
+  /** Topic for sensor data from MQTT bridge */
+  SENSOR_DATA: "iot-sensor-readings",
 } as const;

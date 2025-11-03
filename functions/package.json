@@ -8,12 +8,14 @@
     "format:check": "prettier --check \"src/**/*.{ts,js,json}\"",
     "check": "npm run lint && npm run format:check",
     "fix": "npm run lint:fix && npm run format",
+    "validate:pubsub": "ts-node src/utils/validatePubSubTopics.ts",
+    "validate": "npm run validate:pubsub",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "npm run check && npm run build && firebase deploy --only functions",
+    "deploy": "npm run check && npm run validate && npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {
@@ -28,6 +30,7 @@
     "nodemailer": "^7.0.9"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.57.1",
@@ -37,6 +40,7 @@
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-unused-imports": "^4.3.0",
     "prettier": "^3.6.2",
+    "ts-node": "^10.9.0",
     "typescript": "^5.2.0"
   },
   "private": true
