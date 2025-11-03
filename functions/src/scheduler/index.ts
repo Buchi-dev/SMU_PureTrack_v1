@@ -5,6 +5,9 @@
  * @module scheduler
  */
 
+// Export offline device checker (runs every 5 minutes)
+export { checkOfflineDevices } from "./checkOfflineDevices";
+
 // Export stale alerts checker (runs every 1 hour)
 export { checkStaleAlerts } from "./checkStaleAlerts";
 

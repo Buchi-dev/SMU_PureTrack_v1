@@ -214,10 +214,18 @@ async function updateDeviceStatus(deviceId: string): Promise<void> {
     }
 
     if (shouldUpdateFirestore) {
-      await db.collection(COLLECTIONS.DEVICES).doc(deviceId).update({
+      // Update to reflect device is back online
+      const updateData: Record<string, unknown> = {
         lastSeen: admin.firestore.FieldValue.serverTimestamp(),
         status: "online",
-      });
+      };
+
+      // Clear offlineSince if device was previously offline
+      if (deviceData?.offlineSince) {
+        updateData.offlineSince = admin.firestore.FieldValue.delete();
+      }
+
+      await db.collection(COLLECTIONS.DEVICES).doc(deviceId).update(updateData);
       logger.info(`Updated Firestore lastSeen for device: ${deviceId}`);
     }
   } catch (error) {
