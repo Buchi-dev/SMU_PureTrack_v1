@@ -56,9 +56,12 @@ export interface DeviceStatusMessage {
  *   json: { status: 'online' }
  * });
  */
+
+import { PUBSUB_TOPICS } from "../constants/pubsub.constants";
+
 export const monitorDeviceStatus = onMessagePublished(
   {
-    topic: "iot-device-status",
+    topic: PUBSUB_TOPICS.DEVICE_STATUS,
     region: "us-central1",
     retry: false, // Status updates are informational, no retry needed
     minInstances: 0,

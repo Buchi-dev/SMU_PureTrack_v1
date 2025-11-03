@@ -89,13 +89,15 @@ export const DEVICE_DEFAULTS = {
 
 /**
  * MQTT topic patterns for device communication
+ * CRITICAL: Must match Arduino device topics exactly (case-sensitive)
  */
 export const MQTT_TOPICS = {
   DISCOVERY_REQUEST: "device/discovery/request",
   DISCOVERY_RESPONSE: "device/discovery/response",
+  REGISTRATION_PREFIX: "device/registration/",
   COMMAND_PREFIX: "device/command/",
   STATUS_PREFIX: "device/status/",
-  SENSOR_DATA_PREFIX: "device/sensorData/",
+  SENSOR_DATA_PREFIX: "device/sensordata/",  // Must be lowercase to match Arduino
 } as const;
 
 // ===========================
@@ -104,9 +106,12 @@ export const MQTT_TOPICS = {
 
 /**
  * Google Cloud Pub/Sub topics for device management
+ * CRITICAL: Must match mqtt-bridge TOPIC_MAPPINGS and pubsub.constants.ts
  */
 export const PUBSUB_TOPICS = {
   DEVICE_COMMANDS: "device-commands",
+  DEVICE_REGISTRATION: "iot-device-registration",
+  DEVICE_STATUS: "iot-device-status",
   DEVICE_EVENTS: "device-events",
-  SENSOR_DATA: "sensor-data",
+  SENSOR_DATA: "iot-sensor-readings",  // Must match mqtt-bridge mapping
 } as const;
