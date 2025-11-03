@@ -90,7 +90,7 @@ export interface Device {
  */
 export const autoRegisterDevice = onMessagePublished(
   {
-    topic: PUBSUB_TOPICS.SENSOR_DATA, // Using sensor data topic for now
+    topic: PUBSUB_TOPICS.DEVICE_REGISTRATION,
     region: "us-central1",
     retry: true,
     minInstances: 0,

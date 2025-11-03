@@ -16,8 +16,8 @@ import {
   DEVICE_MANAGEMENT_MESSAGES,
   DEVICE_DEFAULTS,
   MQTT_TOPICS,
-  PUBSUB_TOPICS,
 } from "../constants";
+import { PUBSUB_TOPICS } from "../constants/pubsub.constants";
 import type {
   Device,
   DeviceStatus,

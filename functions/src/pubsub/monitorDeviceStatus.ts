@@ -25,6 +25,7 @@ import type { MessagePublishedData } from "firebase-functions/v2/pubsub";
 
 import { db } from "../config/firebase";
 import { COLLECTIONS } from "../constants/database.constants";
+import { PUBSUB_TOPICS } from "../constants/pubsub.constants";
 import { isValidDeviceId } from "../utils/validators";
 
 /**
@@ -58,7 +59,7 @@ export interface DeviceStatusMessage {
  */
 export const monitorDeviceStatus = onMessagePublished(
   {
-    topic: "iot-device-status",
+    topic: PUBSUB_TOPICS.DEVICE_STATUS,
     region: "us-central1",
     retry: false, // Status updates are informational, no retry needed
     minInstances: 0,

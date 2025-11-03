@@ -95,18 +95,5 @@ export const MQTT_TOPICS = {
   DISCOVERY_RESPONSE: "device/discovery/response",
   COMMAND_PREFIX: "device/command/",
   STATUS_PREFIX: "device/status/",
-  SENSOR_DATA_PREFIX: "device/sensorData/",
-} as const;
-
-// ===========================
-// PUBSUB TOPICS
-// ===========================
-
-/**
- * Google Cloud Pub/Sub topics for device management
- */
-export const PUBSUB_TOPICS = {
-  DEVICE_COMMANDS: "device-commands",
-  DEVICE_EVENTS: "device-events",
-  SENSOR_DATA: "sensor-data",
+  SENSOR_DATA_PREFIX: "device/sensordata/",
 } as const;
