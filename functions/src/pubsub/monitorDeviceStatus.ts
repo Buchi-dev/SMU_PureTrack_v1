@@ -25,6 +25,7 @@ import type { MessagePublishedData } from "firebase-functions/v2/pubsub";
 
 import { db } from "../config/firebase";
 import { COLLECTIONS } from "../constants/database.constants";
+import { PUBSUB_TOPICS } from "../constants/pubsub.constants";
 import { isValidDeviceId } from "../utils/validators";
 
 /**
@@ -56,9 +57,6 @@ export interface DeviceStatusMessage {
  *   json: { status: 'online' }
  * });
  */
-
-import { PUBSUB_TOPICS } from "../constants/pubsub.constants";
-
 export const monitorDeviceStatus = onMessagePublished(
   {
     topic: PUBSUB_TOPICS.DEVICE_STATUS,

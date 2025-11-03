@@ -97,7 +97,7 @@ export const MQTT_TOPICS = {
   REGISTRATION_PREFIX: "device/registration/",
   COMMAND_PREFIX: "device/command/",
   STATUS_PREFIX: "device/status/",
-  SENSOR_DATA_PREFIX: "device/sensordata/",  // Must be lowercase to match Arduino
+  SENSOR_DATA_PREFIX: "device/sensordata/", // Must be lowercase to match Arduino
 } as const;
 
 // ===========================
@@ -113,5 +113,5 @@ export const PUBSUB_TOPICS = {
   DEVICE_REGISTRATION: "iot-device-registration",
   DEVICE_STATUS: "iot-device-status",
   DEVICE_EVENTS: "device-events",
-  SENSOR_DATA: "iot-sensor-readings",  // Must match mqtt-bridge mapping
+  SENSOR_DATA: "iot-sensor-readings", // Must match mqtt-bridge mapping
 } as const;
