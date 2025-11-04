@@ -70,6 +70,7 @@ export const DeviceMetricsSchema = z.object({
 export const WaterQualityDeviceDataSchema = z.object({
   deviceId: z.string(),
   deviceName: z.string(),
+  location: z.string().optional(),
   metrics: DeviceMetricsSchema,
   readings: z.array(SensorReadingSchema),
   alerts: z.array(AlertDataSchema),

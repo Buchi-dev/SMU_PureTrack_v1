@@ -62,6 +62,7 @@ export interface AlertData {
 export interface WaterQualityDeviceData {
   deviceId: string;
   deviceName: string;
+  location?: string;
   metrics: DeviceMetrics;
   readings: SensorReading[];
   alerts: AlertData[];

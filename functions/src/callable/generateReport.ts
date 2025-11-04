@@ -15,7 +15,7 @@ import type * as FirebaseFirestore from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import type { CallableRequest } from "firebase-functions/v2/https";
 
-import { db } from "../config/firebase";
+import { db, rtdb } from "../config/firebase";
 import { REPORT_GENERATION_ERRORS, REPORT_GENERATION_MESSAGES, COLLECTIONS } from "../constants";
 import type {
   ReportGenerationRequest,
@@ -46,6 +46,15 @@ async function handleGenerateWaterQualityReport(
   try {
     const { deviceIds, startDate, endDate } = request.data;
 
+    console.log("📊 Generating Water Quality Report");
+    console.log("Device IDs:", deviceIds);
+    console.log(
+      "Date Range:",
+      startDate ? new Date(startDate).toISOString() : "none",
+      "to",
+      endDate ? new Date(endDate).toISOString() : "none"
+    );
+
     // Query devices
     let devicesQuery: FirebaseFirestore.Query = db.collection(COLLECTIONS.DEVICES);
     if (deviceIds && deviceIds.length > 0) {
@@ -53,6 +62,7 @@ async function handleGenerateWaterQualityReport(
     }
 
     const devicesSnapshot = await devicesQuery.get();
+    console.log(`Found ${devicesSnapshot.size} devices`);
 
     if (devicesSnapshot.empty) {
       throw new HttpsError("not-found", REPORT_GENERATION_ERRORS.NO_DEVICES_FOUND);
@@ -65,35 +75,69 @@ async function handleGenerateWaterQualityReport(
       const deviceData = deviceDoc.data();
       const deviceId = deviceData.deviceId;
 
-      // Query sensor readings
-      let readingsQuery: FirebaseFirestore.Query = db
-        .collection(COLLECTIONS.SENSOR_READINGS)
-        .where("deviceId", "==", deviceId)
-        .orderBy("timestamp", "desc")
-        .limit(100);
+      console.log(`\n📱 Processing device: ${deviceId}`);
 
-      if (startDate) {
-        readingsQuery = readingsQuery.where("timestamp", ">=", startDate);
-      }
-      if (endDate) {
-        readingsQuery = readingsQuery.where("timestamp", "<=", endDate);
+      // Query sensor readings from Realtime Database
+      // Path: sensorReadings/{deviceId}/history
+      const historyRef = rtdb.ref(`sensorReadings/${deviceId}/history`);
+      console.log(`Querying RTDB path: sensorReadings/${deviceId}/history`);
+
+      let historyQuery = historyRef.orderByChild("receivedAt");
+
+      // Apply date filters if provided
+      if (startDate && endDate) {
+        // Realtime Database queries by receivedAt timestamp
+        historyQuery = historyQuery.startAt(startDate).endAt(endDate);
+        console.log(
+          `Filtering by date range: ${new Date(startDate).toISOString()} to ${new Date(endDate).toISOString()}`
+        );
       }
 
-      const readingsSnapshot = await readingsQuery.get();
-      const readings: SensorReading[] = readingsSnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          deviceId: data.deviceId,
-          ph: data.ph || 0,
-          tds: data.tds || 0,
-          turbidity: data.turbidity || 0,
-          timestamp: data.timestamp || Date.now(),
-          receivedAt: data.receivedAt || Date.now(),
-        };
-      });
+      // Limit to last 100 readings
+      historyQuery = historyQuery.limitToLast(100);
+
+      const historySnapshot = await historyQuery.once("value");
+      const historyData = historySnapshot.val() as Record<string, Record<string, unknown>> | null;
+
+      console.log(
+        `Found ${historyData ? Object.keys(historyData).length : 0} readings for device ${deviceId}`
+      );
+
+      const readings: SensorReading[] = [];
+
+      if (historyData) {
+        // Convert RTDB object to array of readings
+        Object.values(historyData).forEach((reading: Record<string, unknown>) => {
+          if (reading && typeof reading === "object") {
+            readings.push({
+              deviceId: reading.deviceId || deviceId,
+              ph: Number(reading.ph) || 0,
+              tds: Number(reading.tds) || 0,
+              turbidity: Number(reading.turbidity) || 0,
+              timestamp: (reading.receivedAt as number) || Date.now(), // Use receivedAt as timestamp
+              receivedAt: (reading.receivedAt as number) || Date.now(),
+            });
+          }
+        });
+      }
+
+      // Log sample reading for debugging
+      if (readings.length > 0) {
+        console.log("Sample reading:", {
+          ph: readings[0].ph,
+          tds: readings[0].tds,
+          turbidity: readings[0].turbidity,
+          timestamp: new Date(readings[0].timestamp).toISOString(),
+          receivedAt: new Date(readings[0].receivedAt).toISOString(),
+        });
+      } else {
+        console.warn(`⚠️ No readings found for device ${deviceId} in RTDB`);
+        console.warn(`Check if path exists: sensorReadings/${deviceId}/history`);
+      }
 
       // Calculate metrics
       const metrics: DeviceMetrics = calculateMetrics(readings);
+      console.log("Calculated metrics:", metrics);
 
       // Query active alerts for this device
       const alertsSnapshot = await db
@@ -114,9 +158,17 @@ async function handleGenerateWaterQualityReport(
         };
       });
 
+      // Extract location from device metadata
+      const location = deviceData.metadata?.location
+        ? `${deviceData.metadata.location.building || ""}, ${deviceData.metadata.location.floor || ""}`
+            .trim()
+            .replace(/^,\s*|,\s*$/g, "") || "Unknown Location"
+        : "Unknown Location";
+
       devices.push({
         deviceId,
         deviceName: deviceData.name || deviceId,
+        location,
         metrics,
         readings,
         alerts,
