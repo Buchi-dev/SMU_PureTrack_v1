@@ -95,7 +95,9 @@ export const RecentAlertsCard = ({
           <List
             dataSource={recentAlerts}
             renderItem={(alert) => {
-              const time = alert.createdAt?.toDate ? alert.createdAt.toDate() : new Date();
+              const time = alert.createdAt?.toDate?.() 
+                ? alert.createdAt.toDate() 
+                : (alert.createdAt ? new Date(alert.createdAt) : null);
               return (
                 <List.Item
                   key={alert.alertId}
@@ -139,7 +141,9 @@ export const RecentAlertsCard = ({
                             </>
                           )}
                           <Text type="secondary">•</Text>
-                          <Text type="secondary">{dayjs(time).fromNow()}</Text>
+                          <Text type="secondary">
+                            {time ? dayjs(time).fromNow() : 'Unknown time'}
+                          </Text>
                         </Space>
                       </Space>
                     }

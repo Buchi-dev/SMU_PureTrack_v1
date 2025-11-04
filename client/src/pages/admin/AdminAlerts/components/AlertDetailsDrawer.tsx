@@ -35,6 +35,19 @@ import type { WaterQualityAlert } from '../../../../schemas';
 const { Text } = Typography;
 const { TextArea } = Input;
 
+// Helper to convert Ant Design color names to actual color values
+const getColorValue = (colorName: string, token: ReturnType<typeof useThemeToken>): string => {
+  const colorMap: Record<string, string> = {
+    'error': token.colorError,
+    'warning': token.colorWarning,
+    'success': token.colorSuccess,
+    'processing': token.colorInfo,
+    'default': token.colorTextSecondary,
+  };
+  return colorMap[colorName] || token.colorTextSecondary;
+};
+const { TextArea } = Input;
+
 interface AlertDetailsDrawerProps {
   visible: boolean;
   alert: WaterQualityAlert | null;
@@ -89,7 +102,7 @@ export const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
     <Drawer
       title={
         <Space>
-          <WarningOutlined style={{ fontSize: 20, color: getSeverityColor(alert.severity) }} />
+          <WarningOutlined style={{ fontSize: 20, color: getColorValue(getSeverityColor(alert.severity), token) }} />
           <span>{alert.parameter.toUpperCase()} Alert</span>
           <Tag color={getSeverityColor(alert.severity)} style={{ marginLeft: 8 }}>
             {alert.severity}
@@ -135,8 +148,8 @@ export const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
         {/* Status Banner */}
         <div style={{ 
           padding: '16px 24px', 
-          background: `linear-gradient(135deg, ${getSeverityColor(alert.severity)}15 0%, ${getSeverityColor(alert.severity)}05 100%)`,
-          borderBottom: `2px solid ${getSeverityColor(alert.severity)}`
+          background: `linear-gradient(135deg, ${getColorValue(getSeverityColor(alert.severity), token)}15 0%, ${getColorValue(getSeverityColor(alert.severity), token)}05 100%)`,
+          borderBottom: `2px solid ${getColorValue(getSeverityColor(alert.severity), token)}`
         }}>
           <Space>
             <Tag 
@@ -192,7 +205,7 @@ export const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
                         <div style={{ marginTop: 4 }}>
                           <Text strong style={{ 
                             fontSize: 17, 
-                            color: getSeverityColor(alert.severity),
+                            color: getColorValue(getSeverityColor(alert.severity), token),
                             fontWeight: 700
                           }}>
                             {alert.currentValue.toFixed(2)}

@@ -1,5 +1,14 @@
 import { Card, Space, Input, Select, Button, Typography, Tag, Divider, Row, Col } from 'antd';
-import { SearchOutlined, ReloadOutlined, FilterOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { 
+  SearchOutlined, 
+  ReloadOutlined, 
+  FilterOutlined, 
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  WarningOutlined,
+  InfoCircleOutlined,
+  CloseCircleOutlined,
+} from '@ant-design/icons';
 import type { AlertFiltersExtended } from '../../../../schemas';
 
 const { Text } = Typography;
@@ -69,9 +78,33 @@ export const AlertFilters: React.FC<AlertFiltersProps> = ({
               value={filters.severity}
               onChange={(value) => onFiltersChange({ ...filters, severity: value })}
               options={[
-                { label: '🔴 Critical', value: 'Critical' },
-                { label: '⚠️ Warning', value: 'Warning' },
-                { label: 'ℹ️ Advisory', value: 'Advisory' },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <ExclamationCircleOutlined />
+                      <span>Critical</span>
+                    </Space>
+                  ), 
+                  value: 'Critical' 
+                },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <WarningOutlined />
+                      <span>Warning</span>
+                    </Space>
+                  ), 
+                  value: 'Warning' 
+                },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <InfoCircleOutlined />
+                      <span>Advisory</span>
+                    </Space>
+                  ), 
+                  value: 'Advisory' 
+                },
               ]}
               maxTagCount="responsive"
             />
@@ -84,9 +117,33 @@ export const AlertFilters: React.FC<AlertFiltersProps> = ({
               value={filters.status}
               onChange={(value) => onFiltersChange({ ...filters, status: value })}
               options={[
-                { label: '🔴 Active', value: 'Active' },
-                { label: '🟡 Acknowledged', value: 'Acknowledged' },
-                { label: '✅ Resolved', value: 'Resolved' },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <ExclamationCircleOutlined />
+                      <span>Active</span>
+                    </Space>
+                  ), 
+                  value: 'Active' 
+                },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <WarningOutlined />
+                      <span>Acknowledged</span>
+                    </Space>
+                  ), 
+                  value: 'Acknowledged' 
+                },
+                { 
+                  label: (
+                    <Space size={4}>
+                      <CheckCircleOutlined />
+                      <span>Resolved</span>
+                    </Space>
+                  ), 
+                  value: 'Resolved' 
+                },
               ]}
               maxTagCount="responsive"
             />

@@ -55,8 +55,9 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
       await onBatchAcknowledge(selectedRowKeys as string[]);
       message.success(`${selectedRowKeys.length} alerts acknowledged successfully`);
       setSelectedRowKeys([]);
-    } catch {
-      message.error('Failed to acknowledge some alerts');
+    } catch (error) {
+      console.error('Batch acknowledge error:', error);
+      message.error('Failed to acknowledge alerts. Please try again or contact support if the issue persists.');
     } finally {
       setBatchLoading(false);
     }
