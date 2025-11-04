@@ -3,24 +3,19 @@ import {
   Typography,
   Space,
   Tag,
-  Badge,
-  Input,
-  Select,
-  Spin,
   Empty,
-  Table,
-  Alert as AntAlert,
+  Button,
+  List,
 } from 'antd';
 import {
   WarningOutlined,
-  SearchOutlined,
-  FilterOutlined,
+  RightOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useThemeToken } from '../../../../theme';
 import type {
   WaterQualityAlert,
-  WaterQualityAlertSeverity,
-  WaterQualityParameter,
 } from '../../../../schemas';
 import {
   getSeverityColor,
@@ -33,104 +28,29 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
 
 const { Text } = Typography;
-const { Option } = Select;
 
 interface RecentAlertsCardProps {
   alerts: WaterQualityAlert[];
   loading: boolean;
   activeAlerts: number;
   criticalAlerts: number;
-  searchText: string;
-  alertFilter: WaterQualityAlertSeverity | 'all';
-  onSearchChange: (value: string) => void;
-  onFilterChange: (value: WaterQualityAlertSeverity | 'all') => void;
 }
 
+/**
+ * Recent Alerts Summary Card
+ * Displays a summary of recent alerts with link to full alert management
+ */
 export const RecentAlertsCard = ({
   alerts,
   loading,
   activeAlerts,
   criticalAlerts,
-  searchText,
-  alertFilter,
-  onSearchChange,
-  onFilterChange,
 }: RecentAlertsCardProps) => {
   const token = useThemeToken();
+  const navigate = useNavigate();
 
-  const alertColumns = [
-    {
-      title: 'Severity',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 100,
-      render: (severity: WaterQualityAlertSeverity) => (
-        <Tag color={getSeverityColor(severity)} icon={<WarningOutlined />}>
-          {severity}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Device',
-      dataIndex: 'deviceName',
-      key: 'deviceName',
-      render: (name: string, record: WaterQualityAlert) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{name || record.deviceId}</div>
-          {record.deviceBuilding && (
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {record.deviceBuilding}
-              {record.deviceFloor && `, ${record.deviceFloor}`}
-            </Text>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: 'Parameter',
-      dataIndex: 'parameter',
-      key: 'parameter',
-      width: 100,
-      render: (param: WaterQualityParameter) => getParameterName(param),
-    },
-    {
-      title: 'Message',
-      dataIndex: 'message',
-      key: 'message',
-      ellipsis: true,
-    },
-    {
-      title: 'Value',
-      key: 'value',
-      width: 100,
-      render: (record: WaterQualityAlert) => (
-        <Text strong>
-          {record.currentValue.toFixed(2)} {getParameterUnit(record.parameter)}
-        </Text>
-      ),
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: string) => (
-        <Tag color={status === 'Active' ? 'red' : status === 'Acknowledged' ? 'orange' : 'green'}>
-          {status}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Time',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 120,
-      render: (timestamp: any) => {
-        const time = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
-        return <Text type="secondary">{dayjs(time).fromNow()}</Text>;
-      },
-    },
-  ];
+  // Show only the most recent 5 alerts
+  const recentAlerts = alerts.slice(0, 5);
 
   return (
     <Card
@@ -138,59 +58,115 @@ export const RecentAlertsCard = ({
         <Space>
           <WarningOutlined style={{ color: token.colorWarning }} />
           <span>Recent Alerts</span>
-          <Badge count={activeAlerts} />
+          {activeAlerts > 0 && (
+            <Tag color="error">{activeAlerts} Active</Tag>
+          )}
+          {criticalAlerts > 0 && (
+            <Tag color="error" icon={<WarningOutlined />}>
+              {criticalAlerts} Critical
+            </Tag>
+          )}
         </Space>
       }
       extra={
-        <Space>
-          <Input
-            placeholder="Search alerts..."
-            prefix={<SearchOutlined />}
-            style={{ width: 200 }}
-            value={searchText}
-            onChange={(e) => onSearchChange(e.target.value)}
-            allowClear
-          />
-          <Select
-            style={{ width: 150 }}
-            value={alertFilter}
-            onChange={onFilterChange}
-            prefix={<FilterOutlined />}
-          >
-            <Option value="all">All Severity</Option>
-            <Option value="Critical">Critical</Option>
-            <Option value="Warning">Warning</Option>
-            <Option value="Advisory">Advisory</Option>
-          </Select>
-        </Space>
+        <Button
+          type="link"
+          icon={<RightOutlined />}
+          onClick={() => navigate('/admin/alerts')}
+        >
+          View All Alerts
+        </Button>
       }
       bordered={false}
+      loading={loading}
     >
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <Spin size="large" />
-        </div>
-      ) : alerts.length === 0 ? (
-        <Empty description="No alerts found" />
+      {recentAlerts.length === 0 ? (
+        <Empty 
+          image={<BellOutlined style={{ fontSize: 48, color: token.colorSuccess }} />}
+          description={
+            <Space direction="vertical" size={4}>
+              <Text strong>No Recent Alerts</Text>
+              <Text type="secondary">All systems are operating normally</Text>
+            </Space>
+          }
+        />
       ) : (
         <>
-          {criticalAlerts > 0 && (
-            <AntAlert
-              message={`${criticalAlerts} Critical Alert${
-                criticalAlerts > 1 ? 's' : ''
-              } Require Immediate Attention`}
-              type="error"
-              showIcon
-              style={{ marginBottom: '16px' }}
-            />
-          )}
-          <Table
-            columns={alertColumns}
-            dataSource={alerts}
-            rowKey="alertId"
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: 1000 }}
+          <List
+            dataSource={recentAlerts}
+            renderItem={(alert) => {
+              const time = alert.createdAt?.toDate?.() 
+                ? alert.createdAt.toDate() 
+                : (alert.createdAt ? new Date(alert.createdAt) : null);
+              return (
+                <List.Item
+                  key={alert.alertId}
+                  style={{
+                    padding: '12px 16px',
+                    borderLeft: `4px solid ${token[getSeverityColor(alert.severity) as keyof typeof token]}`,
+                    marginBottom: 8,
+                    background: alert.status === 'Active' ? '#fff1f0' : '#fafafa',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => navigate('/admin/alerts')}
+                >
+                  <List.Item.Meta
+                    title={
+                      <Space size={8} wrap>
+                        <Tag color={getSeverityColor(alert.severity)} style={{ margin: 0 }}>
+                          {alert.severity}
+                        </Tag>
+                        <Text strong style={{ fontSize: 13 }}>
+                          {getParameterName(alert.parameter)}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {alert.currentValue.toFixed(2)} {getParameterUnit(alert.parameter)}
+                        </Text>
+                      </Space>
+                    }
+                    description={
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        <Text ellipsis style={{ fontSize: 12 }}>
+                          {alert.message}
+                        </Text>
+                        <Space size={8} wrap style={{ fontSize: 11 }}>
+                          <Text type="secondary">
+                            {alert.deviceName || alert.deviceId}
+                          </Text>
+                          {alert.deviceBuilding && (
+                            <>
+                              <Text type="secondary">•</Text>
+                              <Text type="secondary">{alert.deviceBuilding}</Text>
+                            </>
+                          )}
+                          <Text type="secondary">•</Text>
+                          <Text type="secondary">
+                            {time ? dayjs(time).fromNow() : 'Unknown time'}
+                          </Text>
+                        </Space>
+                      </Space>
+                    }
+                  />
+                  <Tag color={alert.status === 'Active' ? 'error' : alert.status === 'Acknowledged' ? 'warning' : 'success'}>
+                    {alert.status}
+                  </Tag>
+                </List.Item>
+              );
+            }}
           />
+          
+          {alerts.length > 5 && (
+            <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+              <Button
+                type="primary"
+                icon={<BellOutlined />}
+                onClick={() => navigate('/admin/alerts')}
+              >
+                View All {alerts.length} Alerts
+              </Button>
+            </div>
+          )}
         </>
       )}
     </Card>

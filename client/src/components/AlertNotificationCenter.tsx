@@ -24,57 +24,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
-
-// --- Inlined alert types & helpers (copied from src/types/alerts.ts) ---
-export type AlertSeverity = 'Advisory' | 'Warning' | 'Critical';
-export type AlertStatus = 'Active' | 'Acknowledged' | 'Resolved';
-export type WaterParameter = 'tds' | 'ph' | 'turbidity';
-export type TrendDirection = 'increasing' | 'decreasing' | 'stable';
-export type AlertType = 'threshold' | 'trend';
-
-export interface WaterQualityAlert {
-  alertId: string;
-  deviceId: string;
-  deviceName?: string;
-  deviceBuilding?: string;
-  deviceFloor?: string;
-  parameter: WaterParameter;
-  alertType: AlertType;
-  severity: AlertSeverity;
-  status: AlertStatus;
-  currentValue: number;
-  thresholdValue?: number;
-  trendDirection?: TrendDirection;
-  message: string;
-  recommendedAction: string;
-  createdAt: Timestamp;
-  acknowledgedAt?: Timestamp;
-  acknowledgedBy?: string;
-  resolvedAt?: Timestamp;
-  resolvedBy?: string;
-  notificationsSent: string[];
-  metadata?: {
-    previousValue?: number;
-    changeRate?: number;
-    location?: string;
-    [key: string]: any;
-  };
-}
-
-export const getSeverityColor = (severity: AlertSeverity): string => {
-  switch (severity) {
-    case 'Critical':
-      return 'error';
-    case 'Warning':
-      return 'warning';
-    case 'Advisory':
-      return 'processing';
-    default:
-      return 'default';
-  }
-};
-
-// --- End inlined section ---
+import type { WaterQualityAlert } from '../schemas';
+import { getSeverityColor } from '../schemas';
 
 const { Text } = Typography;
 

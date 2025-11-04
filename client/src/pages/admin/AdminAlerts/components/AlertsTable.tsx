@@ -1,4 +1,5 @@
-import { Card, Table, Tag, Button, Space, Typography, Tooltip, Empty } from 'antd';
+import { Card, Table, Tag, Button, Space, Typography, Tooltip, Empty, message } from 'antd';
+import { useState } from 'react';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -7,8 +8,10 @@ import {
   WarningOutlined,
   EnvironmentOutlined,
   ClockCircleOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { TableRowSelection } from 'antd/es/table/interface';
 import { useThemeToken } from '../../../../theme';
 import {
   getParameterUnit,
@@ -24,21 +27,49 @@ interface AlertsTableProps {
   loading: boolean;
   onViewDetails: (alert: WaterQualityAlert) => void;
   onAcknowledge: (alertId: string) => void;
+  onBatchAcknowledge?: (alertIds: string[]) => Promise<void>;
   isAcknowledging?: (alertId: string) => boolean;
 }
 
 /**
  * Alerts Table Component
- * Displays alerts in a sortable, paginated table
+ * Displays alerts in a sortable, paginated table with batch operations
  */
 export const AlertsTable: React.FC<AlertsTableProps> = ({
   alerts,
   loading,
   onViewDetails,
   onAcknowledge,
+  onBatchAcknowledge,
   isAcknowledging = () => false,
 }) => {
   const token = useThemeToken();
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchLoading, setBatchLoading] = useState(false);
+
+  const handleBatchAcknowledge = async () => {
+    if (!onBatchAcknowledge || selectedRowKeys.length === 0) return;
+    
+    setBatchLoading(true);
+    try {
+      await onBatchAcknowledge(selectedRowKeys as string[]);
+      message.success(`${selectedRowKeys.length} alerts acknowledged successfully`);
+      setSelectedRowKeys([]);
+    } catch (error) {
+      console.error('Batch acknowledge error:', error);
+      message.error('Failed to acknowledge alerts. Please try again or contact support if the issue persists.');
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
+  const rowSelection: TableRowSelection<WaterQualityAlert> = {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+    getCheckboxProps: (record) => ({
+      disabled: record.status !== 'Active',
+    }),
+  };
 
   const columns: ColumnsType<WaterQualityAlert> = [
     {
@@ -177,16 +208,46 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
 
   return (
     <Card>
+      {/* Batch Actions Bar */}
+      {selectedRowKeys.length > 0 && onBatchAcknowledge && (
+        <div
+          style={{
+            padding: '12px 16px',
+            marginBottom: 16,
+            background: token.colorPrimaryBg,
+            borderRadius: token.borderRadius,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <Space>
+            <CheckOutlined style={{ color: token.colorPrimary }} />
+            <Text strong>{selectedRowKeys.length} alert(s) selected</Text>
+          </Space>
+          <Button
+            type="primary"
+            icon={<CheckCircleOutlined />}
+            onClick={handleBatchAcknowledge}
+            loading={batchLoading}
+          >
+            Acknowledge Selected
+          </Button>
+        </div>
+      )}
+
       <Table
         columns={columns}
         dataSource={alerts}
         rowKey="alertId"
         loading={loading}
+        rowSelection={onBatchAcknowledge ? rowSelection : undefined}
         scroll={{ x: 1200, y: 600 }}
         pagination={{
           pageSize: 20,
           showSizeChanger: true,
-          showTotal: (total) => `Total ${total} alerts`,
+          pageSizeOptions: ['10', '20', '50', '100'],
+          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} alerts`,
         }}
         locale={{
           emptyText: (

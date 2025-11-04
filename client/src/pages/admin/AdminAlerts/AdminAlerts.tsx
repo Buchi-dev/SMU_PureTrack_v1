@@ -40,6 +40,27 @@ export const AdminAlerts = () => {
     setDetailsVisible(true);
   };
 
+  // Batch acknowledge multiple alerts
+  const handleBatchAcknowledge = async (alertIds: string[]) => {
+    const results = await Promise.allSettled(
+      alertIds.map((id) => alertsService.acknowledgeAlert(id))
+    );
+    
+    const failed = results
+      .map((result, idx) => (result.status === 'rejected' ? alertIds[idx] : null))
+      .filter((id): id is string => id !== null);
+    
+    if (failed.length === 0) {
+      message.success(`All ${alertIds.length} alerts acknowledged successfully`);
+    } else if (failed.length === alertIds.length) {
+      message.error('Failed to acknowledge any selected alerts');
+    } else {
+      message.warning(
+        `Acknowledged ${alertIds.length - failed.length} of ${alertIds.length} alerts. ${failed.length} failed.`
+      );
+    }
+  };
+
   // READ: Subscribe to real-time alerts from Firestore
   useEffect(() => {
     const unsubscribe = alertsService.subscribeToAlerts(
@@ -86,6 +107,7 @@ export const AdminAlerts = () => {
           loading={loading}
           onViewDetails={viewAlertDetails}
           onAcknowledge={acknowledgeAlert}
+          onBatchAcknowledge={handleBatchAcknowledge}
           isAcknowledging={isAcknowledging}
         />
 

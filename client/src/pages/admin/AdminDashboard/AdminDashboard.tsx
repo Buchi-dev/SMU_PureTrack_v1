@@ -1,7 +1,5 @@
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
 import { Typography, Space } from 'antd';
-import { useState } from 'react';
-import type { WaterQualityAlertSeverity } from '../../../schemas';
 import {
   StatisticsCards,
   SensorReadingsCard,
@@ -13,8 +11,8 @@ import {
   useDevices,
   useHistoricalData,
   useDashboardStats,
-  useFilteredAlerts,
 } from './hooks';
+import { useState } from 'react';
 
 const { Title, Text } = Typography;
 
@@ -24,8 +22,6 @@ const { Title, Text } = Typography;
 
 export const AdminDashboard = () => {
   // UI State
-  const [alertFilter, setAlertFilter] = useState<WaterQualityAlertSeverity | 'all'>('all');
-  const [searchText, setSearchText] = useState('');
   const [selectedDevice, setSelectedDevice] = useState<string>('all');
 
   // Custom Hooks
@@ -33,7 +29,6 @@ export const AdminDashboard = () => {
   const { devices, loading: devicesLoading } = useDevices();
   const { historicalData } = useHistoricalData(selectedDevice);
   const stats = useDashboardStats(devices, alerts);
-  const filteredAlerts = useFilteredAlerts(alerts, alertFilter, searchText);
 
   // Combined loading state
   const loading = alertsLoading || devicesLoading;
@@ -77,16 +72,12 @@ export const AdminDashboard = () => {
           onDeviceChange={setSelectedDevice}
         />
 
-        {/* ====== RECENT ALERTS ====== */}
+        {/* ====== RECENT ALERTS SUMMARY ====== */}
         <RecentAlertsCard
-          alerts={filteredAlerts}
+          alerts={alerts}
           loading={loading}
           activeAlerts={stats.activeAlerts}
           criticalAlerts={stats.criticalAlerts}
-          searchText={searchText}
-          alertFilter={alertFilter}
-          onSearchChange={setSearchText}
-          onFilterChange={setAlertFilter}
         />
       </Space>
     </AdminLayout>
