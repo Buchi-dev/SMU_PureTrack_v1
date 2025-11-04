@@ -1,8 +1,8 @@
 import { Modal, Form, Input, Select, Space, Typography, Divider, Alert } from 'antd';
 import { useEffect } from 'react';
-import type { Device } from '../../../schemas';
+import type { Device } from '../../../../schemas';
 import { EnvironmentOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { useThemeToken } from '../../../theme';
+import { useThemeToken } from '../../../../theme';
 
 const { TextArea } = Input;
 const { Option } = Select;

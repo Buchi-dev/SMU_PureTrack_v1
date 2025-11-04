@@ -29,10 +29,10 @@ import {
   EnvironmentOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus, SensorReading } from '../../../schemas';
-import { isDeviceRegistered } from '../../../schemas';
-import { deviceManagementService } from '../../../services/deviceManagement.Service';
-import { useThemeToken } from '../../../theme';
+import type { Device, DeviceStatus, SensorReading } from '../../../../schemas';
+import { isDeviceRegistered } from '../../../../schemas';
+import { deviceManagementService } from '../../../../services/deviceManagement.Service';
+import { useThemeToken } from '../../../../theme';
 
 const { Text } = Typography;
 

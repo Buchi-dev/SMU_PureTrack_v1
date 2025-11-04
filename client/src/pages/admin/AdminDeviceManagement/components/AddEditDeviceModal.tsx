@@ -1,6 +1,6 @@
 import { Modal, Form, Input, Select, Space, Typography, Row, Col, Card } from 'antd';
 import { useEffect } from 'react';
-import type { Device } from '../../../schemas';
+import type { Device } from '../../../../schemas';
 import { 
   ApiOutlined, 
   EditOutlined,
@@ -20,7 +20,7 @@ import {
   BulbOutlined,
   RadarChartOutlined,
 } from '@ant-design/icons';
-import { useThemeToken } from '../../../theme';
+import { useThemeToken } from '../../../../theme';
 
 const { TextArea } = Input;
 const { Option } = Select;
