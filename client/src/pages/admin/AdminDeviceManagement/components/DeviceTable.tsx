@@ -13,7 +13,7 @@ const { Text, Title } = Typography;
 
 interface DeviceTableProps {
   activeTab: 'registered' | 'unregistered';
-  onTabChange: (key: string) => void;
+  onTabChange: (key: 'registered' | 'unregistered') => void;
   filteredDevices: Device[];
   loading: boolean;
   stats: {
@@ -62,7 +62,7 @@ export const DeviceTable = ({
     >
       <Tabs
         activeKey={activeTab}
-        onChange={onTabChange}
+        onChange={(key) => onTabChange(key as 'registered' | 'unregistered')}
         size="large"
         style={{
           flex: 1,

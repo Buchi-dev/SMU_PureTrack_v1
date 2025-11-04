@@ -5,6 +5,9 @@ import type { DeviceSensorData } from '../pages/admin/AdminDashboard/components'
 /**
  * Custom hook to fetch devices and setup real-time sensor data listeners
  * Uses deviceManagementService for centralized data access
+ * 
+ * IMPORTANT: Device status comes from Firestore only.
+ * RTDB subscriptions update latestReading but NOT device status.
  */
 export const useDevices = () => {
   const [devices, setDevices] = useState<DeviceSensorData[]>([]);
@@ -41,10 +44,11 @@ export const useDevices = () => {
             deviceIds,
             (deviceId, reading) => {
               if (reading) {
+                // ✅ Update sensor reading but keep Firestore status as source of truth
                 setDevices((prev) =>
                   prev.map((d) =>
                     d.deviceId === deviceId
-                      ? { ...d, latestReading: reading, status: 'online' }
+                      ? { ...d, latestReading: reading }
                       : d
                   )
                 );

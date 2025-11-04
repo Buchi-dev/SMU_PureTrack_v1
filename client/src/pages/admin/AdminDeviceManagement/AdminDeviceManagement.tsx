@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AdminLayout } from '../../../components/layouts';
 import {
   DeviceHeader,
@@ -9,15 +9,13 @@ import {
   RegisterDeviceModal,
 } from './components';
 import { useDeviceManagement, useDeviceActions, useDeviceFilter } from './hooks';
+import './DeviceManagement.css';
 
 export const AdminDeviceManagement = () => {
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState<'registered' | 'unregistered'>('registered');
 
-  // Custom hooks with real-time updates enabled
-  const { devices, loading, loadDevices } = useDeviceManagement({
-    enableRealtime: true, // Enable real-time sensor data updates
-  });
+  const { devices, loading, loadDevices } = useDeviceManagement();
   
   const {
     selectedDevice,
@@ -40,7 +38,6 @@ export const AdminDeviceManagement = () => {
     searchText,
   });
 
-  // Handle device registration with tab switch
   const handleRegisterWithTabSwitch = async (
     deviceId: string,
     locationData: { building: string; floor: string; notes?: string }
@@ -50,47 +47,6 @@ export const AdminDeviceManagement = () => {
       setActiveTab('registered');
     }
   };
-
-  // Inject custom table styles
-  useEffect(() => {
-    const styleId = 'device-table-styles';
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      styleElement.innerHTML = `
-        .ant-table-row-striped {
-          background-color: rgba(0, 0, 0, 0.02);
-        }
-        .ant-table-row-striped:hover > td {
-          background-color: rgba(0, 0, 0, 0.04) !important;
-        }
-        .device-table .ant-table-tbody > tr > td {
-          padding: 12px 16px !important;
-        }
-        .device-table .ant-table-thead > tr > th {
-          font-weight: 600 !important;
-          background-color: #fafafa !important;
-          padding: 14px 16px !important;
-        }
-        
-        /* Unregistered devices special styling */
-        .unregistered-devices-table .unregistered-row {
-          border-left: 3px solid #faad14;
-          background-color: #fffbe6;
-        }
-        .unregistered-devices-table .unregistered-row.ant-table-row-striped {
-          background-color: #fff7e6;
-        }
-        .unregistered-devices-table .unregistered-row:hover > td {
-          background-color: #fff1b8 !important;
-        }
-        .unregistered-devices-table .ant-table-thead > tr > th {
-          background-color: #fff7e6 !important;
-        }
-      `;
-      document.head.appendChild(styleElement);
-    }
-  }, []);
 
   return (
     <AdminLayout>
@@ -103,16 +59,13 @@ export const AdminDeviceManagement = () => {
           padding: '4px',
         }}
       >
-        {/* Header */}
         <DeviceHeader onRefresh={loadDevices} onSearchChange={setSearchText} />
 
-        {/* Statistics Cards */}
         <DeviceStats stats={stats} />
 
-        {/* Devices Table with Tabs */}
         <DeviceTable
           activeTab={activeTab}
-          onTabChange={(key) => setActiveTab(key as 'registered' | 'unregistered')}
+          onTabChange={setActiveTab}
           filteredDevices={filteredDevices}
           loading={loading}
           stats={stats}
@@ -122,7 +75,6 @@ export const AdminDeviceManagement = () => {
           onRegister={handleRegister}
         />
 
-        {/* Add/Edit Modal */}
         <AddEditDeviceModal
           visible={isAddEditModalVisible}
           mode={modalMode}
@@ -131,14 +83,12 @@ export const AdminDeviceManagement = () => {
           onCancel={handleModalClose}
         />
 
-        {/* View Modal */}
         <ViewDeviceModal
           visible={isViewModalVisible}
           device={selectedDevice}
           onClose={handleModalClose}
         />
 
-        {/* Register Device Modal */}
         <RegisterDeviceModal
           visible={isRegisterModalVisible}
           device={selectedDevice}

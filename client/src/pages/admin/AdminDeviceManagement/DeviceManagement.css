@@ -1,0 +1,39 @@
+/* Device Management Table Styles */
+
+/* Striped rows */
+.ant-table-row-striped {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.ant-table-row-striped:hover > td {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Device table cell padding */
+.device-table .ant-table-tbody > tr > td {
+  padding: 12px 16px !important;
+}
+
+.device-table .ant-table-thead > tr > th {
+  font-weight: 600 !important;
+  background-color: #fafafa !important;
+  padding: 14px 16px !important;
+}
+
+/* Unregistered devices special styling */
+.unregistered-devices-table .unregistered-row {
+  border-left: 3px solid #faad14;
+  background-color: #fffbe6;
+}
+
+.unregistered-devices-table .unregistered-row.ant-table-row-striped {
+  background-color: #fff7e6;
+}
+
+.unregistered-devices-table .unregistered-row:hover > td {
+  background-color: #fff1b8 !important;
+}
+
+.unregistered-devices-table .ant-table-thead > tr > th {
+  background-color: #fff7e6 !important;
+}

@@ -20,7 +20,6 @@ import {
   Drawer,
   Form,
   Divider,
-  Badge,
   Tooltip,
   Empty,
 } from 'antd';
@@ -34,15 +33,15 @@ import {
   BellOutlined,
   EyeOutlined,
   WarningOutlined,
+  EnvironmentOutlined,
+  ClockCircleOutlined,
+  TabletOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { alertsService } from '../../../services/alerts.Service';
 import type {
   WaterQualityAlert,
-  WaterQualityAlertStatus as AlertStatus,
-  WaterQualityAlertSeverity as AlertSeverity,
-  WaterQualityParameter as WaterParameter,
-  AlertFiltersExtended as AlertFilters,
+  AlertFiltersExtended,
 } from '../../../schemas';
 import {
   getParameterUnit,
@@ -62,7 +61,7 @@ export const AdminAlerts = () => {
   const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
-  const [filters, setFilters] = useState<AlertFilters>({});
+  const [filters, setFilters] = useState<AlertFiltersExtended>({});
 
   const [stats, setStats] = useState({
     total: 0,
@@ -175,14 +174,25 @@ export const AdminAlerts = () => {
   // Table columns
   const columns: ColumnsType<WaterQualityAlert> = [
     {
-      title: 'Severity',
-      dataIndex: 'severity',
-      key: 'severity',
-      width: 100,
-      render: (severity: AlertSeverity) => (
-        <Tag color={getSeverityColor(severity)} icon={<WarningOutlined />}>
-          {severity}
-        </Tag>
+      title: 'Alert Status',
+      key: 'alertStatus',
+      width: 200,
+      render: (_, record) => (
+        <Space direction="vertical" size={2}>
+          <Tag color={getSeverityColor(record.severity)} icon={<WarningOutlined />}>
+            {record.severity}
+          </Tag>
+          <Tag 
+            color={getStatusColor(record.status)} 
+            icon={
+              record.status === 'Active' ? <ExclamationCircleOutlined /> :
+              record.status === 'Acknowledged' ? <CheckCircleOutlined /> :
+              <CloseCircleOutlined />
+            }
+          >
+            {record.status}
+          </Tag>
+        </Space>
       ),
       sorter: (a, b) => {
         const order = { Critical: 3, Warning: 2, Advisory: 1 };
@@ -190,92 +200,70 @@ export const AdminAlerts = () => {
       },
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 120,
-      render: (status: AlertStatus) => {
-        const icon =
-          status === 'Active' ? <ExclamationCircleOutlined /> :
-            status === 'Acknowledged' ? <CheckCircleOutlined /> :
-              <CloseCircleOutlined />;
+      title: 'Measurement',
+      key: 'measurement',
+      width: 150,
+      render: (_, record) => (
+        <Space direction="vertical" size={2}>
+          <Text strong style={{ fontSize: '12px' }}>{record.parameter.toUpperCase()}</Text>
+          <Text strong style={{ color: getSeverityColor(record.severity) }}>
+            {record.currentValue.toFixed(2)} {getParameterUnit(record.parameter)}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Device & Location',
+      key: 'deviceLocation',
+      width: 220,
+      render: (_, record) => {
+        const locationText = [record.deviceBuilding, record.deviceFloor]
+          .filter(Boolean)
+          .join(', ');
         return (
-          <Tag color={getStatusColor(status)} icon={icon}>
-            {status}
-          </Tag>
+          <Space direction="vertical" size={2}>
+            <Tooltip title={record.deviceId}>
+              <Text strong ellipsis>{record.deviceName || record.deviceId}</Text>
+            </Tooltip>
+            {locationText ? (
+              <Space size={4}>
+                <EnvironmentOutlined style={{ fontSize: '10px', color: token.colorTextTertiary }} />
+                <Text type="secondary" style={{ fontSize: '12px' }}>
+                  {locationText}
+                </Text>
+              </Space>
+            ) : (
+              <Text type="secondary" italic style={{ fontSize: '12px' }}>No location</Text>
+            )}
+          </Space>
         );
       },
     },
     {
-      title: 'Parameter',
-      dataIndex: 'parameter',
-      key: 'parameter',
-      width: 150,
-      render: (param: WaterParameter) => (
-        <Text strong>{param.toUpperCase()}</Text>
-      ),
-    },
-    {
-      title: 'Device',
-      dataIndex: 'deviceName',
-      key: 'deviceName',
+      title: 'Alert Details',
+      key: 'alertDetails',
       ellipsis: true,
-      render: (name: string, record) => (
-        <Tooltip title={record.deviceId}>
-          <Text>{name || record.deviceId}</Text>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'Location',
-      key: 'location',
-      width: 180,
       render: (_, record) => {
-        if (record.deviceBuilding || record.deviceFloor) {
-          const locationText = [record.deviceBuilding, record.deviceFloor]
-            .filter(Boolean)
-            .join(', ');
-          return (
-            <Text type="secondary">
-              📍 {locationText}
-            </Text>
-          );
+        let timeStr = 'N/A';
+        if (record.createdAt?.toDate) {
+          try {
+            const date = record.createdAt.toDate();
+            timeStr = date.toLocaleString();
+          } catch (error) {
+            console.error('Error formatting timestamp:', error);
+          }
         }
-        return <Text type="secondary" italic>Not configured</Text>;
-      },
-    },
-    {
-      title: 'Value',
-      dataIndex: 'currentValue',
-      key: 'currentValue',
-      width: 120,
-      render: (value: number, record) => (
-        <Text strong>
-          {value.toFixed(2)} {getParameterUnit(record.parameter)}
-        </Text>
-      ),
-    },
-    {
-      title: 'Message',
-      dataIndex: 'message',
-      key: 'message',
-      ellipsis: true,
-    },
-    {
-      title: 'Created',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (timestamp: any) => {
-        if (!timestamp || !timestamp.toDate) {
-          return <Text type="secondary">N/A</Text>;
-        }
-        try {
-          return <Text type="secondary">{timestamp.toDate().toLocaleString()}</Text>;
-        } catch (error) {
-          console.error('Error formatting timestamp:', error, timestamp);
-          return <Text type="secondary">Invalid date</Text>;
-        }
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <Text ellipsis>{record.message}</Text>
+            <Space size={4}>
+              <ClockCircleOutlined style={{ fontSize: '10px', color: token.colorTextTertiary }} />
+              <Text type="secondary" style={{ fontSize: '12px' }}>
+                {timeStr}
+              </Text>
+            </Space>
+          </Space>
+        );
       },
       sorter: (a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
@@ -289,8 +277,8 @@ export const AdminAlerts = () => {
       width: 200,
       fixed: 'right',
       render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="View Details">
+        <Space size="small" wrap>
+          <Tooltip title="View Details" getPopupContainer={(trigger) => trigger.parentElement || document.body}>
             <Button
               type="link"
               size="small"
@@ -301,7 +289,7 @@ export const AdminAlerts = () => {
             </Button>
           </Tooltip>
           {record.status === 'Active' && (
-            <Tooltip title="Acknowledge Alert">
+            <Tooltip title="Acknowledge Alert" getPopupContainer={(trigger) => trigger.parentElement || document.body}>
               <Button
                 type="link"
                 size="small"
@@ -433,7 +421,7 @@ export const AdminAlerts = () => {
             dataSource={filteredAlerts}
             rowKey="alertId"
             loading={loading}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1200, y: 600 }}
             pagination={{
               pageSize: 20,
               showSizeChanger: true,
@@ -448,173 +436,307 @@ export const AdminAlerts = () => {
                 </Empty>
               ),
             }}
+            sticky
           />
         </Card>
 
-        {/* Alert Details Drawer */}
+        {/* Alert Details Drawer - Redesigned */}
         <Drawer
-          title="Alert Details"
-          placement="right"
-          width={600}
-          open={detailsVisible}
-          onClose={() => setDetailsVisible(false)}
-          extra={
+          title={
             <Space>
-              {selectedAlert?.status === 'Active' && (
-                <Button
-                  type="primary"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => acknowledgeAlert(selectedAlert.alertId)}
-                >
-                  Acknowledge
-                </Button>
-              )}
+              <WarningOutlined style={{ fontSize: 20 }} />
+              <span>Alert Details</span>
             </Space>
           }
+          placement="right"
+          width={650}
+          open={detailsVisible}
+          onClose={() => setDetailsVisible(false)}
+          styles={{
+            body: { padding: 0 }
+          }}
         >
           {selectedAlert && (
-            <div>
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {/* Status and Severity */}
-                <Card size="small">
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <div>
-                      <Text type="secondary">Status:</Text>{' '}
-                      <Tag color={getStatusColor(selectedAlert.status)}>
-                        {selectedAlert.status}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text type="secondary">Severity:</Text>{' '}
-                      <Tag color={getSeverityColor(selectedAlert.severity)}>
-                        {selectedAlert.severity}
-                      </Tag>
-                    </div>
-                    <div>
-                      <Text type="secondary">Type:</Text>{' '}
-                      <Tag>{selectedAlert.alertType}</Tag>
-                    </div>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Header Section with Status */}
+              <div style={{ 
+                padding: '24px 24px 20px', 
+                background: `linear-gradient(135deg, ${getSeverityColor(selectedAlert.severity)}15 0%, ${getSeverityColor(selectedAlert.severity)}05 100%)`,
+                borderBottom: `3px solid ${getSeverityColor(selectedAlert.severity)}`
+              }}>
+                <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                  <Space size={8}>
+                    <Tag 
+                      color={getSeverityColor(selectedAlert.severity)} 
+                      icon={<WarningOutlined />}
+                      style={{ fontSize: 14, padding: '4px 12px', fontWeight: 600 }}
+                    >
+                      {selectedAlert.severity}
+                    </Tag>
+                    <Tag 
+                      color={getStatusColor(selectedAlert.status)}
+                      icon={
+                        selectedAlert.status === 'Active' ? <ExclamationCircleOutlined /> :
+                        selectedAlert.status === 'Acknowledged' ? <CheckCircleOutlined /> :
+                        <CloseCircleOutlined />
+                      }
+                      style={{ fontSize: 14, padding: '4px 12px' }}
+                    >
+                      {selectedAlert.status}
+                    </Tag>
+                    <Tag style={{ fontSize: 12, padding: '2px 8px' }}>
+                      {selectedAlert.alertType}
+                    </Tag>
                   </Space>
-                </Card>
+                  
+                  {/* Quick Actions */}
+                  {selectedAlert.status === 'Active' && (
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => acknowledgeAlert(selectedAlert.alertId)}
+                      block
+                      size="large"
+                    >
+                      Acknowledge Alert
+                    </Button>
+                  )}
+                </Space>
+              </div>
 
-                {/* Device and Parameter Info */}
-                <Card size="small" title="Device Information">
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <div>
-                      <Text strong>Device:</Text> {selectedAlert.deviceName || selectedAlert.deviceId}
-                    </div>
-                    {(selectedAlert.deviceBuilding || selectedAlert.deviceFloor) && (
-                      <div>
-                        <Text strong>Location:</Text>{' '}
-                        <Text>
-                          📍 {[selectedAlert.deviceBuilding, selectedAlert.deviceFloor].filter(Boolean).join(', ')}
-                        </Text>
-                      </div>
-                    )}
-                    <div>
-                      <Text strong>Parameter:</Text> {getParameterName(selectedAlert.parameter)}
-                    </div>
-                    <div>
-                      <Text strong>Current Value:</Text>{' '}
-                      <Text strong style={{ color: getSeverityColor(selectedAlert.severity) }}>
-                        {selectedAlert.currentValue.toFixed(2)} {getParameterUnit(selectedAlert.parameter)}
+              {/* Scrollable Content */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+                <Space direction="vertical" size={20} style={{ width: '100%' }}>
+                  
+                  {/* Alert Message - Prominent */}
+                  <div style={{
+                    padding: 16,
+                    background: token.colorBgContainer,
+                    borderLeft: `4px solid ${getSeverityColor(selectedAlert.severity)}`,
+                    borderRadius: 8,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                  }}>
+                    <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase', fontWeight: 600 }}>
+                      Alert Message
+                    </Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Text style={{ fontSize: 15, lineHeight: 1.6 }}>
+                        {selectedAlert.message}
                       </Text>
                     </div>
-                    {selectedAlert.thresholdValue && (
+                  </div>
+
+                  {/* Measurement Info - Visual Cards */}
+                  <Row gutter={12}>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#f5f5f5' }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Parameter</Text>
+                        <div style={{ marginTop: 4 }}>
+                          <Text strong style={{ fontSize: 16, color: token.colorPrimary }}>
+                            {getParameterName(selectedAlert.parameter)}
+                          </Text>
+                        </div>
+                      </Card>
+                    </Col>
+                    <Col span={12}>
+                      <Card size="small" style={{ textAlign: 'center', background: '#f5f5f5' }}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Current Value</Text>
+                        <div style={{ marginTop: 4 }}>
+                          <Text strong style={{ 
+                            fontSize: 18, 
+                            color: getSeverityColor(selectedAlert.severity),
+                            fontWeight: 700
+                          }}>
+                            {selectedAlert.currentValue.toFixed(2)}
+                          </Text>
+                          <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                            {getParameterUnit(selectedAlert.parameter)}
+                          </Text>
+                        </div>
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  {selectedAlert.thresholdValue && (
+                    <Card size="small" style={{ background: '#fff9e6' }}>
+                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>Threshold Limit</Text>
+                          <div>
+                            <Text strong style={{ fontSize: 16 }}>
+                              {selectedAlert.thresholdValue} {getParameterUnit(selectedAlert.parameter)}
+                            </Text>
+                          </div>
+                        </div>
+                        {selectedAlert.trendDirection && (
+                          <Tag color="orange">{selectedAlert.trendDirection}</Tag>
+                        )}
+                      </Space>
+                    </Card>
+                  )}
+
+                  <Divider style={{ margin: '8px 0' }} />
+
+                  {/* Device Information */}
+                  <div>
+                    <Space style={{ fontSize: 14, marginBottom: 12 }}>
+                      <TabletOutlined />
+                      <Text strong>Device Information</Text>
+                    </Space>
+                    <Card size="small" bodyStyle={{ padding: 16 }}>
+                      <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                        <div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>Device Name</Text>
+                          <div>
+                            <Text strong>{selectedAlert.deviceName || selectedAlert.deviceId}</Text>
+                          </div>
+                        </div>
+                        {(selectedAlert.deviceBuilding || selectedAlert.deviceFloor) && (
+                          <div>
+                            <Text type="secondary" style={{ fontSize: 12 }}>Location</Text>
+                            <div>
+                              <Space size={4}>
+                                <EnvironmentOutlined style={{ color: token.colorPrimary }} />
+                                <Text>
+                                  {[selectedAlert.deviceBuilding, selectedAlert.deviceFloor].filter(Boolean).join(', ')}
+                                </Text>
+                              </Space>
+                            </div>
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: token.colorTextTertiary }}>
+                          ID: {selectedAlert.deviceId}
+                        </div>
+                      </Space>
+                    </Card>
+                  </div>
+
+                  {/* Recommended Action */}
+                  <div style={{
+                    padding: 16,
+                    background: '#fffbe6',
+                    border: '1px solid #ffe58f',
+                    borderRadius: 8
+                  }}>
+                    <Space align="start">
+                      <ExclamationCircleOutlined style={{ color: '#faad14', fontSize: 18, marginTop: 2 }} />
                       <div>
-                        <Text strong>Threshold:</Text> {selectedAlert.thresholdValue} {getParameterUnit(selectedAlert.parameter)}
+                        <Text strong style={{ display: 'block', marginBottom: 8 }}>
+                          Recommended Action
+                        </Text>
+                        <Text style={{ fontSize: 14, lineHeight: 1.6 }}>
+                          {selectedAlert.recommendedAction}
+                        </Text>
                       </div>
-                    )}
-                    {selectedAlert.trendDirection && (
-                      <div>
-                        <Text strong>Trend:</Text> <Tag>{selectedAlert.trendDirection}</Tag>
-                      </div>
-                    )}
-                  </Space>
-                </Card>
+                    </Space>
+                  </div>
 
-                {/* Alert Message */}
-                <Card size="small" title="Alert Message">
-                  <Text>{selectedAlert.message}</Text>
-                </Card>
+                  <Divider style={{ margin: '8px 0' }} />
 
-                {/* Recommended Action */}
-                <Card size="small" title="Recommended Action" style={{ background: '#fff3cd' }}>
-                  <Text>{selectedAlert.recommendedAction}</Text>
-                </Card>
+                  {/* Timeline */}
+                  <div>
+                    <Space style={{ fontSize: 14, marginBottom: 12 }}>
+                      <ClockCircleOutlined />
+                      <Text strong>Timeline</Text>
+                    </Space>
+                    <Card size="small" bodyStyle={{ padding: 16 }}>
+                      <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text type="secondary">Created</Text>
+                          <Text strong>
+                            {selectedAlert.createdAt?.toDate ? 
+                              selectedAlert.createdAt.toDate().toLocaleString() : 
+                              'N/A'}
+                          </Text>
+                        </div>
+                        {selectedAlert.acknowledgedAt && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Text type="secondary">Acknowledged</Text>
+                            <Text>
+                              {selectedAlert.acknowledgedAt.toDate ? 
+                                selectedAlert.acknowledgedAt.toDate().toLocaleString() : 
+                                'N/A'}
+                            </Text>
+                          </div>
+                        )}
+                        {selectedAlert.resolvedAt && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Text type="secondary">Resolved</Text>
+                            <Text style={{ color: token.colorSuccess }}>
+                              {selectedAlert.resolvedAt.toDate ? 
+                                selectedAlert.resolvedAt.toDate().toLocaleString() : 
+                                'N/A'}
+                            </Text>
+                          </div>
+                        )}
+                      </Space>
+                    </Card>
+                  </div>
 
-                {/* Timestamps */}
-                <Card size="small" title="Timeline">
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <div>
-                      <Text type="secondary">Created:</Text>{' '}
-                      {selectedAlert.createdAt?.toDate ? 
-                        selectedAlert.createdAt.toDate().toLocaleString() : 
-                        'N/A'}
-                    </div>
-                    {selectedAlert.acknowledgedAt && (
-                      <div>
-                        <Text type="secondary">Acknowledged:</Text>{' '}
-                        {selectedAlert.acknowledgedAt.toDate ? 
-                          selectedAlert.acknowledgedAt.toDate().toLocaleString() : 
-                          'N/A'}
-                      </div>
-                    )}
-                    {selectedAlert.resolvedAt && (
-                      <div>
-                        <Text type="secondary">Resolved:</Text>{' '}
-                        {selectedAlert.resolvedAt.toDate ? 
-                          selectedAlert.resolvedAt.toDate().toLocaleString() : 
-                          'N/A'}
-                      </div>
-                    )}
-                  </Space>
-                </Card>
+                  {/* Notifications */}
+                  {selectedAlert.notificationsSent && selectedAlert.notificationsSent.length > 0 && (
+                    <Card size="small" style={{ background: '#f6ffed' }}>
+                      <Space>
+                        <BellOutlined style={{ color: token.colorSuccess }} />
+                        <Text>
+                          <Text strong style={{ color: token.colorSuccess }}>
+                            {selectedAlert.notificationsSent.length}
+                          </Text>
+                          {' '}user{selectedAlert.notificationsSent.length !== 1 ? 's' : ''} notified
+                        </Text>
+                      </Space>
+                    </Card>
+                  )}
 
-                {/* Notifications Sent */}
-                {selectedAlert.notificationsSent && selectedAlert.notificationsSent.length > 0 && (
-                  <Card size="small" title="Notifications Sent">
-                    <Badge
-                      count={selectedAlert.notificationsSent.length}
-                      style={{ backgroundColor: token.colorSuccess }}
-                    >
-                      <Text>{selectedAlert.notificationsSent.length} users notified</Text>
-                    </Badge>
-                  </Card>
-                )}
-
-                <Divider />
-
-                {/* Resolve Alert Form */}
-                {selectedAlert.status !== 'Resolved' && (
-                  <Card size="small" title="Resolve Alert">
-                    <Form
-                      layout="vertical"
-                      onFinish={(values) => resolveAlert(selectedAlert.alertId, values.notes)}
-                    >
-                      <Form.Item
-                        name="notes"
-                        label="Resolution Notes (optional)"
+                  {/* Resolve Alert Form */}
+                  {selectedAlert.status !== 'Resolved' && (
+                    <div style={{ 
+                      padding: 20, 
+                      background: token.colorBgContainer,
+                      border: '1px solid #d9d9d9',
+                      borderRadius: 8,
+                      marginTop: 8
+                    }}>
+                      <Space style={{ fontSize: 14, marginBottom: 16 }}>
+                        <CheckCircleOutlined style={{ color: token.colorSuccess }} />
+                        <Text strong>Resolve This Alert</Text>
+                      </Space>
+                      <Form
+                        layout="vertical"
+                        onFinish={(values) => resolveAlert(selectedAlert.alertId, values.notes)}
                       >
-                        <TextArea
-                          rows={4}
-                          placeholder="Enter any notes about how this alert was resolved..."
-                        />
-                      </Form.Item>
-                      <Form.Item>
-                        <Button
-                          type="primary"
-                          htmlType="submit"
-                          icon={<CheckCircleOutlined />}
-                          block
+                        <Form.Item
+                          name="notes"
+                          label="Resolution Notes"
+                          extra="Describe how the issue was resolved or any actions taken"
                         >
-                          Mark as Resolved
-                        </Button>
-                      </Form.Item>
-                    </Form>
-                  </Card>
-                )}
-              </Space>
+                          <TextArea
+                            rows={4}
+                            placeholder="Example: Checked water filtration system, replaced filter cartridge, water quality returned to normal levels."
+                            style={{ fontSize: 13 }}
+                          />
+                        </Form.Item>
+                        <Form.Item style={{ marginBottom: 0 }}>
+                          <Button
+                            type="primary"
+                            htmlType="submit"
+                            icon={<CheckCircleOutlined />}
+                            size="large"
+                            block
+                            style={{ 
+                              background: token.colorSuccess,
+                              borderColor: token.colorSuccess,
+                              height: 44
+                            }}
+                          >
+                            Mark as Resolved
+                          </Button>
+                        </Form.Item>
+                      </Form>
+                    </div>
+                  )}
+                </Space>
+              </div>
             </div>
           )}
         </Drawer>

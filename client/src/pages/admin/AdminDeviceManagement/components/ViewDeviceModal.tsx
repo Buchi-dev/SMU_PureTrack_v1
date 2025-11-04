@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import {
   Modal,
@@ -6,32 +5,23 @@ import {
   Tag,
   Space,
   Card,
-  Statistic,
-  Row,
-  Col,
   Button,
   Typography,
-  Spin,
   Alert,
-  Timeline,
-  Progress,
 } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   WarningOutlined,
   ToolOutlined,
-  ReloadOutlined,
-  ThunderboltOutlined,
-  DashboardOutlined,
   WifiOutlined,
   ApiOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus, SensorReading } from '../../../../schemas';
+import type { Device, DeviceStatus } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
-import { deviceManagementService } from '../../../../services/deviceManagement.Service';
 import { useThemeToken } from '../../../../theme';
 
 const { Text } = Typography;
@@ -51,58 +41,6 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
 
 export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalProps) => {
   const token = useThemeToken();
-  const [sensorData, setSensorData] = useState<SensorReading | null>(null);
-  const [sensorHistory, setSensorHistory] = useState<SensorReading[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (visible && device) {
-      loadSensorData();
-      loadSensorHistory();
-    }
-  }, [visible, device]);
-
-  const loadSensorData = async () => {
-    if (!device) return;
-    
-    setLoading(true);
-    try {
-      const data = await deviceManagementService.getSensorReadings(device.deviceId);
-      setSensorData(data);
-    } catch (error) {
-      console.error('Error loading sensor data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSensorHistory = async () => {
-    if (!device) return;
-    
-    try {
-      const history = await deviceManagementService.getSensorHistory(device.deviceId, 10);
-      setSensorHistory(history);
-    } catch (error) {
-      console.error('Error loading sensor history:', error);
-    }
-  };
-
-  const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString();
-  };
-
-  const getPhColor = (ph: number) => {
-    if (ph < 6.5) return token.colorError; // Acidic - Red
-    if (ph > 8.5) return token.colorInfo; // Alkaline - Blue
-    return token.colorSuccess; // Neutral - Green
-  };
-
-  const getTurbidityStatus = (turbidity: number) => {
-    if (turbidity < 5) return { text: 'Excellent', color: token.colorSuccess };
-    if (turbidity < 20) return { text: 'Good', color: token.colorSuccess };
-    if (turbidity < 50) return { text: 'Fair', color: token.colorWarning };
-    return { text: 'Poor', color: token.colorError };
-  };
 
   if (!device) return null;
 
@@ -118,9 +56,6 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
       onCancel={onClose}
       width={900}
       footer={[
-        <Button key="refresh" icon={<ReloadOutlined />} onClick={loadSensorData}>
-          Refresh Data
-        </Button>,
         <Button key="close" type="primary" onClick={onClose}>
           Close
         </Button>,
@@ -234,120 +169,7 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
           </Card>
         )}
 
-        {/* Sensor Readings */}
-        {device.status === 'online' && (
-          <Card
-            title={
-              <Space>
-                <ThunderboltOutlined />
-                <span>Live Sensor Readings</span>
-              </Space>
-            }
-            size="small"
-            extra={
-              <Button
-                type="link"
-                icon={<ReloadOutlined />}
-                onClick={loadSensorData}
-                loading={loading}
-                size="small"
-              >
-                Refresh
-              </Button>
-            }
-          >
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <Spin size="large" tip="Loading sensor data...">
-                  <div style={{ padding: '30px' }} />
-                </Spin>
-              </div>
-            ) : sensorData ? (
-              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={8}>
-                    <Card>
-                      <Statistic
-                        title="pH Level"
-                        value={sensorData.ph}
-                        precision={2}
-                        valueStyle={{ color: getPhColor(sensorData.ph) }}
-                        suffix="pH"
-                      />
-                      <Progress
-                        percent={(sensorData.ph / 14) * 100}
-                        strokeColor={getPhColor(sensorData.ph)}
-                        showInfo={false}
-                        size="small"
-                        style={{ marginTop: 8 }}
-                      />
-                    </Card>
-                  </Col>
-                  <Col xs={24} sm={8}>
-                    <Card>
-                      <Statistic
-                        title="Turbidity"
-                        value={sensorData.turbidity}
-                        precision={1}
-                        valueStyle={{ color: getTurbidityStatus(sensorData.turbidity).color }}
-                        suffix="NTU"
-                      />
-                      <Tag color={getTurbidityStatus(sensorData.turbidity).color} style={{ marginTop: 8 }}>
-                        {getTurbidityStatus(sensorData.turbidity).text}
-                      </Tag>
-                    </Card>
-                  </Col>
-                  <Col xs={24} sm={8}>
-                    <Card>
-                      <Statistic
-                        title="TDS"
-                        value={sensorData.tds}
-                        precision={0}
-                        valueStyle={{ color: token.colorInfo }}
-                        suffix="ppm"
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-                <Alert
-                  message={`Last updated: ${formatTimestamp(sensorData.receivedAt)}`}
-                  type="info"
-                  showIcon
-                  closable
-                />
-              </Space>
-            ) : (
-              <Alert
-                message="No sensor data available"
-                description="This device hasn't reported any sensor readings yet."
-                type="warning"
-                showIcon
-              />
-            )}
-          </Card>
-        )}
-
-        {/* Sensor History */}
-        {sensorHistory.length > 0 && (
-          <Card title="Recent Sensor History" size="small">
-            <Timeline
-              items={sensorHistory.slice(0, 5).map((reading) => ({
-                children: (
-                  <Space direction="vertical" size="small">
-                    <Text strong>{formatTimestamp(reading.timestamp)}</Text>
-                    <Space wrap>
-                      <Tag color="blue">pH: {reading.ph.toFixed(2)}</Tag>
-                      <Tag color="cyan">Turbidity: {reading.turbidity.toFixed(1)} NTU</Tag>
-                      <Tag color="purple">TDS: {reading.tds} ppm</Tag>
-                    </Space>
-                  </Space>
-                ),
-                color: 'blue',
-              }))}
-            />
-          </Card>
-        )}
-
+        {/* Status Messages */}
         {device.status === 'offline' && (
           <Alert
             message="Device Offline"

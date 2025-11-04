@@ -11,7 +11,6 @@ import {
   ToolOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  BugOutlined,
   ExperimentOutlined,
   FireOutlined,
   CloudOutlined,
@@ -44,32 +43,6 @@ export const AddEditDeviceModal = ({
   const [form] = Form.useForm();
   const token = useThemeToken();
 
-  // Inject custom modal styles
-  useEffect(() => {
-    const styleId = 'device-modal-styles';
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      styleElement.innerHTML = `
-        .ant-modal-content {
-          border-radius: 12px !important;
-        }
-        .ant-form-item-label > label {
-          font-size: 13px;
-        }
-        .ant-card {
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        }
-        .ant-card:hover {
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-          transition: box-shadow 0.3s ease;
-        }
-      `;
-      document.head.appendChild(styleElement);
-    }
-  }, []);
-
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (visible) {
       if (mode === 'edit' && device) {
@@ -479,7 +452,7 @@ export const AddEditDeviceModal = ({
                     </Option>
                     <Option value="ph">
                       <Space>
-                        <BugOutlined />
+                        <ExperimentOutlined />
                         pH Level
                       </Space>
                     </Option>

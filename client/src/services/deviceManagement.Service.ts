@@ -36,16 +36,38 @@ export class DeviceManagementService {
   /** READ - Direct Firestore query */
   async listDevices(): Promise<Device[]> {
     try {
+      console.log('📡 Fetching devices from Firestore...');
       const devicesRef = collection(this.firestore, 'devices');
-      const q = query(devicesRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
       
-      return snapshot.docs.map(doc => ({
-        deviceId: doc.id,
-        ...doc.data()
-      } as Device));
+      // Try without orderBy first to see if that's causing issues
+      let snapshot;
+      try {
+        const q = query(devicesRef, orderBy('registeredAt', 'desc'));
+        snapshot = await getDocs(q);
+        console.log('📊 Firestore query with orderBy completed:', snapshot.size, 'documents found');
+      } catch (orderError: any) {
+        console.warn('⚠️ OrderBy failed, trying without ordering:', orderError.message);
+        // Fallback to query without orderBy
+        snapshot = await getDocs(devicesRef);
+        console.log('📊 Firestore query without orderBy completed:', snapshot.size, 'documents found');
+      }
+      
+      const devices = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log('📄 Device document:', doc.id, data);
+        return {
+          id: doc.id,
+          deviceId: doc.id,
+          ...data
+        } as Device;
+      });
+      
+      console.log('✅ Mapped devices:', devices);
+      return devices;
     } catch (error: any) {
-      console.error('Error fetching devices from Firestore:', error);
+      console.error('❌ Error fetching devices from Firestore:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
       throw new Error('Failed to list devices');
     }
   }
