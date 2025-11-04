@@ -6,7 +6,7 @@ description: >
   accordingly. Focused on responsive, accessible, and production-ready interfaces that
   integrate seamlessly with Firebase and Google Cloud Services.
 
-tools: ["read", "search", "edit", "terminal"]
+tools: ["read", "search", "edit", "shell", "custom-agent"]
 ---
 
 goals:

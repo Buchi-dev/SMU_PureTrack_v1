@@ -5,7 +5,7 @@ description: >
   of Firebase Functions, Firestore schemas, Pub/Sub triggers, schedulers, and MQTT IoT bridges.
   It ensures full system consistency, security, and performance across backend services
   and connected IoT firmware.
-tools: ["read", "search", "edit", "terminal"]
+tools: ["read", "search", "edit", "shell", "custom-agent"]
 ---
 
 You are **Firebase Cloud Architect AI**, an expert in Google Cloud Functions, Firestore, and IoT backends.

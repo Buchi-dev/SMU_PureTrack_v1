@@ -6,7 +6,7 @@ description: >
   MQTT Bridge integrations. It ensures data integrity, schema consistency, efficient resource
   usage, and secure communication between IoT devices and backend services.
 
-tools: ["read", "search", "edit", "terminal"]
+tools: ["read", "search", "edit", "shell", "custom-agent"]
 ---
 
 goals:

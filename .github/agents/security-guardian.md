@@ -5,7 +5,7 @@ description: >
   Firestore Rules, Google Cloud configurations, MQTT bridges, and React frontends.
   Ensures zero hardcoded secrets, enforces RBAC, validates IAM roles, and secures
   communication across backend and device layers.
-tools: ["read", "search", "edit", "terminal"]
+tools: ["read", "search", "edit", "shell", "custom-agent"]
 ---
 goals:
   - Scan the entire repository to detect hardcoded credentials or secrets.
