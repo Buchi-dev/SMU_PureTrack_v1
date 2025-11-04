@@ -40,6 +40,12 @@ export const AdminAlerts = () => {
     setDetailsVisible(true);
   };
 
+  // Batch acknowledge multiple alerts
+  const handleBatchAcknowledge = async (alertIds: string[]) => {
+    const promises = alertIds.map((id) => alertsService.acknowledgeAlert(id));
+    await Promise.all(promises);
+  };
+
   // READ: Subscribe to real-time alerts from Firestore
   useEffect(() => {
     const unsubscribe = alertsService.subscribeToAlerts(
@@ -86,6 +92,7 @@ export const AdminAlerts = () => {
           loading={loading}
           onViewDetails={viewAlertDetails}
           onAcknowledge={acknowledgeAlert}
+          onBatchAcknowledge={handleBatchAcknowledge}
           isAcknowledging={isAcknowledging}
         />
 
