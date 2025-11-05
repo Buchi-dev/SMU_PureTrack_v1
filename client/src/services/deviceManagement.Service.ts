@@ -103,6 +103,55 @@ export class DeviceManagementService {
     );
   }
 
+  /** READ - Get sensor readings once (async) */
+  async getSensorReadings(deviceId: string): Promise<SensorReading | null> {
+    try {
+      const snapshot = await new Promise<any>((resolve, reject) => {
+        const unsubscribe = onValue(
+          ref(this.db, `sensorReadings/${deviceId}/latestReading`),
+          (snapshot) => {
+            unsubscribe();
+            resolve(snapshot);
+          },
+          (error) => {
+            unsubscribe();
+            reject(error);
+          }
+        );
+      });
+      return snapshot.val() as SensorReading | null;
+    } catch (error) {
+      console.error(`Error fetching sensor readings for device ${deviceId}:`, error);
+      throw new Error(`Failed to fetch sensor readings for device ${deviceId}`);
+    }
+  }
+
+  /** READ - Get sensor history once (async) */
+  async getSensorHistory(deviceId: string, limit: number = 50): Promise<SensorReading[]> {
+    try {
+      const snapshot = await new Promise<any>((resolve, reject) => {
+        const unsubscribe = onValue(
+          ref(this.db, `sensorReadings/${deviceId}/history`),
+          (snapshot) => {
+            unsubscribe();
+            resolve(snapshot);
+          },
+          (error) => {
+            unsubscribe();
+            reject(error);
+          }
+        );
+      });
+      
+      const data = snapshot.val();
+      const readings = data ? (Object.values(data) as SensorReading[]) : [];
+      return readings.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    } catch (error) {
+      console.error(`Error fetching sensor history for device ${deviceId}:`, error);
+      throw new Error(`Failed to fetch sensor history for device ${deviceId}`);
+    }
+  }
+
   /** READ - Real-time RTDB listeners */
   subscribeToMultipleDevices(
     deviceIds: string[],

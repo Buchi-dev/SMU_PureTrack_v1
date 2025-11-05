@@ -62,9 +62,9 @@ export const StaffAnalytics = () => {
           
           // Aggregate data for device comparison
           if (history.length > 0) {
-            const devicePh = history.reduce((sum, r) => sum + (r.ph || 0), 0) / history.length;
-            const deviceTurb = history.reduce((sum, r) => sum + (r.turbidity || 0), 0) / history.length;
-            const deviceTds = history.reduce((sum, r) => sum + (r.tds || 0), 0) / history.length;
+            const devicePh = history.reduce((sum: number, r: any) => sum + (r.ph || 0), 0) / history.length;
+            const deviceTurb = history.reduce((sum: number, r: any) => sum + (r.turbidity || 0), 0) / history.length;
+            const deviceTds = history.reduce((sum: number, r: any) => sum + (r.tds || 0), 0) / history.length;
             
             deviceStats.push({
               device: device.name || device.deviceId,
@@ -81,7 +81,7 @@ export const StaffAnalytics = () => {
           }
           
           // Create time-series data (last 24 hours)
-          history.forEach((reading, index) => {
+          history.forEach((reading: any, index: number) => {
             const timeLabel = `${index}h`;
             if (reading.ph) {
               phDataPoints.push({ time: timeLabel, ph: reading.ph });

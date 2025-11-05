@@ -7,7 +7,6 @@ import {
   ExclamationCircleOutlined,
   WarningOutlined,
   InfoCircleOutlined,
-  CloseCircleOutlined,
 } from '@ant-design/icons';
 import type { AlertFiltersExtended } from '../../../../schemas';
 
