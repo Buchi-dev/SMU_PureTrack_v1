@@ -14,7 +14,7 @@ import {
   ALLOWED_EMAIL_DOMAIN,
   DEFAULT_USER_ROLE,
   DEFAULT_USER_STATUS,
-} from "../constants/auth.constants";
+} from "../constants/Auth.Constants";
 import {DEFAULT_NOTIFICATION_PREFERENCES} from "../constants/User.Constants";
 import type {
   ParsedUserInfo,

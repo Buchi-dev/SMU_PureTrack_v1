@@ -25,7 +25,7 @@ import {
   AUTH_ERROR_MESSAGES,
   LOG_PREFIXES,
   AUTH_PROVIDERS,
-} from "../constants/auth.constants";
+} from "../constants/Auth.Constants";
 import {
   validateUserData,
   validateEmailDomain,
