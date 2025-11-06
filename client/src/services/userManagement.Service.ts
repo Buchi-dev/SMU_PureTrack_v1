@@ -8,8 +8,11 @@
  */
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import type { Unsubscribe } from 'firebase/firestore';
 import type { UserStatus, UserRole } from '../contexts';
 import { refreshUserToken } from '../utils/authHelpers';
+import { db } from '../config/firebase';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -17,14 +20,17 @@ import { refreshUserToken } from '../utils/authHelpers';
 
 /**
  * User data returned from list operation
+ * Matches backend ListUserData type from functions/src_new/types/User.Types.ts
  */
 export interface UserListData {
   id: string;
-  email: string;
+  uuid: string;
   firstname: string;
   lastname: string;
-  phoneNumber?: string;
+  middlename: string;
   department: string;
+  phoneNumber: string;
+  email: string;
   role: UserRole;
   status: UserStatus;
   createdAt: Date;
@@ -100,17 +106,79 @@ export interface ErrorResponse {
  */
 export class UserManagementService {
   private functions;
-  private functionName = 'userManagement';
+  private functionName = 'UserCalls'; // Updated to match backend function name
 
   constructor() {
     this.functions = getFunctions();
   }
 
   /**
-   * List all users
+   * Subscribe to users (Real-time READ)
+   * 
+   * Sets up a real-time listener for user changes.
+   * Follows Architecture Rule R1: Use real-time listeners (onSnapshot).
+   * 
+   * @param {Function} onUpdate - Callback when users data changes
+   * @param {Function} onError - Callback when an error occurs
+   * 
+   * @returns {Unsubscribe} Function to call to unsubscribe
+   * 
+   * @example
+   * const unsubscribe = service.subscribeToUsers(
+   *   (users) => setUsers(users),
+   *   (error) => console.error(error)
+   * );
+   * 
+   * // Cleanup on unmount
+   * return () => unsubscribe();
+   */
+  subscribeToUsers(
+    onUpdate: (users: UserListData[]) => void,
+    onError: (error: Error) => void
+  ): Unsubscribe {
+    const usersQuery = query(
+      collection(db, 'users'),
+      orderBy('createdAt', 'desc')
+    );
+
+    return onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const users = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            uuid: data.uuid || '',
+            firstname: data.firstname || '',
+            lastname: data.lastname || '',
+            middlename: data.middlename || '',
+            department: data.department || '',
+            phoneNumber: data.phoneNumber || '',
+            email: data.email || '',
+            role: data.role as UserRole,
+            status: data.status as UserStatus,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate(),
+            lastLogin: data.lastLogin?.toDate(),
+          } as UserListData;
+        });
+        onUpdate(users);
+      },
+      (error) => {
+        console.error('Error subscribing to users:', error);
+        onError(new Error(error.message || 'Failed to subscribe to users'));
+      }
+    );
+  }
+
+  /**
+   * List all users (One-time READ - Use subscribeToUsers for real-time)
    * 
    * Retrieves all users from the system, ordered by creation date.
    * Requires admin authentication.
+   * 
+   * ⚠️ DEPRECATION NOTE: This is a one-time fetch. For real-time updates,
+   * use subscribeToUsers() instead, which follows Architecture Rule R1.
    * 
    * @returns {Promise<ListUsersResponse>} List of users with count
    * 
@@ -118,14 +186,14 @@ export class UserManagementService {
    * @throws {ErrorResponse} If the operation fails
    * 
    * @example
-   * const service = new UserManagementService();
-   * try {
-   *   const result = await service.listUsers();
-   *   console.log(`Loaded ${result.count} users`);
-   *   console.log(result.users);
-   * } catch (error) {
-   *   console.error('Failed to load users:', error);
-   * }
+   * // ❌ Old pattern (manual polling)
+   * const result = await service.listUsers();
+   * 
+   * // ✅ New pattern (real-time)
+   * const unsubscribe = service.subscribeToUsers(
+   *   (users) => setUsers(users),
+   *   (error) => console.error(error)
+   * );
    */
   async listUsers(): Promise<ListUsersResponse> {
     const callable = httpsCallable<{ action: string }, ListUsersResponse>(

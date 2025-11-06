@@ -79,6 +79,35 @@ onValue(sensorRef, (snapshot) => {
 });
 ```
 
+#### User Management (Firestore)
+```typescript
+// Service Layer: userManagement.Service.ts
+subscribeToUsers(
+  onUpdate: (users: UserListData[]) => void,
+  onError: (error: Error) => void
+): Unsubscribe {
+  const usersQuery = query(
+    collection(db, 'users'),
+    orderBy('createdAt', 'desc')
+  );
+
+  return onSnapshot(usersQuery, 
+    (snapshot) => onUpdate(snapshot.docs.map(...)),
+    (err) => onError(err)
+  );
+}
+
+// Component: AdminUserManagement.tsx
+useEffect(() => {
+  const unsubscribe = userManagementService.subscribeToUsers(
+    (users) => setUsers(users),
+    (error) => console.error(error)
+  );
+  
+  return () => unsubscribe(); // Cleanup
+}, []);
+```
+
 ### READ Operation Rules
 
 | Rule # | Description | Enforcement |
@@ -209,6 +238,58 @@ const resolveAlert = async (alertId: string, notes?: string) => {
 };
 ```
 
+#### Update User Status
+```typescript
+// Service Layer: userManagement.Service.ts
+async updateUserStatus(userId: string, status: UserStatus): Promise<void> {
+  const callable = httpsCallable(this.functions, 'UserCalls');
+  const result = await callable({ 
+    action: 'updateStatus',
+    userId,
+    status
+  });
+  return result.data;
+}
+
+// Component: AdminUserManagement.tsx
+const updateUserStatusHandler = async (userId: string, newStatus: UserStatus) => {
+  try {
+    await userManagementService.updateUserStatus(userId, newStatus);
+    message.success('User status updated');
+    // ✅ No manual refresh needed - real-time listener updates automatically
+  } catch (error: any) {
+    message.error(error.message || 'Failed to update user status');
+  }
+};
+```
+
+#### Update User Role
+```typescript
+// Service Layer: userManagement.Service.ts
+async updateUser(userId: string, status?: UserStatus, role?: UserRole): Promise<void> {
+  const callable = httpsCallable(this.functions, 'UserCalls');
+  const result = await callable({ 
+    action: 'updateUser',
+    userId,
+    status,
+    role
+  });
+  return result.data;
+}
+
+// Component: AdminUserManagement.tsx
+const handleEditUser = async () => {
+  try {
+    await userManagementService.updateUser(selectedUser.id, editStatus, editRole);
+    message.success('User updated successfully');
+    setEditModalVisible(false);
+    // ✅ No manual refresh needed - real-time listener updates automatically
+  } catch (error: any) {
+    message.error(error.message || 'Failed to update user');
+  }
+};
+```
+
 ### WRITE Operation Rules
 
 | Rule # | Description | Enforcement |
@@ -265,6 +346,9 @@ services/
 │   └── WRITE: resolveAlert()
 ├── deviceManagement.Service.ts
 ├── userManagement.Service.ts
+│   ├── READ:  subscribeToUsers()
+│   ├── WRITE: updateUserStatus()
+│   └── WRITE: updateUser()
 └── reports.Service.ts
 ```
 
@@ -284,9 +368,11 @@ hooks/
 ```
 pages/admin/
 ├── AdminDashboard/
-│   └── AdminDashboard.tsx    // Uses: useAlerts, useDevices
-└── AdminAlerts/
-    └── AdminAlerts.tsx       // Uses: alertsService (R+W)
+│   └── AdminDashboard.tsx        // Uses: useAlerts, useDevices
+├── AdminAlerts/
+│   └── AdminAlerts.tsx           // Uses: alertsService (R+W)
+└── AdminUserManagement/
+    └── AdminUserManagement.tsx   // Uses: userManagementService (R+W)
 ```
 
 ---
@@ -305,6 +391,20 @@ match /alerts/{alertId} {
                 && request.resource.data.diff(resource.data)
                      .affectedKeys()
                      .hasOnly(['status', 'acknowledgedAt', 'resolvedAt', ...]);
+  
+  // ❌ WRITE (CREATE/DELETE): Blocked from client
+  allow create, delete: if false;
+}
+
+match /users/{userId} {
+  // ✅ READ: All authenticated users
+  allow read: if isAuthenticated();
+  
+  // ✅ WRITE (UPDATE): Admins only, specific fields
+  allow update: if isAdmin()
+                && request.resource.data.diff(resource.data)
+                     .affectedKeys()
+                     .hasOnly(['status', 'role', 'updatedAt', 'updatedBy']);
   
   // ❌ WRITE (CREATE/DELETE): Blocked from client
   allow create, delete: if false;
@@ -451,8 +551,11 @@ test('acknowledges alert via cloud function', async () => {
 |-----------|--------|------|-----------|
 | **READ** Alerts | `subscribeToAlerts()` | Client → Firestore | ✅ Yes |
 | **READ** Sensors | `onValue()` | Client → RTDB | ✅ Yes |
+| **READ** Users | `subscribeToUsers()` | Client → Firestore | ✅ Yes |
 | **WRITE** Acknowledge | `acknowledgeAlert()` | Client → Function → Firestore | ✅ Auto-sync |
 | **WRITE** Resolve | `resolveAlert()` | Client → Function → Firestore | ✅ Auto-sync |
+| **WRITE** Update Status | `updateUserStatus()` | Client → Function → Firestore | ✅ Auto-sync |
+| **WRITE** Update User | `updateUser()` | Client → Function → Firestore | ✅ Auto-sync |
 | **WRITE** Create Device | `addDevice()` | Client → Function → Firestore | ✅ Auto-sync |
 
 ---

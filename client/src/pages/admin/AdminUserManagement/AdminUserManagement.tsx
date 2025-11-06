@@ -30,11 +30,12 @@ import {
   StopOutlined,
   EyeOutlined,
   EditOutlined,
-  ReloadOutlined,
   SearchOutlined,
   MailOutlined,
   PhoneOutlined,
   CalendarOutlined,
+  ReloadOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import type { UserProfile, UserStatus, UserRole } from '../../../contexts';
 import type { ColumnsType } from 'antd/es/table';
@@ -48,7 +49,7 @@ interface UserWithId extends UserProfile {
 
 export const AdminUserManagement = () => {
   const { token } = theme.useToken();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with true for initial load
   const [users, setUsers] = useState<UserWithId[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithId[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserWithId | null>(null);
@@ -58,28 +59,94 @@ export const AdminUserManagement = () => {
   const [searchText, setSearchText] = useState('');
   const [editStatus, setEditStatus] = useState<UserStatus>('Pending');
   const [editRole, setEditRole] = useState<UserRole>('Staff');
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch users using User Management Service
-  const fetchUsers = async () => {
-    setLoading(true);
+  // Manual token refresh handler
+  const handleTokenRefresh = async () => {
+    setRefreshing(true);
     try {
-      const result = await userManagementService.listUsers();
+      const { refreshAndVerifyAdmin, logAuthDebugInfo } = await import('../../../utils/authHelpers');
       
-      // Data already has dates converted by the service
-      const usersList: UserWithId[] = result.users.map((user: any) => ({
-        ...user,
-      }));
-
-      setUsers(usersList);
-      filterUsers(usersList, activeTab, searchText);
-      message.success(`Loaded ${result.count} users`);
+      // Log current auth info
+      await logAuthDebugInfo();
+      
+      // Refresh token
+      const result = await refreshAndVerifyAdmin();
+      
+      if (result.success) {
+        if (result.isAdmin) {
+          message.success('✅ Token refreshed successfully. Admin access confirmed.');
+          // Trigger a re-render by reloading
+          window.location.reload();
+        } else {
+          message.warning({
+            content: (
+              <div>
+                <div><WarningOutlined /> Your role is '{result.role}', not 'Admin'.</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>
+                  Please contact your system administrator to grant Admin access.
+                </div>
+              </div>
+            ),
+            duration: 8,
+          });
+        }
+      } else {
+        message.error(`Failed to refresh token: ${result.message}`);
+      }
     } catch (error: any) {
-      console.error('Error fetching users:', error);
-      message.error(error.message || 'Failed to load users');
+      console.error('Token refresh error:', error);
+      message.error('Failed to refresh authentication token');
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   };
+
+  // 📖 READ: Real-time subscription to users (Architecture Rule R1)
+  useEffect(() => {
+    setLoading(true);
+    
+    // Debug: Log auth info when component mounts
+    import('../../../utils/authHelpers').then(({ logAuthDebugInfo }) => {
+      logAuthDebugInfo();
+    });
+    
+    const unsubscribe = userManagementService.subscribeToUsers(
+      (usersList) => {
+        setUsers(usersList);
+        filterUsers(usersList, activeTab, searchText);
+        setLoading(false);
+      },
+      async (error) => {
+        console.error('Error subscribing to users:', error);
+        
+        // If permission denied, try refreshing token and retrying
+        if (error.message.includes('insufficient permissions')) {
+          console.log('⚠️ Permission denied. Attempting token refresh...');
+          try {
+            const { refreshAndVerifyAdmin } = await import('../../../utils/authHelpers');
+            const result = await refreshAndVerifyAdmin();
+            console.log('🔄 Token refresh result:', result);
+            
+            if (!result.isAdmin) {
+              message.error(`Access denied: Your account role is '${result.role}', but Admin access is required. Please contact your system administrator.`);
+            } else {
+              message.error('Permission denied. Please sign out and sign back in to refresh your access token.');
+            }
+          } catch (refreshError) {
+            console.error('Failed to refresh token:', refreshError);
+            message.error('Failed to load users. Please sign out and sign back in.');
+          }
+        } else {
+          message.error(error.message || 'Failed to load users');
+        }
+        setLoading(false);
+      }
+    );
+
+    // Cleanup listener on unmount (Architecture Rule R4)
+    return () => unsubscribe();
+  }, []); // Only run once on mount
 
   // Filter users based on tab and search
   const filterUsers = (usersList: UserWithId[], tab: string, search: string) => {
@@ -108,28 +175,23 @@ export const AdminUserManagement = () => {
     setFilteredUsers(filtered);
   };
 
-  // Update user status using User Management Service
+  // ✍️ WRITE: Update user status via Cloud Function (Architecture Rule W1)
   const updateUserStatusHandler = async (userId: string, newStatus: UserStatus) => {
     try {
-      setLoading(true);
       const result = await userManagementService.updateUserStatus(userId, newStatus);
-      
       message.success(result.message);
-      await fetchUsers(); // Refresh the list
+      // ✅ No manual refresh needed - real-time listener updates automatically (Architecture Rule W6)
     } catch (error: any) {
       console.error('Error updating user status:', error);
       message.error(error.message || 'Failed to update user status');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Handle edit user using User Management Service
+  // ✍️ WRITE: Handle edit user via Cloud Function (Architecture Rule W1)
   const handleEditUser = async () => {
     if (!selectedUser) return;
 
     try {
-      setLoading(true);
       const result = await userManagementService.updateUser(
         selectedUser.id,
         editStatus,
@@ -138,12 +200,10 @@ export const AdminUserManagement = () => {
 
       message.success(result.message);
       setEditModalVisible(false);
-      await fetchUsers();
+      // ✅ No manual refresh needed - real-time listener updates automatically (Architecture Rule W6)
     } catch (error: any) {
       console.error('Error updating user:', error);
       message.error(error.message || 'Failed to update user');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -322,11 +382,6 @@ export const AdminUserManagement = () => {
     },
   ];
 
-  // Load users on mount
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
   // Update filtered users when tab or search changes
   useEffect(() => {
     filterUsers(users, activeTab, searchText);
@@ -411,14 +466,17 @@ export const AdminUserManagement = () => {
                 style={{ maxWidth: 400 }}
                 allowClear
               />
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={fetchUsers}
-                loading={loading}
-              >
-                Refresh
-              </Button>
+              <Space>
+                <Tooltip title="If you're seeing permission errors, click here to refresh your authentication token">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleTokenRefresh}
+                    loading={refreshing}
+                  >
+                    Refresh Token
+                  </Button>
+                </Tooltip>
+              </Space>
             </div>
 
             {/* Tabs */}

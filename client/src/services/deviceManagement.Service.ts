@@ -6,7 +6,6 @@ import type {
   Device, 
   SensorReading, 
   DeviceData, 
-  CommandParams, 
   DeviceResponse 
 } from '../schemas';
 
