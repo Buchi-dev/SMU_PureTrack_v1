@@ -18,7 +18,6 @@ import {
 import {
   BellOutlined,
   MailOutlined,
-  MobileOutlined,
   ClockCircleOutlined,
   SaveOutlined,
   ThunderboltOutlined,
@@ -289,37 +288,6 @@ const NotificationSettings: React.FC = () => {
                     <Switch size="default" />
                   </Form.Item>
                 </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  padding: '16px',
-                  background: '#fafafa',
-                  borderRadius: '8px',
-                }}>
-                  <Space size="middle">
-                    <MobileOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                    <div>
-                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                        Push Notifications
-                      </div>
-                      <Text type="secondary" style={{ fontSize: 13 }}>
-                        Get instant alerts on your mobile device
-                      </Text>
-                      <div style={{ marginTop: '4px' }}>
-                        <Tag color="default" style={{ fontSize: '11px' }}>Coming Soon</Tag>
-                      </div>
-                    </div>
-                  </Space>
-                  <Form.Item
-                    name="pushNotifications"
-                    valuePropName="checked"
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Switch size="default" disabled />
-                  </Form.Item>
-                </div>
               </Space>
             </Card>
           </Col>
@@ -418,124 +386,327 @@ const NotificationSettings: React.FC = () => {
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
           }}
         >
-          <Paragraph type="secondary" style={{ marginBottom: '20px', fontSize: '14px' }}>
+          <Paragraph type="secondary" style={{ marginBottom: '24px', fontSize: '14px' }}>
             Customize which alerts you want to receive based on severity, parameters, and devices
           </Paragraph>
 
-          <Row gutter={[24, 20]}>
-            <Col xs={24} md={8}>
-              <Form.Item
-                name="alertSeverities"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Alert Severities</span>
-                  </Space>
-                }
-                tooltip="Select which severity levels trigger notifications"
+          {/* Three Column Grid Layout for Desktop */}
+          <Row gutter={[24, 24]}>
+            {/* Alert Severities Column */}
+            <Col xs={24} lg={8}>
+              <Card
+                size="small"
+                style={{ 
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #fff5eb 0%, #fff 100%)',
+                  border: '1px solid #ffd591',
+                }}
               >
-                <Select
-                  mode="multiple"
-                  placeholder="Select severities"
-                  style={{ width: '100%' }}
-                  size="large"
-                  suffixIcon={<ThunderboltOutlined />}
+                <div style={{ 
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  paddingBottom: '12px',
+                  borderBottom: '2px solid #ffd591'
+                }}>
+                  <ThunderboltOutlined style={{ fontSize: '18px', color: '#fa8c16' }} />
+                  <span style={{ fontWeight: 600, fontSize: '15px', color: '#ad6800' }}>Alert Severities</span>
+                </div>
+                <Form.Item
+                  name="alertSeverities"
+                  tooltip="Select which severity levels trigger notifications"
+                  style={{ marginBottom: 8 }}
                 >
-                  <Option value="Critical">
-                    <Space>
-                      <Tag color="error">Critical</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Immediate action</Text>
-                    </Space>
-                  </Option>
-                  <Option value="Warning">
-                    <Space>
-                      <Tag color="warning">Warning</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Monitor closely</Text>
-                    </Space>
-                  </Option>
-                  <Option value="Advisory">
-                    <Space>
-                      <Tag color="processing">Advisory</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Informational</Text>
-                    </Space>
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item
-                name="parameters"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Water Parameters</span>
-                  </Space>
-                }
-                tooltip="Leave empty to receive alerts for all parameters"
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="All parameters"
-                  style={{ width: '100%' }}
-                  allowClear
-                  size="large"
-                  suffixIcon={<ExperimentOutlined />}
-                >
-                  <Option value="ph">
-                    <Space>
-                      <Tag color="blue">pH</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Acidity/Alkalinity</Text>
-                    </Space>
-                  </Option>
-                  <Option value="tds">
-                    <Space>
-                      <Tag color="cyan">TDS</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Dissolved Solids</Text>
-                    </Space>
-                  </Option>
-                  <Option value="turbidity">
-                    <Space>
-                      <Tag color="geekblue">Turbidity</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Water Clarity</Text>
-                    </Space>
-                  </Option>
-                </Select>
-              </Form.Item>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Form.Item
-                name="devices"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Specific Devices</span>
-                  </Space>
-                }
-                tooltip="Leave empty to monitor all devices"
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="All devices"
-                  style={{ width: '100%' }}
-                  allowClear
-                  size="large"
-                  suffixIcon={<ApiOutlined />}
-                  loading={devices.length === 0}
-                  notFoundContent={devices.length === 0 ? "Loading devices..." : "No devices found"}
-                >
-                  {devices.map((device) => (
-                    <Option key={device.deviceId} value={device.deviceId}>
-                      <div>
-                        <div style={{ fontWeight: 500 }}>{device.name}</div>
-                        {device.metadata?.location?.building && (
-                          <Text type="secondary" style={{ fontSize: '11px' }}>
-                            {device.metadata.location.building}
-                          </Text>
-                        )}
+                  <Select
+                    mode="multiple"
+                    placeholder="Select severity levels"
+                    style={{ width: '100%' }}
+                    size="large"
+                    maxTagCount="responsive"
+                    optionLabelProp="label"
+                  >
+                    <Option value="Critical" label="Critical">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="error" style={{ margin: 0 }}>Critical</Tag>
+                          <Text style={{ fontSize: '14px' }}>Critical</Text>
+                        </Space>
                       </div>
                     </Option>
-                  ))}
-                </Select>
-              </Form.Item>
+                    <Option value="Warning" label="Warning">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="warning" style={{ margin: 0 }}>Warning</Tag>
+                          <Text style={{ fontSize: '14px' }}>Warning</Text>
+                        </Space>
+                      </div>
+                    </Option>
+                    <Option value="Advisory" label="Advisory">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="processing" style={{ margin: 0 }}>Advisory</Tag>
+                          <Text style={{ fontSize: '14px' }}>Advisory</Text>
+                        </Space>
+                      </div>
+                    </Option>
+                  </Select>
+                </Form.Item>
+                <Text type="secondary" style={{ fontSize: '12px', display: 'block', fontStyle: 'italic' }}>
+                  Leave empty to receive all severity levels
+                </Text>
+                
+                {/* Visual Summary */}
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px',
+                  background: 'rgba(250, 140, 22, 0.05)',
+                  borderRadius: '6px',
+                  border: '1px dashed #ffd591'
+                }}>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
+                    <strong>Severity Levels:</strong>
+                  </Text>
+                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="error" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>Critical</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Immediate action required</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="warning" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>Warning</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Monitor closely</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="processing" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>Advisory</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Informational only</Text>
+                    </div>
+                  </Space>
+                </div>
+              </Card>
+            </Col>
+
+            {/* Water Parameters Column */}
+            <Col xs={24} lg={8}>
+              <Card
+                size="small"
+                style={{ 
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #e6f7ff 0%, #fff 100%)',
+                  border: '1px solid #91d5ff',
+                }}
+              >
+                <div style={{ 
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  paddingBottom: '12px',
+                  borderBottom: '2px solid #91d5ff'
+                }}>
+                  <ExperimentOutlined style={{ fontSize: '18px', color: '#1890ff' }} />
+                  <span style={{ fontWeight: 600, fontSize: '15px', color: '#096dd9' }}>Water Parameters</span>
+                </div>
+                <Form.Item
+                  name="parameters"
+                  tooltip="Filter alerts by specific water quality parameters"
+                  style={{ marginBottom: 8 }}
+                >
+                  <Select
+                    mode="multiple"
+                    placeholder="All parameters"
+                    style={{ width: '100%' }}
+                    allowClear
+                    size="large"
+                    maxTagCount="responsive"
+                    optionLabelProp="label"
+                  >
+                    <Option value="ph" label="pH Level">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="blue" style={{ margin: 0 }}>pH</Tag>
+                          <Text style={{ fontSize: '14px' }}>pH Level</Text>
+                        </Space>
+                      </div>
+                    </Option>
+                    <Option value="tds" label="TDS">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="cyan" style={{ margin: 0 }}>TDS</Tag>
+                          <Text style={{ fontSize: '14px' }}>Total Dissolved Solids</Text>
+                        </Space>
+                      </div>
+                    </Option>
+                    <Option value="turbidity" label="Turbidity">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '4px 0'
+                      }}>
+                        <Space>
+                          <Tag color="geekblue" style={{ margin: 0 }}>Turbidity</Tag>
+                          <Text style={{ fontSize: '14px' }}>Turbidity</Text>
+                        </Space>
+                      </div>
+                    </Option>
+                  </Select>
+                </Form.Item>
+                <Text type="secondary" style={{ fontSize: '12px', display: 'block', fontStyle: 'italic' }}>
+                  Leave empty to receive alerts for all parameters
+                </Text>
+
+                {/* Visual Summary */}
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px',
+                  background: 'rgba(24, 144, 255, 0.05)',
+                  borderRadius: '6px',
+                  border: '1px dashed #91d5ff'
+                }}>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
+                    <strong>Available Parameters:</strong>
+                  </Text>
+                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="blue" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>pH</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Acidity/Alkalinity (0-14)</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="cyan" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>TDS</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Dissolved minerals (ppm)</Text>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Tag color="geekblue" style={{ margin: 0, minWidth: '70px', textAlign: 'center' }}>Turbidity</Tag>
+                      <Text type="secondary" style={{ fontSize: '11px' }}>Water clarity (NTU)</Text>
+                    </div>
+                  </Space>
+                </div>
+              </Card>
+            </Col>
+
+            {/* Specific Devices Column */}
+            <Col xs={24} lg={8}>
+              <Card
+                size="small"
+                style={{ 
+                  height: '100%',
+                  background: 'linear-gradient(135deg, #f6ffed 0%, #fff 100%)',
+                  border: '1px solid #b7eb8f',
+                }}
+              >
+                <div style={{ 
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  paddingBottom: '12px',
+                  borderBottom: '2px solid #b7eb8f'
+                }}>
+                  <ApiOutlined style={{ fontSize: '18px', color: '#52c41a' }} />
+                  <span style={{ fontWeight: 600, fontSize: '15px', color: '#389e0d' }}>Specific Devices</span>
+                </div>
+                <Form.Item
+                  name="devices"
+                  tooltip="Filter alerts by specific monitoring devices"
+                  style={{ marginBottom: 8 }}
+                >
+                  <Select
+                    mode="multiple"
+                    placeholder="All devices"
+                    style={{ width: '100%' }}
+                    allowClear
+                    size="large"
+                    maxTagCount="responsive"
+                    loading={devices.length === 0}
+                    notFoundContent={devices.length === 0 ? "Loading devices..." : "No devices found"}
+                    optionLabelProp="label"
+                  >
+                    {devices.map((device) => (
+                      <Option 
+                        key={device.deviceId} 
+                        value={device.deviceId}
+                        label={device.name}
+                      >
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          padding: '4px 0'
+                        }}>
+                          <Text style={{ fontSize: '14px', fontWeight: 500 }}>{device.name}</Text>
+                          {device.metadata?.location?.building && (
+                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                              📍 {device.metadata.location.building}
+                              {device.metadata.location.room && ` - ${device.metadata.location.room}`}
+                            </Text>
+                          )}
+                        </div>
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <Text type="secondary" style={{ fontSize: '12px', display: 'block', fontStyle: 'italic' }}>
+                  Leave empty to monitor all devices
+                </Text>
+
+                {/* Visual Summary */}
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '12px',
+                  background: 'rgba(82, 196, 26, 0.05)',
+                  borderRadius: '6px',
+                  border: '1px dashed #b7eb8f'
+                }}>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '8px' }}>
+                    <strong>Active Devices:</strong>
+                  </Text>
+                  {devices.length > 0 ? (
+                    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                      {devices.slice(0, 3).map((device) => (
+                        <div key={device.deviceId} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Tag color="green" style={{ margin: 0, fontSize: '10px' }}>●</Tag>
+                          <Text type="secondary" style={{ fontSize: '11px' }} ellipsis>
+                            {device.name}
+                          </Text>
+                        </div>
+                      ))}
+                      {devices.length > 3 && (
+                        <Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                          + {devices.length - 3} more device{devices.length - 3 > 1 ? 's' : ''}
+                        </Text>
+                      )}
+                    </Space>
+                  ) : (
+                    <Text type="secondary" style={{ fontSize: '11px', fontStyle: 'italic' }}>
+                      Loading devices...
+                    </Text>
+                  )}
+                </div>
+              </Card>
             </Col>
           </Row>
         </Card>

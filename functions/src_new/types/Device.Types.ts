@@ -5,8 +5,6 @@
  * @module types/deviceManagement.types
  */
 
-import type {SensorReading} from "./Report.Types";
-
 // ===========================
 // ENUMS & LITERALS
 // ===========================
@@ -18,15 +16,12 @@ export type DeviceStatus = "online" | "offline" | "error" | "maintenance";
 
 /**
  * Device management actions
+ * These are the ONLY actions supported by the Cloud Function
  */
 export type DeviceAction =
   | "addDevice"
-  | "getDevice"
   | "updateDevice"
-  | "deleteDevice"
-  | "listDevices"
-  | "getSensorReadings"
-  | "getSensorHistory";
+  | "deleteDevice";
 
 // ===========================
 // DEVICE STRUCTURE TYPES
@@ -97,43 +92,6 @@ export interface Device {
  * to avoid duplication. Import from there if needed.
  */
 
-/**
- * Partial sensor data for updates
- */
-export interface SensorData {
-  turbidity?: number;
-  tds?: number;
-  ph?: number;
-  timestamp?: number;
-}
-
-// ===========================
-// MQTT/COMMAND TYPES
-// ===========================
-
-/**
- * Command message for device communication via MQTT/Pub-Sub
- */
-export interface CommandMessage {
-  command: string;
-  params?: Record<string, unknown>;
-  timestamp: number;
-  requestId?: string;
-}
-
-/**
- * Device registration information from MQTT discovery
- */
-export interface DeviceRegistrationInfo {
-  deviceId: string;
-  name: string;
-  type: string;
-  firmwareVersion: string;
-  macAddress: string;
-  ipAddress: string;
-  sensors: string[];
-}
-
 // ===========================
 // REQUEST/RESPONSE TYPES
 // ===========================
@@ -141,27 +99,30 @@ export interface DeviceRegistrationInfo {
 /**
  * Device management request structure
  * Used for callable function requests
+ *
+ * WRITE OPERATIONS ONLY:
+ * - addDevice: Create new device (requires deviceId + deviceData)
+ * - updateDevice: Update existing device (requires deviceId + deviceData)
+ * - deleteDevice: Remove device (requires deviceId only)
+ *
+ * READ operations (listDevices, getSensorReadings, etc.) are handled
+ * via direct Firebase SDK calls on the client side.
  */
 export interface DeviceManagementRequest {
   action: DeviceAction;
   deviceId?: string;
   deviceData?: DeviceData;
-  command?: string;
-  params?: Record<string, unknown>;
-  limit?: number;
 }
 
 /**
  * Device management response structure
  * Returned from callable function handlers
+ *
+ * For WRITE operations only (add/update/delete)
  */
 export interface DeviceManagementResponse {
   success: boolean;
   message?: string;
-  device?: Device;
-  devices?: Device[];
-  count?: number;
-  sensorData?: SensorReading;
-  history?: SensorReading[];
+  device?: Device; // Returned on addDevice
   error?: string;
 }

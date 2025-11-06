@@ -21,12 +21,27 @@ export interface ErrorResponse {
  * Architecture Pattern:
  * - READ operations: Direct Firebase access (Firestore/RTDB) for real-time data
  * - WRITE operations: Cloud Functions only for security and validation
+ * 
+ * Cloud Functions (functions/src_new/callable/Devices.ts):
+ *   - addDevice: Create new device (admin only)
+ *   - updateDevice: Modify device properties (admin only)
+ *   - deleteDevice: Remove device and sensor data (admin only)
+ * 
+ * Client Direct Access (this service):
+ *   - listDevices: Query Firestore devices collection
+ *   - getSensorReadings: Read from RTDB sensorReadings/{deviceId}/latestReading
+ *   - getSensorHistory: Read from RTDB sensorReadings/{deviceId}/history
+ *   - subscribeToSensorReadings: Real-time RTDB listener
+ *   - subscribeToSensorHistory: Real-time RTDB listener
+ * 
+ * Helper Methods:
+ *   - registerDevice: Convenience wrapper for updateDevice with location metadata
  */
 export class DeviceManagementService {
   private readonly functions = getFunctions();
   private readonly db = getDatabase();
   private readonly firestore = getFirestore();
-  private readonly functionName = 'deviceManagement';
+  private readonly functionName = 'DevicesCalls'; // Must match exported function name in functions/src_new/index.ts
 
   // ============================================================================
   // READ OPERATIONS (Client → Firebase Direct)
@@ -208,26 +223,14 @@ export class DeviceManagementService {
     );
   }
 
-  /** WRITE - Cloud Function */
-  async discoverDevices(): Promise<void> {
-    await this.callFunction({ action: 'discoverDevices' }, 'Failed to send discovery command');
-  }
-
-  /** WRITE - Cloud Function (via updateDevice) */
+  /**
+   * Register a device by updating its location metadata
+   * This is a convenience method that calls updateDevice
+   */
   async registerDevice(deviceId: string, building: string, floor: string, notes?: string): Promise<void> {
     await this.updateDevice(deviceId, {
       metadata: { location: { building, floor, notes: notes || '' } }
     });
-  }
-
-  /** WRITE - Cloud Function (via updateDevice) */
-  async setMaintenanceMode(deviceId: string): Promise<void> {
-    await this.updateDevice(deviceId, { status: 'maintenance' });
-  }
-
-  /** WRITE - Cloud Function (via updateDevice) */
-  async setOnline(deviceId: string): Promise<void> {
-    await this.updateDevice(deviceId, { status: 'online' });
   }
 
   // ============================================================================

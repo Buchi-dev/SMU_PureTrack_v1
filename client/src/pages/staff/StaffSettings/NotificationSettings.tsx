@@ -18,7 +18,6 @@ import {
 import {
   BellOutlined,
   MailOutlined,
-  MobileOutlined,
   ClockCircleOutlined,
   SaveOutlined,
   ThunderboltOutlined,
@@ -289,37 +288,6 @@ const NotificationSettings: React.FC = () => {
                     <Switch size="default" />
                   </Form.Item>
                 </div>
-
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  padding: '16px',
-                  background: '#fafafa',
-                  borderRadius: '8px',
-                }}>
-                  <Space size="middle">
-                    <MobileOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                    <div>
-                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                        Push Notifications
-                      </div>
-                      <Text type="secondary" style={{ fontSize: 13 }}>
-                        Get instant alerts on your mobile device
-                      </Text>
-                      <div style={{ marginTop: '4px' }}>
-                        <Tag color="default" style={{ fontSize: '11px' }}>Coming Soon</Tag>
-                      </div>
-                    </div>
-                  </Space>
-                  <Form.Item
-                    name="pushNotifications"
-                    valuePropName="checked"
-                    style={{ marginBottom: 0 }}
-                  >
-                    <Switch size="default" disabled />
-                  </Form.Item>
-                </div>
               </Space>
             </Card>
           </Col>
@@ -418,117 +386,201 @@ const NotificationSettings: React.FC = () => {
             boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
           }}
         >
-          <Paragraph type="secondary" style={{ marginBottom: '20px', fontSize: '14px' }}>
+          <Paragraph type="secondary" style={{ marginBottom: '24px', fontSize: '14px' }}>
             Customize which alerts you want to receive based on severity, parameters, and devices
           </Paragraph>
 
-          <Row gutter={[24, 20]}>
-            <Col xs={24} md={8}>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* Alert Severities */}
+            <div>
+              <div style={{ 
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <ThunderboltOutlined style={{ fontSize: '16px', color: '#fa8c16' }} />
+                <span style={{ fontWeight: 600, fontSize: '15px' }}>Alert Severities</span>
+              </div>
               <Form.Item
                 name="alertSeverities"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Alert Severities</span>
-                  </Space>
-                }
                 tooltip="Select which severity levels trigger notifications"
+                style={{ marginBottom: 0 }}
               >
                 <Select
                   mode="multiple"
-                  placeholder="Select severities"
+                  placeholder="Select severity levels to receive notifications"
                   style={{ width: '100%' }}
                   size="large"
-                  suffixIcon={<ThunderboltOutlined />}
+                  maxTagCount="responsive"
+                  optionLabelProp="label"
                 >
-                  <Option value="Critical">
-                    <Space>
-                      <Tag color="error">Critical</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Immediate action</Text>
-                    </Space>
+                  <Option value="Critical" label="Critical">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="error" style={{ margin: 0 }}>Critical</Tag>
+                        <Text style={{ fontSize: '14px' }}>Critical</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Immediate action required</Text>
+                    </div>
                   </Option>
-                  <Option value="Warning">
-                    <Space>
-                      <Tag color="warning">Warning</Tag>
+                  <Option value="Warning" label="Warning">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="warning" style={{ margin: 0 }}>Warning</Tag>
+                        <Text style={{ fontSize: '14px' }}>Warning</Text>
+                      </Space>
                       <Text type="secondary" style={{ fontSize: '12px' }}>Monitor closely</Text>
-                    </Space>
+                    </div>
                   </Option>
-                  <Option value="Advisory">
-                    <Space>
-                      <Tag color="processing">Advisory</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Informational</Text>
-                    </Space>
+                  <Option value="Advisory" label="Advisory">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="processing" style={{ margin: 0 }}>Advisory</Tag>
+                        <Text style={{ fontSize: '14px' }}>Advisory</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Informational only</Text>
+                    </div>
                   </Option>
                 </Select>
               </Form.Item>
-            </Col>
+              <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
+                Leave empty to receive all severity levels
+              </Text>
+            </div>
 
-            <Col xs={24} md={8}>
+            {/* Water Parameters */}
+            <div>
+              <div style={{ 
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <ExperimentOutlined style={{ fontSize: '16px', color: '#1890ff' }} />
+                <span style={{ fontWeight: 600, fontSize: '15px' }}>Water Parameters</span>
+              </div>
               <Form.Item
                 name="parameters"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Water Parameters</span>
-                  </Space>
-                }
-                tooltip="Leave empty to receive alerts for all parameters"
+                tooltip="Filter alerts by specific water quality parameters"
+                style={{ marginBottom: 0 }}
               >
                 <Select
                   mode="multiple"
-                  placeholder="All parameters"
+                  placeholder="All water quality parameters"
                   style={{ width: '100%' }}
                   allowClear
                   size="large"
-                  suffixIcon={<ExperimentOutlined />}
+                  maxTagCount="responsive"
+                  optionLabelProp="label"
                 >
-                  <Option value="ph">
-                    <Space>
-                      <Tag color="blue">pH</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Acidity/Alkalinity</Text>
-                    </Space>
+                  <Option value="ph" label="pH Level">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="blue" style={{ margin: 0 }}>pH</Tag>
+                        <Text style={{ fontSize: '14px' }}>pH Level</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Acidity/Alkalinity (0-14)</Text>
+                    </div>
                   </Option>
-                  <Option value="tds">
-                    <Space>
-                      <Tag color="cyan">TDS</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Dissolved Solids</Text>
-                    </Space>
+                  <Option value="tds" label="TDS">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="cyan" style={{ margin: 0 }}>TDS</Tag>
+                        <Text style={{ fontSize: '14px' }}>Total Dissolved Solids</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Dissolved minerals (ppm)</Text>
+                    </div>
                   </Option>
-                  <Option value="turbidity">
-                    <Space>
-                      <Tag color="geekblue">Turbidity</Tag>
-                      <Text type="secondary" style={{ fontSize: '12px' }}>Water Clarity</Text>
-                    </Space>
+                  <Option value="turbidity" label="Turbidity">
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'space-between',
+                      padding: '4px 0'
+                    }}>
+                      <Space>
+                        <Tag color="geekblue" style={{ margin: 0 }}>Turbidity</Tag>
+                        <Text style={{ fontSize: '14px' }}>Turbidity</Text>
+                      </Space>
+                      <Text type="secondary" style={{ fontSize: '12px' }}>Water clarity (NTU)</Text>
+                    </div>
                   </Option>
                 </Select>
               </Form.Item>
-            </Col>
+              <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
+                Leave empty to receive alerts for all parameters
+              </Text>
+            </div>
 
-            <Col xs={24} md={8}>
+            {/* Specific Devices */}
+            <div>
+              <div style={{ 
+                marginBottom: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <ApiOutlined style={{ fontSize: '16px', color: '#52c41a' }} />
+                <span style={{ fontWeight: 600, fontSize: '15px' }}>Specific Devices</span>
+              </div>
               <Form.Item
                 name="devices"
-                label={
-                  <Space>
-                    <span style={{ fontWeight: 600, fontSize: '14px' }}>Specific Devices</span>
-                  </Space>
-                }
-                tooltip="Leave empty to monitor all devices"
+                tooltip="Filter alerts by specific monitoring devices"
+                style={{ marginBottom: 0 }}
               >
                 <Select
                   mode="multiple"
-                  placeholder="All devices"
+                  placeholder="All monitoring devices"
                   style={{ width: '100%' }}
                   allowClear
                   size="large"
-                  suffixIcon={<ApiOutlined />}
+                  maxTagCount="responsive"
                   loading={devices.length === 0}
                   notFoundContent={devices.length === 0 ? "Loading devices..." : "No devices found"}
+                  optionLabelProp="label"
                 >
                   {devices.map((device) => (
-                    <Option key={device.deviceId} value={device.deviceId}>
-                      <div>
-                        <div style={{ fontWeight: 500 }}>{device.name}</div>
+                    <Option 
+                      key={device.deviceId} 
+                      value={device.deviceId}
+                      label={device.name}
+                    >
+                      <div style={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        padding: '4px 0'
+                      }}>
+                        <Text style={{ fontSize: '14px', fontWeight: 500 }}>{device.name}</Text>
                         {device.metadata?.location?.building && (
-                          <Text type="secondary" style={{ fontSize: '11px' }}>
-                            {device.metadata.location.building}
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            📍 {device.metadata.location.building}
+                            {device.metadata.location.room && ` - ${device.metadata.location.room}`}
                           </Text>
                         )}
                       </div>
@@ -536,8 +588,11 @@ const NotificationSettings: React.FC = () => {
                   ))}
                 </Select>
               </Form.Item>
-            </Col>
-          </Row>
+              <Text type="secondary" style={{ fontSize: '12px', marginTop: '8px', display: 'block' }}>
+                Leave empty to monitor all devices
+              </Text>
+            </div>
+          </Space>
         </Card>
 
         {/* Scheduled Analytics Info */}
