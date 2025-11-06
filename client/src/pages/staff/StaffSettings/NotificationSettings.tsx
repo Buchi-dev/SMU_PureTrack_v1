@@ -68,12 +68,17 @@ const NotificationSettings: React.FC = () => {
     try {
       setLoading(true);
       
+      console.log('📥 Loading preferences for user:', user.uid);
+      
       // Get user preferences using service layer
       const userPrefs = await notificationPreferencesService.getUserPreferences(user.uid);
 
+      console.log('📋 Loaded preferences from database:', userPrefs);
+
       if (userPrefs) {
         setPreferences(userPrefs);
-        form.setFieldsValue({
+        
+        const formValues = {
           emailNotifications: userPrefs.emailNotifications,
           pushNotifications: userPrefs.pushNotifications,
           sendScheduledAlerts: userPrefs.sendScheduledAlerts ?? true,
@@ -85,8 +90,12 @@ const NotificationSettings: React.FC = () => {
             dayjs(userPrefs.quietHoursStart, 'HH:mm'),
             dayjs(userPrefs.quietHoursEnd, 'HH:mm'),
           ] : undefined,
-        });
+        };
+        
+        console.log('📝 Setting form values:', formValues);
+        form.setFieldsValue(formValues);
       } else {
+        console.log('⚠️ No preferences found, setting defaults');
         // Set defaults for new user
         form.setFieldsValue({
           emailNotifications: true,
@@ -99,7 +108,7 @@ const NotificationSettings: React.FC = () => {
         });
       }
     } catch (error: any) {
-      console.error('Error loading preferences:', error);
+      console.error('❌ Error loading preferences:', error);
       message.error(error.message || 'Failed to load notification preferences');
     } finally {
       setLoading(false);
@@ -131,25 +140,34 @@ const NotificationSettings: React.FC = () => {
         ? values.quietHours[1].format('HH:mm')
         : undefined;
 
-      // Save preferences using service layer
-      const savedPreferences = await notificationPreferencesService.setupPreferences({
+      const preferencesPayload = {
         userId: user.uid,
         email: user.email,
-        emailNotifications: values.emailNotifications,
-        pushNotifications: values.pushNotifications,
+        emailNotifications: values.emailNotifications ?? false,
+        pushNotifications: values.pushNotifications ?? false,
         sendScheduledAlerts: values.sendScheduledAlerts ?? true,
-        alertSeverities: values.alertSeverities || [],
+        alertSeverities: values.alertSeverities || ['Critical', 'Warning', 'Advisory'],
         parameters: values.parameters || [],
         devices: values.devices || [],
-        quietHoursEnabled: values.quietHoursEnabled,
+        quietHoursEnabled: values.quietHoursEnabled ?? false,
         quietHoursStart,
         quietHoursEnd,
-      });
+      };
 
+      console.log('💾 Saving notification preferences:', preferencesPayload);
+
+      // Save preferences using service layer
+      const savedPreferences = await notificationPreferencesService.setupPreferences(preferencesPayload);
+
+      console.log('✅ Preferences saved successfully:', savedPreferences);
+      
       message.success('Notification preferences saved successfully');
       setPreferences(savedPreferences);
+      
+      // Reload preferences to ensure UI is in sync
+      await loadPreferences();
     } catch (error: any) {
-      console.error('Error saving preferences:', error);
+      console.error('❌ Error saving preferences:', error);
       message.error(error.message || 'Failed to save notification preferences');
     } finally {
       setSaving(false);
@@ -216,92 +234,92 @@ const NotificationSettings: React.FC = () => {
               }}
             >
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Form.Item
-                  name="emailNotifications"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '16px',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                  }}>
-                    <Space size="middle">
-                      <MailOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                      <div>
-                        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                          Email Notifications
-                        </div>
-                        <Text type="secondary" style={{ fontSize: 13 }}>
-                          Receive real-time alerts and scheduled reports via email
-                        </Text>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '16px',
+                  background: '#fafafa',
+                  borderRadius: '8px',
+                }}>
+                  <Space size="middle">
+                    <MailOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                        Email Notifications
                       </div>
-                    </Space>
+                      <Text type="secondary" style={{ fontSize: 13 }}>
+                        Receive real-time alerts and scheduled reports via email
+                      </Text>
+                    </div>
+                  </Space>
+                  <Form.Item
+                    name="emailNotifications"
+                    valuePropName="checked"
+                    style={{ marginBottom: 0 }}
+                  >
                     <Switch size="default" />
-                  </div>
-                </Form.Item>
+                  </Form.Item>
+                </div>
 
-                <Form.Item
-                  name="sendScheduledAlerts"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '16px',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                  }}>
-                    <Space size="middle">
-                      <MailOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                      <div>
-                        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                          Scheduled Analytics Reports
-                        </div>
-                        <Text type="secondary" style={{ fontSize: 13 }}>
-                          Receive daily, weekly, and monthly analytics via email
-                        </Text>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '16px',
+                  background: '#fafafa',
+                  borderRadius: '8px',
+                }}>
+                  <Space size="middle">
+                    <MailOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                        Scheduled Analytics Reports
                       </div>
-                    </Space>
+                      <Text type="secondary" style={{ fontSize: 13 }}>
+                        Receive daily, weekly, and monthly analytics via email
+                      </Text>
+                    </div>
+                  </Space>
+                  <Form.Item
+                    name="sendScheduledAlerts"
+                    valuePropName="checked"
+                    style={{ marginBottom: 0 }}
+                  >
                     <Switch size="default" />
-                  </div>
-                </Form.Item>
+                  </Form.Item>
+                </div>
 
-                <Form.Item
-                  name="pushNotifications"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '16px',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                  }}>
-                    <Space size="middle">
-                      <MobileOutlined style={{ fontSize: 24, color: '#52c41a' }} />
-                      <div>
-                        <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                          Push Notifications
-                        </div>
-                        <Text type="secondary" style={{ fontSize: 13 }}>
-                          Get instant alerts on your mobile device
-                        </Text>
-                        <div style={{ marginTop: '4px' }}>
-                          <Tag color="default" style={{ fontSize: '11px' }}>Coming Soon</Tag>
-                        </div>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '16px',
+                  background: '#fafafa',
+                  borderRadius: '8px',
+                }}>
+                  <Space size="middle">
+                    <MobileOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                    <div>
+                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                        Push Notifications
                       </div>
-                    </Space>
+                      <Text type="secondary" style={{ fontSize: 13 }}>
+                        Get instant alerts on your mobile device
+                      </Text>
+                      <div style={{ marginTop: '4px' }}>
+                        <Tag color="default" style={{ fontSize: '11px' }}>Coming Soon</Tag>
+                      </div>
+                    </div>
+                  </Space>
+                  <Form.Item
+                    name="pushNotifications"
+                    valuePropName="checked"
+                    style={{ marginBottom: 0 }}
+                  >
                     <Switch size="default" disabled />
-                  </div>
-                </Form.Item>
+                  </Form.Item>
+                </div>
               </Space>
             </Card>
           </Col>
@@ -323,30 +341,30 @@ const NotificationSettings: React.FC = () => {
               }}
             >
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Form.Item
-                  name="quietHoursEnabled"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '16px',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
-                        Enable Quiet Hours
-                      </div>
-                      <Text type="secondary" style={{ fontSize: 13 }}>
-                        Pause non-critical notifications during rest hours
-                      </Text>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  padding: '16px',
+                  background: '#fafafa',
+                  borderRadius: '8px',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>
+                      Enable Quiet Hours
                     </div>
-                    <Switch size="default" />
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      Pause non-critical notifications during rest hours
+                    </Text>
                   </div>
-                </Form.Item>
+                  <Form.Item
+                    name="quietHoursEnabled"
+                    valuePropName="checked"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Switch size="default" />
+                  </Form.Item>
+                </div>
 
                 <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.quietHoursEnabled !== currentValues.quietHoursEnabled}>
                   {({ getFieldValue }) =>
