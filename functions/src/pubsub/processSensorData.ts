@@ -94,10 +94,14 @@ export const processSensorData = onMessagePublished(
   },
   async (event: CloudEvent<MessagePublishedData<SensorData | BatchSensorData>>): Promise<void> => {
     try {
-      // Extract device ID from message attributes
-      const deviceId = event.data.message.attributes?.device_id;
+      // Extract device ID from message attributes (support both snake_case and camelCase)
+      const deviceId = event.data.message.attributes?.device_id ||
+                       event.data.message.attributes?.deviceId;
+
       if (!deviceId) {
-        logger.error(SENSOR_DATA_ERRORS.NO_DEVICE_ID);
+        logger.error(SENSOR_DATA_ERRORS.NO_DEVICE_ID, {
+          attributes: event.data.message.attributes,
+        });
         return; // Don't retry for missing device ID
       }
 

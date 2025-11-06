@@ -99,12 +99,16 @@ export const autoRegisterDevice = onMessagePublished(
   async (event: CloudEvent<MessagePublishedData<DeviceRegistrationInfo>>): Promise<void> => {
     try {
       const deviceInfo = event.data.message.json;
-      if (!deviceInfo || !deviceInfo.deviceId) {
-        logger.error("Invalid device registration data");
+
+      // Try to get deviceId from attributes first (for backward compatibility with bridge)
+      const deviceId = event.data.message.attributes?.device_id ||
+                       event.data.message.attributes?.deviceId ||
+                       deviceInfo?.deviceId;
+
+      if (!deviceId) {
+        logger.error("Invalid device registration data - missing deviceId");
         return; // Don't retry for invalid data
       }
-
-      const deviceId = deviceInfo.deviceId;
 
       // Validate device ID format
       if (!isValidDeviceId(deviceId)) {

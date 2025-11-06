@@ -435,10 +435,11 @@ const handleMQTTMessage = (topic, message) => {
     const messageData = {
       data: Buffer.from(JSON.stringify(data)),
       attributes: {
-        deviceId,
-        topic,
+        device_id: deviceId,          // snake_case for Pub/Sub compatibility
+        deviceId: deviceId,            // Keep camelCase for backward compatibility
+        topic: topic,
         timestamp: new Date().toISOString(),
-        correlationId,
+        correlationId: correlationId,
         source: 'mqtt-bridge'
       }
     };
