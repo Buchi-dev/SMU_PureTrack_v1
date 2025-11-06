@@ -41,8 +41,8 @@ import {
   DIGEST_SCHEDULER_CONFIG,
   DIGEST_ERRORS,
   DIGEST_MESSAGES,
-} from "../constants/digest.constants";
-import type {AlertDigest} from "../types/digest.types";
+} from "../constants/Digest.Constants";
+import type {AlertDigest} from "../types/Digest.Types";
 
 /**
  * Scheduled digest sender

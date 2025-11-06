@@ -3,8 +3,8 @@ import {logger} from "firebase-functions/v2";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 
 import {db} from "../config/firebase";
-import {COLLECTIONS} from "../constants/database.constants";
-import {SCHEDULER_CONFIG} from "../constants/scheduler.constants";
+import {COLLECTIONS} from "../constants/Database.Constants";
+import {SCHEDULER_CONFIG} from "../constants/Scheduler.Constants";
 
 const DEFAULT_CHECK_INTERVAL_MINUTES = 5;
 const MANILA_TIMEZONE = SCHEDULER_CONFIG.TIMEZONE;
