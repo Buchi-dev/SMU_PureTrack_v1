@@ -58,12 +58,4 @@ setGlobalOptions({
   memory: "512MiB",
 });
 
-// ===========================
-// RE-EXPORT COLLECTION CONSTANTS
-// ===========================
 
-/**
- * Re-export collection names for convenience
- * Import from constants/database.constants for primary usage
- */
-export {COLLECTIONS} from "../constants/database.constants";

@@ -33,7 +33,7 @@ import {
   createUserProfile,
   logBusinessAction,
   createPermissionDeniedError,
-} from "../utils/authHelpers";
+} from "../utils/AuthHelpers";
 
 /**
  * Before User Created - Account Registration Hook

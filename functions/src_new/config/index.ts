@@ -1,7 +1,5 @@
 /**
- * Configuration Module Entry Point
- * Exports Firebase configuration and constants
+ * Config Module Exports
  */
 
 export * from "./firebase";
-export * from "./email";

@@ -5,23 +5,13 @@
  * @module constants/auth.constants
  */
 
-// ===========================
-// EMAIL DOMAIN CONSTANTS
-// ===========================
 
-/**
- * Allowed email domain for user authentication
- * Only users with this domain can register and sign in
- */
 export const ALLOWED_EMAIL_DOMAIN = "@smu.edu.ph";
 
-/**
- * Organization name for error messages and logging
- */
 const ORGANIZATION_NAME = "Saint Mary's University";
 
 // Import user status and role from userManagement constants (single source of truth)
-import type {UserStatus, UserRole} from "./userManagement.constants";
+import type {UserStatus, UserRole} from "./User.Constants";
 
 // ===========================
 // DEFAULT USER VALUES

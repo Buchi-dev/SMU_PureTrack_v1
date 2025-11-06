@@ -8,12 +8,14 @@
 import * as admin from "firebase-admin";
 import {HttpsError} from "firebase-functions/v2/identity";
 
-import {db, COLLECTIONS} from "../config/firebase";
+import {db} from "../config/firebase";
+import {COLLECTIONS, FIELD_NAMES} from "../constants/Database.Constants";
 import {
   ALLOWED_EMAIL_DOMAIN,
   DEFAULT_USER_ROLE,
   DEFAULT_USER_STATUS,
 } from "../constants/auth.constants";
+import {DEFAULT_NOTIFICATION_PREFERENCES} from "../constants/User.Constants";
 import type {
   ParsedUserInfo,
   ParsedDisplayName,
@@ -22,7 +24,7 @@ import type {
   BusinessLog,
   UserProfile,
   LoginResult,
-} from "../types";
+} from "../types/Auth.Types";
 
 // ===========================
 // VALIDATION FUNCTIONS
@@ -193,15 +195,15 @@ export async function createUserProfile(userInfo: ParsedUserInfo): Promise<void>
   const defaultNotificationPreferences = {
     userId: userInfo.uid,
     email: userInfo.email,
-    emailNotifications: false,
-    pushNotifications: false,
-    sendScheduledAlerts: true,
-    alertSeverities: ["Critical", "Warning", "Advisory"],
-    parameters: [],
-    devices: [],
-    quietHoursEnabled: false,
-    quietHoursStart: null,
-    quietHoursEnd: null,
+    emailNotifications: DEFAULT_NOTIFICATION_PREFERENCES.EMAIL_NOTIFICATIONS,
+    pushNotifications: DEFAULT_NOTIFICATION_PREFERENCES.PUSH_NOTIFICATIONS,
+    sendScheduledAlerts: DEFAULT_NOTIFICATION_PREFERENCES.SEND_SCHEDULED_ALERTS,
+    alertSeverities: DEFAULT_NOTIFICATION_PREFERENCES.ALERT_SEVERITIES,
+    parameters: DEFAULT_NOTIFICATION_PREFERENCES.PARAMETERS,
+    devices: DEFAULT_NOTIFICATION_PREFERENCES.DEVICES,
+    quietHoursEnabled: DEFAULT_NOTIFICATION_PREFERENCES.QUIET_HOURS_ENABLED,
+    quietHoursStart: DEFAULT_NOTIFICATION_PREFERENCES.QUIET_HOURS_START,
+    quietHoursEnd: DEFAULT_NOTIFICATION_PREFERENCES.QUIET_HOURS_END,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -212,7 +214,7 @@ export async function createUserProfile(userInfo: ParsedUserInfo): Promise<void>
     .doc(userInfo.uid)
     .set({
       ...userProfileData,
-      notificationPreferences: defaultNotificationPreferences,
+      [FIELD_NAMES.NOTIFICATION_PREFERENCES]: defaultNotificationPreferences,
     });
 }
 
@@ -238,8 +240,8 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
  */
 export async function updateLastLogin(uid: string): Promise<void> {
   await db.collection(COLLECTIONS.USERS).doc(uid).update({
-    lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    [FIELD_NAMES.LAST_LOGIN]: admin.firestore.FieldValue.serverTimestamp(),
+    [FIELD_NAMES.UPDATED_AT]: admin.firestore.FieldValue.serverTimestamp(),
   });
 }
 

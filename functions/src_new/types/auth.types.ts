@@ -7,7 +7,7 @@
 
 import * as admin from "firebase-admin";
 
-import type {UserStatus, UserRole} from "../constants/userManagement.constants";
+import type {UserStatus, UserRole} from "../constants/User.Constants";
 
 // ===========================
 // USER PROFILE TYPES

@@ -36,6 +36,35 @@ export const VALID_USER_ROLES = ["Admin", "Staff"] as const;
 export type UserRole = (typeof VALID_USER_ROLES)[number];
 
 // ===========================
+// NOTIFICATION PREFERENCES DEFAULTS
+// ===========================
+
+/**
+ * Default alert severities for new notification preferences
+ * Applied when user doesn't specify custom severities
+ */
+export const DEFAULT_ALERT_SEVERITIES = [
+  "Critical",
+  "Warning",
+  "Advisory",
+] as const;
+
+/**
+ * Default values for notification preferences
+ */
+export const DEFAULT_NOTIFICATION_PREFERENCES = {
+  EMAIL_NOTIFICATIONS: false,
+  PUSH_NOTIFICATIONS: false,
+  SEND_SCHEDULED_ALERTS: true,
+  ALERT_SEVERITIES: DEFAULT_ALERT_SEVERITIES,
+  PARAMETERS: [] as string[],
+  DEVICES: [] as string[],
+  QUIET_HOURS_ENABLED: false,
+  QUIET_HOURS_START: null,
+  QUIET_HOURS_END: null,
+} as const;
+
+// ===========================
 // ERROR MESSAGES
 // ===========================
 
@@ -75,4 +104,30 @@ export const USER_MANAGEMENT_ERRORS = {
 export const USER_MANAGEMENT_MESSAGES = {
   STATUS_UPDATED: (status: UserStatus) => `User status updated to ${status}`,
   USER_UPDATED: "User updated successfully",
+} as const;
+
+export const NOTIFICATION_PREFERENCES_ERRORS = {
+  // Validation errors
+  MISSING_USER_ID: "User ID is required",
+  MISSING_REQUIRED_FIELDS: "Missing required fields",
+  EMAIL_REQUIRED: "Email is required when email notifications are enabled",
+
+  // Authentication errors
+  UNAUTHENTICATED: "Authentication required to manage notification preferences",
+  PERMISSION_DENIED: "You do not have permission to manage these notification preferences",
+  ADMIN_REQUIRED: "Admin privileges required for this operation",
+
+  // Operation errors
+  GET_FAILED: "Failed to retrieve notification preferences",
+  LIST_FAILED: "Failed to list notification preferences",
+  SETUP_FAILED: "Failed to setup notification preferences",
+  DELETE_FAILED: "Failed to delete notification preferences",
+  USER_NOT_FOUND: "User not found",
+} as const;
+
+export const NOTIFICATION_PREFERENCES_MESSAGES = {
+  NOT_FOUND: "Notification preferences not found",
+  GET_SUCCESS: "Notification preferences retrieved successfully",
+  CREATE_SUCCESS: "Notification preferences created successfully",
+  UPDATE_SUCCESS: "Notification preferences updated successfully",
 } as const;
