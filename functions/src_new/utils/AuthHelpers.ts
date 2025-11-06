@@ -13,7 +13,7 @@ import {
   ALLOWED_EMAIL_DOMAIN,
   DEFAULT_USER_ROLE,
   DEFAULT_USER_STATUS,
-} from "../constants/Auth.Constants";
+} from "../constants/Auth.constants";
 import {COLLECTIONS, FIELD_NAMES} from "../constants/Database.Constants";
 import {DEFAULT_NOTIFICATION_PREFERENCES} from "../constants/User.Constants";
 import type {
@@ -24,7 +24,7 @@ import type {
   BusinessLog,
   UserProfile,
   LoginResult,
-} from "../types/Auth.Types";
+} from "../types/Auth.types";
 
 import {withErrorHandling} from "./ErrorHandlers";
 

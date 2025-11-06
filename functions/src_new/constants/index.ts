@@ -12,7 +12,7 @@ export * from "./User.Constants";
 export * from "./Database.Constants";
 
 // Re-export all Auth constants
-export * from "./Auth.Constants";
+export * from "./Auth.constants";
 
 // Re-export all Alert Management constants
 export * from "./Alert.Constants";
@@ -23,8 +23,6 @@ export * from "./Report.Constants";
 // Re-export all Device Management constants
 export * from "./Device.Constants";
 
-// Re-export all Digest constants - note: keep casing consistent!
-export * from "./Digest.Constants";
 
 // Re-export all Scheduler constants
 export * from "./Scheduler.Constants";

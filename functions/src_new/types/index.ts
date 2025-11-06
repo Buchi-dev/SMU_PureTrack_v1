@@ -18,7 +18,5 @@ export * from "./Report.Types";
 export * from "./Device.Types";
 
 // Re-export all Auth types
-export * from "./Auth.Types";
+export * from "./Auth.types";
 
-// Re-export all Digest types
-export * from "./Digest.Types";
