@@ -8,9 +8,6 @@
 // Export authentication helpers
 export * from "./authHelpers";
 
-// Export user management helpers
-export * from "./userManagementHelpers";
-
 // Export switch case routing utility
 export * from "./switchCaseRouting";
 
@@ -25,3 +22,6 @@ export * from "./thresholdHelpers";
 
 // Export alert creation and management helpers
 export {generateAlertContent, createAlert, getNotificationRecipients} from "./alertHelpers";
+
+// Export user management helpers
+export * from "./userManagementHelpers";

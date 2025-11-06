@@ -129,7 +129,7 @@ export function transformUserDocToListData(
  */
 export function buildUpdateData(
   performedBy: string,
-  updates: Partial<{ status: UserStatus; role: UserRole }>
+  updates: Partial<{status: UserStatus; role: UserRole}>
 ): Record<string, unknown> {
   const updateData: Record<string, unknown> = {
     /* eslint-disable-next-line new-cap */
@@ -157,9 +157,9 @@ export function buildUpdateData(
  */
 export async function updateUserCustomClaims(
   userId: string,
-  claims: Partial<{ status: UserStatus; role: UserRole }>
+  claims: Partial<{status: UserStatus; role: UserRole}>
 ): Promise<void> {
-  const customClaims: Record<string, unknown> = {};
+  const customClaims: Record<string, string> = {};
 
   if (claims.status) {
     customClaims.status = claims.status;
