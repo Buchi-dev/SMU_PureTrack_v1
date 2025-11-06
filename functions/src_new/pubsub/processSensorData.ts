@@ -42,7 +42,7 @@ import {
 import type {WaterParameter} from "../types/Alert.Types";
 import type {SensorData, SensorReading, BatchSensorData} from "../types/Sensor.Types";
 import {createAlert, getNotificationRecipients} from "../utils/alertHelpers";
-import {sendEmailNotification} from "../utils/emailTemplates";
+import {sendEmailNotification} from "../utils/emailNotifications";
 import {getThresholdConfig, checkThreshold, analyzeTrend} from "../utils/thresholdHelpers";
 import {isValidDeviceId, isValidSensorReading} from "../utils/validators";
 

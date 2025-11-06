@@ -182,7 +182,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
 
   try {
     // Load template
-    logger.info(`Loading email template: ${templateName}`);
+    logger.info(`[Email Service] Loading template: ${templateName}`);
     const template = loadTemplate(templateName);
 
     // Inject data into template
@@ -203,10 +203,9 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
     // Send email
     await transporter.sendMail(mailOptions);
 
-    logger.info(`Email sent successfully: ${templateName} to ${to}`);
+    logger.info(`[Email Service] Successfully sent ${templateName} email to ${to}`);
   } catch (error) {
-    logger.error(`Failed to send email: ${templateName}`, {
-      to,
+    logger.error(`[Email Service] Failed to send ${templateName} email to ${to}:`, {
       subject,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -306,13 +305,6 @@ export function getParameterDisplayName(parameter: string): string {
     return "Total Dissolved Solids (TDS)";
   case "turbidity":
     return "Turbidity";
-  case "temperature":
-    return "Temperature";
-  case "dissolvedoxygen":
-  case "dissolved_oxygen":
-    return "Dissolved Oxygen";
-  case "conductivity":
-    return "Conductivity";
   default:
     return parameter.toUpperCase();
   }
@@ -335,53 +327,4 @@ export function formatEmailTimestamp(date: Date, timezone = "Asia/Manila"): stri
     minute: "2-digit",
     hour12: true,
   });
-}
-
-/**
- * Helper function to generate alert table rows HTML
- *
- * @param {Array} alerts - Array of alert objects
- * @return {string} HTML string of table rows
- */
-export function generateAlertTableRows(
-  alerts: Array<{
-    severity: string;
-    deviceName?: string;
-    deviceId: string;
-    parameter: string;
-    value: number;
-    createdAt: Date;
-    hoursStale?: number;
-  }>
-): string {
-  return alerts
-    .map(
-      (alert) => `
-    <tr style="border-bottom: 1px solid #e5e7eb;">
-      <td style="padding: 12px; border-right: 1px solid #e5e7eb;">
-        <span style="color: ${getSeverityColor(alert.severity)}; font-weight: 600;">${alert.severity}</span>
-      </td>
-      <td style="padding: 12px; border-right: 1px solid #e5e7eb;">
-        ${alert.deviceName || alert.deviceId}
-      </td>
-      <td style="padding: 12px; border-right: 1px solid #e5e7eb;">
-        ${alert.parameter.toUpperCase()}
-      </td>
-      <td style="padding: 12px; border-right: 1px solid #e5e7eb;">
-        ${alert.value.toFixed(2)}
-      </td>
-      <td style="padding: 12px; border-right: 1px solid #e5e7eb;">
-        ${alert.createdAt.toLocaleString("en-US", {timeZone: "Asia/Manila"})}
-      </td>
-      ${
-  alert.hoursStale !== undefined ?
-    `<td style="padding: 12px; color: #dc2626; font-weight: 600;">
-          ${alert.hoursStale.toFixed(1)} hours
-        </td>` :
-    ""
-}
-    </tr>
-  `
-    )
-    .join("");
 }

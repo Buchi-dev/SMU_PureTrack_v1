@@ -24,4 +24,4 @@ export * from "./thresholdHelpers";
 export {generateAlertContent, createAlert, getNotificationRecipients} from "./alertHelpers";
 
 // Re-export email template utilities
-export * from "./emailTemplates";
+export * from "./emailNotifications";

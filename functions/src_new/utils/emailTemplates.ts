@@ -36,7 +36,14 @@ export async function sendEmailNotification(
   alert: Record<string, unknown>
 ): Promise<boolean> {
   try {
-    // Dynamically import email service to avoid circular dependencies
+    // Extract alert data with type safety
+    const alertData = alert as unknown as WaterQualityAlert;
+
+    logger.info(
+      `[Real-Time Alert] Preparing ${alertData.severity} alert email for ${recipient.email} (Alert: ${alertData.alertId})`
+    );
+
+    // Dynamically import email service helpers to avoid circular dependencies
     const {
       sendEmail,
       getSeverityColor,
@@ -46,13 +53,10 @@ export async function sendEmailNotification(
       formatEmailTimestamp,
     } = await import("./emailService");
 
-    // Extract alert data with type safety
-    const alertData = alert as unknown as WaterQualityAlert;
-
     // Get recipient name
     const recipientName = recipient.userId || "User";
 
-    // Get severity color
+    // Get severity color and alert box background
     const severityColor = getSeverityColor(alertData.severity);
     const alertBoxBg = getAlertBoxBackground(alertData.severity);
 
@@ -90,7 +94,7 @@ export async function sendEmailNotification(
     }
 
     // Dashboard URL
-    const dashboardUrl = `${process.env.APP_URL || "https://your-app-url.com"}/dashboard/alerts/${alertData.alertId}`;
+    const dashboardUrl = `${process.env.APP_URL || "https://my-app-da540.web.app"}/dashboard/alerts/${alertData.alertId}`;
 
     // Prepare template data
     const templateData = {
@@ -123,10 +127,15 @@ export async function sendEmailNotification(
       fromName: "Water Quality Alert System",
     });
 
-    logger.info(`Real-time alert email sent to ${recipient.email} for alert ${alertData.alertId}`);
+    logger.info(
+      `[Real-Time Alert] Successfully sent email to ${recipient.email} for alert ${alertData.alertId}`
+    );
     return true;
   } catch (error) {
-    logger.error(`Failed to send real-time alert email to ${recipient.email}:`, error);
+    logger.error(
+      `[Real-Time Alert] Failed to send email to ${recipient.email}:`,
+      error
+    );
     return false;
   }
 }
