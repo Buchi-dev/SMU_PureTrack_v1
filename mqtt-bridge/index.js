@@ -538,12 +538,30 @@ const initializeMQTTClient = () => {
 const app = express();
 app.disable('x-powered-by');
 
-// Enable CORS for all origins (or configure specific origins)
+// CORS Configuration - Whitelist production and development origins
+const allowedOrigins = [
+  'https://my-app-da530.web.app',
+  'https://my-app-da530.firebaseapp.com', // Firebase also provides this URL
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
 app.use(cors({
-  origin: true, // Allow all origins in development
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      logger.warn({ origin }, 'Blocked CORS request from unauthorized origin');
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
 }));
 
 app.use(compression());
