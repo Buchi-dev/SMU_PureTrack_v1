@@ -13,15 +13,15 @@ import {
   ALLOWED_EMAIL_DOMAIN,
   DEFAULT_USER_ROLE,
   DEFAULT_USER_STATUS,
-} from "../constants/Auth.constants";
-import {COLLECTIONS, FIELD_NAMES} from "../constants/Database.Constants";
+} from "../constants/Auth.Constants";
+import {COLLECTIONS, FIELD_NAMES} from "../constants/database.constants";
 import {DEFAULT_NOTIFICATION_PREFERENCES} from "../constants/User.Constants";
 import type {
   ParsedUserInfo,
   ParsedDisplayName,
   DomainValidationResult,
   UserProfile,
-} from "../types/Auth.types";
+} from "../types/auth.types";
 
 import {withErrorHandling} from "./ErrorHandlers";
 import {sanitizeUserName, validateEmailWithDomain} from "./validators";
@@ -68,11 +68,11 @@ export function validateUserData(userData: unknown): void {
  */
 export function parseDisplayName(displayName: string): ParsedDisplayName {
   const nameParts = (displayName || "").trim().split(" ");
-  
+
   // Sanitize firstname
   const firstnameResult = sanitizeUserName(nameParts[0] || "");
   const firstname = firstnameResult.isValid ? firstnameResult.sanitized : "";
-  
+
   // Sanitize lastname
   const lastnameRaw = nameParts.slice(1).join(" ") || "";
   const lastnameResult = sanitizeUserName(lastnameRaw);

@@ -18,7 +18,6 @@
  */
 
 import {defineSecret} from "firebase-functions/params";
-import {logger} from "firebase-functions/v2";
 
 /**
  * Email credentials from Firebase Secret Manager

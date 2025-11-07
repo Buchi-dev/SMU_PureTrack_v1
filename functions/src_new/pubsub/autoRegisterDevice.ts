@@ -25,7 +25,7 @@ import type {MessagePublishedData} from "firebase-functions/v2/pubsub";
 import {onMessagePublished} from "firebase-functions/v2/pubsub";
 
 import {db, rtdb} from "../config/firebase";
-import {COLLECTIONS} from "../constants/Database.Constants";
+import {COLLECTIONS} from "../constants/database.constants";
 import {PUBSUB_TOPICS} from "../constants/PubSub.Constants";
 import {isValidDeviceId} from "../utils/validators";
 

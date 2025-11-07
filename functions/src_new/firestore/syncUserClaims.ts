@@ -12,7 +12,7 @@
 import * as admin from "firebase-admin";
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 
-import {COLLECTIONS} from "../constants/Database.Constants";
+import {COLLECTIONS} from "../constants/database.constants";
 import type {UserStatus, UserRole} from "../constants/User.Constants";
 import {withErrorHandling} from "../utils/ErrorHandlers";
 

@@ -30,7 +30,7 @@ import {onMessagePublished} from "firebase-functions/v2/pubsub";
 
 import {EMAIL_USER_SECRET_REF, EMAIL_PASSWORD_SECRET_REF} from "../config/email";
 import {db, rtdb} from "../config/firebase";
-import {COLLECTIONS} from "../constants/Database.Constants";
+import {COLLECTIONS} from "../constants/database.constants";
 import {
   ALERT_COOLDOWN_MS,
   HISTORY_STORAGE_INTERVAL,
@@ -167,7 +167,7 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
 
   // Check if device is registered in Firestore before storing data
   const deviceDoc = await db.collection(COLLECTIONS.DEVICES).doc(deviceId).get();
-  
+
   if (!deviceDoc.exists) {
     logger.warn(
       `Device ${deviceId} is not registered - rejecting sensor data`,
@@ -216,7 +216,7 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
  *
  * OPTIMIZATION: Only updates if lastSeen is older than threshold
  * Reduces Firestore writes by ~70% (2-min threshold vs real-time)
- * 
+ *
  * STATE TRANSITIONS:
  * - offline → online (when data arrives)
  * - online → online (refresh lastSeen)

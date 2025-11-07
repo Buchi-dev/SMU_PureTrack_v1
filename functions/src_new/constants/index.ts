@@ -9,10 +9,10 @@
 export * from "./User.Constants";
 
 // Re-export all Database constants
-export * from "./Database.Constants";
+export * from "./database.constants";
 
 // Re-export all Auth constants
-export * from "./Auth.constants";
+export * from "./Auth.Constants";
 
 // Re-export all Alert Management constants
 export * from "./Alert.Constants";

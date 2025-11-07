@@ -22,7 +22,7 @@ export const HISTORY_STORAGE_INTERVAL = 5;
  * Firestore lastSeen update threshold (2 minutes in milliseconds)
  * Only updates device lastSeen timestamp if older than this threshold
  * Reduces Firestore writes by ~70% while maintaining better accuracy
- * 
+ *
  * OPTIMIZATION: Reduced from 5 min to 2 min for faster offline detection
  * Trade-off: Slightly more writes, but better device status accuracy
  */

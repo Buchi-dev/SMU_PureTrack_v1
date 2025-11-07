@@ -67,6 +67,10 @@ module.exports = {
       },
     ],
     
+    // // Additional unused code detection
+    // "no-unused-vars": "warn",
+    // "import/no-unused-modules": [1, { "unusedExports": true }],
+    
     // TypeScript specific
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/explicit-function-return-type": [

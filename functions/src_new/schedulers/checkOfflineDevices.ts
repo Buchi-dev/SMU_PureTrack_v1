@@ -3,7 +3,7 @@ import {logger} from "firebase-functions/v2";
 import {onSchedule} from "firebase-functions/v2/scheduler";
 
 import {db} from "../config/firebase";
-import {COLLECTIONS} from "../constants/Database.Constants";
+import {COLLECTIONS} from "../constants/database.constants";
 import {SCHEDULER_CONFIG} from "../constants/Scheduler.Constants";
 
 const DEFAULT_CHECK_INTERVAL_MINUTES = 2; // Reduced from 5 to 2 minutes for faster detection
@@ -13,11 +13,11 @@ const BATCH_LIMIT = 500;
 /**
  * Calculate offline threshold in ms.
  * Threshold = interval × 1.5 (tighter tolerance for faster detection)
- * 
+ *
  * OPTIMIZATION: Changed from 2x to 1.5x multiplier
  * - Old: 5 min interval × 2 = 10 min threshold
  * - New: 5 min interval × 1.5 = 7.5 min threshold
- * 
+ *
  * @param {number} intervalMinutes - The check interval in minutes.
  * @return {number} The offline threshold in milliseconds.
  */

@@ -12,7 +12,7 @@ import * as admin from "firebase-admin";
 import {logger} from "firebase-functions/v2";
 
 import {db} from "../config/firebase";
-import {COLLECTIONS} from "../constants/Database.Constants";
+import {COLLECTIONS} from "../constants/database.constants";
 import type {
   WaterParameter,
   AlertSeverity,

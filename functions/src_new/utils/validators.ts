@@ -244,7 +244,9 @@ export function isValidAckToken(token: string): boolean {
  * - Used by: userManagement, beforeCreate
  *
  * @param {string} name - Name string to sanitize and validate
- * @return {{ isValid: boolean; sanitized: string }} Validation result and sanitized value
+ * @return {object} Validation result and sanitized value
+ * @return {boolean} isValid - Whether the name is valid
+ * @return {string} sanitized - The sanitized name
  *
  * @example
  * sanitizeUserName('  John  Doe  ')     // { isValid: true, sanitized: 'John Doe' }
@@ -277,7 +279,9 @@ export function sanitizeUserName(name: string): {isValid: boolean; sanitized: st
  *
  * @param {string} email - Email address to validate
  * @param {string} allowedDomain - Allowed email domain (e.g., '@smu.edu.ph')
- * @return {{ isValid: boolean; normalized: string }} Validation result and normalized email
+ * @return {object} Validation result and normalized email
+ * @return {boolean} isValid - Whether the email is valid
+ * @return {string} normalized - The normalized email
  *
  * @example
  * validateEmailWithDomain('user@smu.edu.ph', '@smu.edu.ph')

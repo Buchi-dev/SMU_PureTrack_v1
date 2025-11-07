@@ -23,10 +23,9 @@
 import {beforeUserSignedIn} from "firebase-functions/v2/identity";
 
 import {
-  USER_STATUSES,
   AUTH_ERROR_MESSAGES,
   LOG_PREFIXES,
-} from "../constants/Auth.constants";
+} from "../constants/Auth.Constants";
 import {
   validateUserData,
   validateEmailDomain,
