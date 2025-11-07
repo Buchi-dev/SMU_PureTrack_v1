@@ -1,16 +1,10 @@
-import { Card, Row, Col, Statistic, Progress, Space, Typography, Divider } from 'antd';
-import { 
-  DatabaseOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  BellOutlined,
-  CloudServerOutlined,
-  ExperimentOutlined,
-  ThunderboltOutlined
-} from '@ant-design/icons';
+import { Space } from 'antd';
 import { memo, useMemo } from 'react';
-
-const { Text, Title } = Typography;
+import { SystemHealthCard } from './SystemHealthCard';
+import { AlertStatusCard } from './AlertStatusCard';
+import { MqttBridgeStatusCard } from './MqttBridgeStatusCard';
+import { DeviceStatusCard } from './DeviceStatusCard';
+import { Row, Col } from 'antd';
 
 interface DashboardSummaryProps {
   deviceStats: {
@@ -35,6 +29,11 @@ interface DashboardSummaryProps {
       failed: number;
     };
   } | null;
+  mqttMemory?: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+  } | null;
   loading: boolean;
 }
 
@@ -42,6 +41,7 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
   deviceStats, 
   alertStats, 
   mqttHealth,
+  mqttMemory,
   loading 
 }) => {
   // DEFENSIVE: Validate input data before calculations
@@ -61,221 +61,53 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
     advisory: alertStats?.advisory ?? 0,
   }), [alertStats]);
 
-  // Calculate health percentages with defensive checks
-  const deviceHealthPercent = useMemo(() => {
-    if (!safeDeviceStats || safeDeviceStats.total === 0) return 0;
-    return Math.round((safeDeviceStats.online / safeDeviceStats.total) * 100);
-  }, [safeDeviceStats]);
-
-  const alertHealthPercent = useMemo(() => {
-    if (!safeAlertStats) return 100; // No data = assume healthy
-    if (safeAlertStats.total === 0) return 100; // No alerts is good
-    return Math.max(0, 100 - Math.round((safeAlertStats.active / safeAlertStats.total) * 100));
-  }, [safeAlertStats]);
-
-  const mqttHealthPercent = useMemo(() => {
-    if (!mqttHealth) return 0;
-    return mqttHealth.status === 'healthy' && mqttHealth.connected ? 100 : 0;
-  }, [mqttHealth]);
-
-  // Overall system health - defensive calculation
-  const overallHealth = useMemo(() => {
-    // Don't calculate if we have no valid data at all
-    if (!safeDeviceStats || !safeAlertStats || !mqttHealth) return 0;
-    return Math.round((deviceHealthPercent + alertHealthPercent + mqttHealthPercent) / 3);
-  }, [deviceHealthPercent, alertHealthPercent, mqttHealthPercent, safeDeviceStats, safeAlertStats, mqttHealth]);
-
-  const getHealthColor = (percent: number) => {
-    if (percent >= 80) return '#52c41a'; // Green
-    if (percent >= 50) return '#faad14'; // Yellow
-    return '#ff4d4f'; // Red
-  };
-
-  const getHealthStatus = (percent: number) => {
-    if (percent >= 80) return 'Excellent';
-    if (percent >= 50) return 'Fair';
-    return 'Poor';
-  };
+  // Calculate RAM usage from MQTT Bridge memory data
+  const ramUsage = useMemo(() => {
+    if (!mqttMemory) return null;
+    
+    const RAM_LIMIT_BYTES = 256 * 1024 * 1024; // 256MB limit for Cloud Run
+    const used = mqttMemory.rss;
+    const total = RAM_LIMIT_BYTES;
+    const percent = Math.min(Math.round((used / total) * 100), 100);
+    
+    return { used, total, percent };
+  }, [mqttMemory]);
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {/* Overall System Health */}
-      <Card loading={loading}>
-        <Row gutter={[24, 24]} align="middle">
-          <Col xs={24} md={12}>
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Title level={3} style={{ margin: 0 }}>Overall System Health</Title>
-              <Text type="secondary">Real-time monitoring across all systems</Text>
-            </Space>
-          </Col>
-          <Col xs={24} md={12}>
-            <div style={{ textAlign: 'center' }}>
-              <Progress
-                type="dashboard"
-                percent={overallHealth}
-                strokeColor={getHealthColor(overallHealth)}
-                format={(percent) => (
-                  <Space direction="vertical" size={0}>
-                    <Text strong style={{ fontSize: '32px' }}>{percent}%</Text>
-                    <Text type="secondary">{getHealthStatus(percent || 0)}</Text>
-                  </Space>
-                )}
-                size={180}
-              />
-            </div>
-          </Col>
-        </Row>
-      </Card>
+      {/* Overall System Health - Now with RAM data */}
+      <SystemHealthCard
+        deviceStats={safeDeviceStats}
+        alertStats={safeAlertStats}
+        mqttHealth={mqttHealth}
+        ramUsage={ramUsage}
+        loading={loading}
+      />
 
       {/* Detailed Stats Grid */}
       <Row gutter={[16, 16]}>
-        {/* Device Statistics */}
+        {/* Device Statistics - Using new DeviceStatusCard */}
         <Col xs={24} md={8}>
-          <Card 
-            title={
-              <Space>
-                <DatabaseOutlined />
-                <span>Device Status</span>
-              </Space>
-            }
+          <DeviceStatusCard
+            deviceStats={safeDeviceStats}
             loading={loading}
-          >
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Statistic
-                title="Total Devices"
-                value={safeDeviceStats.total}
-                prefix={<DatabaseOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-              <Divider style={{ margin: '8px 0' }} />
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Statistic
-                    title="Online"
-                    value={safeDeviceStats.online}
-                    prefix={<CheckCircleOutlined />}
-                    valueStyle={{ color: '#52c41a', fontSize: '20px' }}
-                  />
-                </Col>
-                <Col span={12}>
-                  <Statistic
-                    title="Offline"
-                    value={safeDeviceStats.offline}
-                    prefix={<CloseCircleOutlined />}
-                    valueStyle={{ color: '#ff4d4f', fontSize: '20px' }}
-                  />
-                </Col>
-              </Row>
-              <Progress 
-                percent={deviceHealthPercent} 
-                strokeColor={getHealthColor(deviceHealthPercent)}
-                format={(percent) => `${percent}% Healthy`}
-              />
-            </Space>
-          </Card>
+          />
         </Col>
 
-        {/* Alert Statistics */}
+        {/* Alert Statistics - Using new AlertStatusCard */}
         <Col xs={24} md={8}>
-          <Card 
-            title={
-              <Space>
-                <BellOutlined />
-                <span>Alert Status</span>
-              </Space>
-            }
+          <AlertStatusCard
+            alertStats={safeAlertStats}
             loading={loading}
-          >
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Statistic
-                title="Total Alerts"
-                value={safeAlertStats.total}
-                prefix={<BellOutlined />}
-                valueStyle={{ color: '#1890ff' }}
-              />
-              <Divider style={{ margin: '8px 0' }} />
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Statistic
-                    title="Critical"
-                    value={safeAlertStats.critical}
-                    valueStyle={{ color: '#cf1322', fontSize: '18px' }}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="Warning"
-                    value={safeAlertStats.warning}
-                    valueStyle={{ color: '#faad14', fontSize: '18px' }}
-                  />
-                </Col>
-                <Col span={8}>
-                  <Statistic
-                    title="Advisory"
-                    value={safeAlertStats.advisory}
-                    valueStyle={{ color: '#1890ff', fontSize: '18px' }}
-                  />
-                </Col>
-              </Row>
-              <Progress 
-                percent={alertHealthPercent} 
-                strokeColor={getHealthColor(alertHealthPercent)}
-                status={safeAlertStats.active > 0 ? 'exception' : 'success'}
-                format={() => `${safeAlertStats.active} Active`}
-              />
-            </Space>
-          </Card>
+          />
         </Col>
 
-        {/* MQTT Bridge Statistics */}
+        {/* MQTT Bridge Statistics - Using new MqttBridgeStatusCard */}
         <Col xs={24} md={8}>
-          <Card 
-            title={
-              <Space>
-                <CloudServerOutlined />
-                <span>MQTT Bridge</span>
-              </Space>
-            }
+          <MqttBridgeStatusCard
+            mqttHealth={mqttHealth}
             loading={loading}
-          >
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <Statistic
-                title="Status"
-                value={mqttHealth?.status || 'Unknown'}
-                valueStyle={{ 
-                  color: mqttHealth?.status === 'healthy' ? '#52c41a' : '#ff4d4f',
-                  textTransform: 'capitalize'
-                }}
-              />
-              <Divider style={{ margin: '8px 0' }} />
-              {mqttHealth?.metrics && (
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Statistic
-                      title="Received"
-                      value={mqttHealth.metrics.received}
-                      prefix={<ThunderboltOutlined />}
-                      valueStyle={{ fontSize: '18px' }}
-                    />
-                  </Col>
-                  <Col span={12}>
-                    <Statistic
-                      title="Published"
-                      value={mqttHealth.metrics.published}
-                      prefix={<ExperimentOutlined />}
-                      valueStyle={{ fontSize: '18px' }}
-                    />
-                  </Col>
-                </Row>
-              )}
-              <Progress 
-                percent={mqttHealthPercent} 
-                strokeColor={getHealthColor(mqttHealthPercent)}
-                status={mqttHealth?.connected ? 'success' : 'exception'}
-                format={() => mqttHealth?.connected ? 'Connected' : 'Disconnected'}
-              />
-            </Space>
-          </Card>
+          />
         </Col>
       </Row>
     </Space>

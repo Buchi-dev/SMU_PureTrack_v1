@@ -128,6 +128,7 @@ export const AdminDashboard = memo(() => {
               connected: mqttBridge.health.checks.mqtt.connected,
               metrics: mqttBridge.health.metrics,
             } : null}
+            mqttMemory={mqttBridge.status?.memory || null}
             loading={isLoading}
           />
 

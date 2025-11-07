@@ -28,7 +28,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export class AlertsService {
   private readonly functions = getFunctions();
-  private readonly functionName = 'alertManagement';
+  private readonly functionName = 'AlertsCall';
   private readonly db = getFirestore();
 
   // ============================================================================
