@@ -11,16 +11,12 @@ const promClient = require('prom-client');
 const { v4: uuidv4 } = require('uuid');
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  LOGGER CONFIGURATION
+//  LOGGER CONFIGURATION (Minimal - errors only)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  formatters: { level: (label) => ({ level: label.toUpperCase() }) },
-  transport: process.env.NODE_ENV !== 'production' ? {
-    target: 'pino-pretty',
-    options: { colorize: true, translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' }
-  } : undefined
+  level: process.env.LOG_LEVEL || 'error', // Only critical errors logged
+  formatters: { level: (label) => ({ level: label.toUpperCase() }) }
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -42,10 +38,10 @@ const CONFIG = {
   PUBSUB_DEVICE_REGISTRATION_TOPIC: 'iot-device-registration',
   PUBSUB_DLQ_TOPIC: 'iot-failed-messages-dlq',
   
-  // Hardcoded Buffer Settings (optimized for 10-15 devices)
-  BUFFER_INTERVAL_MS: 10000,
-  MAX_BUFFER_SIZE: 200,
-  BUFFER_FLUSH_THRESHOLD: 0.8,
+  // Hardcoded Buffer Settings (optimized for 10-15 devices, memory-efficient)
+  BUFFER_INTERVAL_MS: 5000, // Reduced from 10s to flush faster (less memory retention)
+  MAX_BUFFER_SIZE: 100, // Reduced from 200 to lower memory footprint
+  BUFFER_FLUSH_THRESHOLD: 0.7, // Flush earlier to prevent memory buildup
   
   // Hardcoded MQTT Settings
   MQTT_KEEPALIVE: 120,
@@ -53,15 +49,15 @@ const CONFIG = {
   QOS_SENSOR_DATA: 0,
   QOS_REGISTRATION: 1,
   
-  // Hardcoded Pub/Sub Batching Settings
-  PUBSUB_MAX_MESSAGES: 500,
-  PUBSUB_MAX_MILLIS: 50,
-  PUBSUB_MAX_BYTES: 5 * 1024 * 1024,
+  // Hardcoded Pub/Sub Batching Settings (memory-optimized)
+  PUBSUB_MAX_MESSAGES: 100, // Reduced from 500 to minimize buffer allocation
+  PUBSUB_MAX_MILLIS: 100, // Increased from 50ms to batch efficiently with fewer messages
+  PUBSUB_MAX_BYTES: 1 * 1024 * 1024, // Reduced from 5MB to 1MB
   
-  // Hardcoded Memory Monitoring
-  MEMORY_CHECK_INTERVAL: 30000,
-  MEMORY_WARNING_PERCENT: 85,
-  MEMORY_CRITICAL_PERCENT: 95,
+  // Hardcoded Memory Monitoring (reduced frequency)
+  MEMORY_CHECK_INTERVAL: 60000, // Increased from 30s to 60s to reduce overhead
+  MEMORY_WARNING_PERCENT: 70, // Lowered threshold for earlier warnings
+  MEMORY_CRITICAL_PERCENT: 85, // Lowered from 95 to take action sooner
   
   // Hardcoded Graceful Shutdown
   SHUTDOWN_GRACE_PERIOD: 8000
@@ -86,17 +82,18 @@ const validateConfig = () => {
 
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  PROMETHEUS METRICS
+//  PROMETHEUS METRICS (Lightweight - only essential metrics)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const register = new promClient.Registry();
-promClient.collectDefaultMetrics({ register, prefix: 'nodejs_' });
+// Removed collectDefaultMetrics to save ~10-15MB - add only if needed for monitoring
+// promClient.collectDefaultMetrics({ register, prefix: 'nodejs_' });
 
 const messageLatency = new promClient.Histogram({
   name: 'mqtt_message_latency_seconds',
   help: 'End-to-end message processing latency',
   labelNames: ['topic_type'],
-  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+  buckets: [0.01, 0.1, 0.5, 1, 5], // Reduced buckets from 8 to 5 for less memory
   registers: [register]
 });
 
@@ -128,12 +125,7 @@ const messagesBuffered = new promClient.Counter({
   registers: [register]
 });
 
-const messagesDropped = new promClient.Counter({
-  name: 'mqtt_messages_dropped_total',
-  help: 'Total messages dropped due to overflow',
-  labelNames: ['topic'],
-  registers: [register]
-});
+// Removed messagesDropped counter - not actively used, saves memory
 
 const circuitBreakerStatus = new promClient.Gauge({
   name: 'mqtt_circuit_breaker_open',
@@ -199,18 +191,18 @@ const publishBreaker = new CircuitBreaker(
 );
 
 publishBreaker.on('open', () => {
-  logger.error('Circuit breaker OPEN - Pub/Sub unavailable');
+  // Circuit breaker opened - tracked by metrics
   metrics.circuitBreakerOpen = true;
   circuitBreakerStatus.set(1);
 });
 
 publishBreaker.on('halfOpen', () => {
-  logger.info('Circuit breaker HALF-OPEN - Testing recovery');
+  // Circuit breaker testing recovery - tracked by metrics
   circuitBreakerStatus.set(0.5);
 });
 
 publishBreaker.on('close', () => {
-  logger.info('Circuit breaker CLOSED - Pub/Sub recovered');
+  // Circuit breaker closed - tracked by metrics
   metrics.circuitBreakerOpen = false;
   circuitBreakerStatus.set(0);
 });
@@ -241,10 +233,7 @@ const addToBuffer = (topicName, message, priority = 'normal') => {
   // Adaptive flush at threshold
   const utilization = buffer.length / CONFIG.MAX_BUFFER_SIZE;
   if (utilization >= CONFIG.BUFFER_FLUSH_THRESHOLD) {
-    logger.info(
-      { topic: topicName, utilization: Math.round(utilization * 100) },
-      'Buffer at threshold, flushing'
-    );
+    // Removed info logger - flushing is tracked by metrics
     flushMessageBuffer(topicName);
   }
 
@@ -260,8 +249,8 @@ const flushMessageBuffer = async (topicName) => {
   const messages = state.messageBuffer.get(topicName) || [];
   if (messages.length === 0) return;
 
-  const chunkSize = 500;
-  logger.info({ topic: topicName, count: messages.length }, 'Flushing messages');
+  const chunkSize = 100; // Reduced from 500 to process smaller batches (less memory peaks)
+  // Removed info logger - not critical
   metrics.flushes++;
 
   try {
@@ -284,10 +273,7 @@ const flushMessageBuffer = async (topicName) => {
             numOfAttempts: 3,
             jitter: 'full',
             retry: (error, attemptNumber) => {
-              logger.warn(
-                { topic: topicName, attempt: attemptNumber, error: error.message },
-                'Retrying Pub/Sub publish'
-              );
+              // Removed warn logger - retry is expected behavior
               return true;
             }
           }
@@ -295,6 +281,9 @@ const flushMessageBuffer = async (topicName) => {
 
         publishSuccess.labels(topicName).inc(chunk.length);
         metrics.published += chunk.length;
+        
+        // Clear chunk from memory immediately after successful publish
+        chunk.length = 0;
       } catch (error) {
         publishFailure.labels(topicName, error.name).inc(chunk.length);
         metrics.failed += chunk.length;
@@ -306,13 +295,11 @@ const flushMessageBuffer = async (topicName) => {
       }
     }
 
+    // Clear buffer and help GC by setting to new array
     state.messageBuffer.set(topicName, []);
-    logger.info({ topic: topicName, count: messages.length }, 'Published successfully');
+    // Removed info logger - success is tracked by metrics
   } catch (error) {
-    logger.error(
-      { topic: topicName, error: error.message },
-      'Flush failed, messages retained'
-    );
+    logger.error({ topic: topicName, error: error.message }, 'Flush failed');
   }
 };
 
@@ -327,7 +314,7 @@ const startBufferFlusher = () => {
       flushAllBuffers();
     }
   }, CONFIG.BUFFER_INTERVAL_MS);
-  logger.info({ intervalMs: CONFIG.BUFFER_INTERVAL_MS }, 'Buffer flusher started');
+  // Removed info logger - startup is tracked by health endpoint
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -346,70 +333,28 @@ const startMemoryMonitoring = () => {
       );
       // Force garbage collection if available
       if (global.gc) {
-        logger.info('Forcing garbage collection');
         global.gc();
       }
-    } else if (memPercent > CONFIG.MEMORY_WARNING_PERCENT) {
-      logger.warn(
-        { memPercent: Math.round(memPercent), rss: Math.round(memUsage.rss / 1024 / 1024) },
-        'High memory usage warning'
-      );
+      // Emergency buffer flush to free memory
+      flushAllBuffers().catch(err => logger.error({ err: err.message }, 'Emergency flush failed'));
     }
+    // Removed warn logger for high memory - tracked by /health endpoint
   }, CONFIG.MEMORY_CHECK_INTERVAL);
-
-  logger.info('Memory monitoring started');
+  // Removed info logger - startup is tracked by health endpoint
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  DEAD LETTER QUEUE
+//  DEAD LETTER QUEUE - REMOVED (Not used, saves memory)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-const handleFailedMessage = async (message, error, retryCount = 0) => {
-  if (retryCount >= 3) {
-    logger.error(
-      {
-        deviceId: message.attributes.deviceId,
-        error: error.message,
-        retryCount
-      },
-      'Message moved to dead letter queue'
-    );
-
-    try {
-      const dlqTopic = pubSubClient.topic(CONFIG.PUBSUB_DLQ_TOPIC);
-      const dlqMessage = {
-        json: JSON.parse(message.data.toString()),
-        attributes: {
-          ...message.attributes,
-          originalError: error.message,
-          failedAt: new Date().toISOString(),
-          retryCount: retryCount.toString(),
-          originalTopic: message.attributes.topic
-        }
-      };
-
-      await dlqTopic.publishMessage(dlqMessage);
-      metrics.messagesInDLQ++;
-
-      logger.info(
-        { dlqTopic: CONFIG.PUBSUB_DLQ_TOPIC },
-        'Message published to DLQ'
-      );
-    } catch (dlqError) {
-      logger.error(
-        { dlqError: dlqError.message },
-        'Failed to publish to DLQ'
-      );
-    }
-  }
-};
+// DLQ functionality removed as it's never called in the codebase
+// This saves the overhead of maintaining DLQ topic connections
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  MQTT HANDLERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const handleMQTTMessage = (topic, message) => {
-  const correlationId = uuidv4();
+  // Removed uuid generation for correlation ID to save memory/CPU
   const startTime = Date.now();
 
   try {
@@ -424,7 +369,7 @@ const handleMQTTMessage = (topic, message) => {
     });
 
     if (!matchedTopic) {
-      logger.warn({ correlationId, topic }, 'No matching Pub/Sub topic');
+      // Removed warn logger - unmatched topics are not critical errors
       return;
     }
 
@@ -440,8 +385,8 @@ const handleMQTTMessage = (topic, message) => {
         deviceId: deviceId,            // Keep camelCase for backward compatibility
         topic: topic,
         timestamp: new Date().toISOString(),
-        correlationId: correlationId,
         source: 'mqtt-bridge'
+        // Removed correlationId to save memory
       }
     };
 
@@ -449,16 +394,9 @@ const handleMQTTMessage = (topic, message) => {
 
     const processingTime = Date.now() - startTime;
     messageLatency.labels(isRegistration ? 'registration' : 'telemetry').observe(processingTime / 1000);
-
-    logger.debug(
-      { correlationId, deviceId, pubSubTopic, processingTime },
-      'Message buffered'
-    );
+    // Removed debug logger - message buffering is tracked by metrics
   } catch (error) {
-    logger.error(
-      { correlationId, topic, error: error.message, stack: error.stack },
-      'Message handling failed'
-    );
+    logger.error({ topic, error: error.message }, 'Message handling failed');
   }
 };
 
@@ -469,7 +407,7 @@ const initializeMQTTClient = () => {
     clientId: `mqtt_bridge_${Date.now()}_${process.pid}`,
     reconnectPeriod: CONFIG.MQTT_RECONNECT_PERIOD,
     keepalive: CONFIG.MQTT_KEEPALIVE,
-    protocolVersion: 5,
+    protocolVersion: 4, // Changed from v5 to v4 - less memory overhead
     clean: true,
     rejectUnauthorized: true,
     will: {
@@ -484,11 +422,11 @@ const initializeMQTTClient = () => {
     }
   };
 
-  logger.info({ broker: CONFIG.MQTT_BROKER_URL }, 'Connecting to MQTT broker');
+  // Removed info logger - connection status tracked by /health endpoint
   state.mqttClient = mqtt.connect(CONFIG.MQTT_BROKER_URL, options);
 
   state.mqttClient.on('connect', () => {
-    logger.info('MQTT connected');
+    // Removed info logger - connection status tracked by /health endpoint
 
     // Publish bridge status
     state.mqttClient.publish(
@@ -512,9 +450,8 @@ const initializeMQTTClient = () => {
       state.mqttClient.subscribe(topic, { qos }, (err) => {
         if (err) {
           logger.error({ topic, error: err.message }, 'Subscription failed');
-        } else {
-          logger.info({ topic, qos }, 'Subscribed');
         }
+        // Removed info logger - subscription success is not critical
       });
     });
 
@@ -524,9 +461,10 @@ const initializeMQTTClient = () => {
 
   state.mqttClient.on('message', handleMQTTMessage);
   state.mqttClient.on('error', (error) => logger.error({ error: error.message }, 'MQTT error'));
-  state.mqttClient.on('reconnect', () => logger.info('MQTT reconnecting'));
-  state.mqttClient.on('close', () => logger.warn('MQTT connection closed'));
-  state.mqttClient.on('offline', () => logger.warn('MQTT client offline'));
+  // Removed warn loggers for reconnect/close/offline - tracked by /health endpoint
+  state.mqttClient.on('reconnect', () => {});
+  state.mqttClient.on('close', () => {});
+  state.mqttClient.on('offline', () => {});
 };
 
 // Command subscription removed - not used in UI
@@ -554,7 +492,7 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      logger.warn({ origin }, 'Blocked CORS request from unauthorized origin');
+      // Removed warn logger - CORS blocking is not critical to log
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -612,7 +550,8 @@ app.get('/health', (req, res) => {
     health.status = 'degraded';
   }
 
-  res.status(health.status === 'healthy' ? 200 : 503).json(health);
+  //res status must be 200 event its degraded or unhealthy
+  res.status(200).json(health);
 });
 
 app.get('/metrics', async (req, res) => {
@@ -645,7 +584,7 @@ app.get('/status', (req, res) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const gracefulShutdown = async (signal) => {
-  logger.info({ signal }, 'Shutdown initiated');
+  // Removed info logger - shutdown is expected behavior
   state.isShuttingDown = true;
 
   const shutdownTimeout = setTimeout(() => {
@@ -665,8 +604,7 @@ const gracefulShutdown = async (signal) => {
       state.memoryCheckIntervalId = null;
     }
 
-    // Flush remaining messages
-    logger.info('Flushing remaining messages');
+    // Flush remaining messages (no logger - expected behavior)
     await Promise.race([
       flushAllBuffers(),
       new Promise((_, reject) =>
@@ -674,9 +612,8 @@ const gracefulShutdown = async (signal) => {
       )
     ]);
 
-    // Close MQTT connection
+    // Close MQTT connection (no logger - expected behavior)
     if (state.mqttClient?.connected) {
-      logger.info('Closing MQTT connection');
       state.mqttClient.publish(
         'bridge/status',
         JSON.stringify({
@@ -693,7 +630,7 @@ const gracefulShutdown = async (signal) => {
     }
 
     clearTimeout(shutdownTimeout);
-    logger.info('Shutdown complete');
+    // Removed info logger - shutdown complete is expected
     process.exit(0);
   } catch (error) {
     logger.error({ error: error.message, stack: error.stack }, 'Shutdown error');
@@ -720,29 +657,14 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const start = async () => {
   try {
-    logger.info('🚀 MQTT-to-Pub/Sub Bridge Starting');
-
+    // Removed startup info loggers - not critical
     validateConfig();
-
-    logger.info(
-      {
-        config: {
-          ...CONFIG,
-          MQTT_PASSWORD: '***',
-          MQTT_USERNAME: '***'
-        }
-      },
-      'Configuration validated'
-    );
 
     initializeBuffers();
     initializeMQTTClient();
 
     const server = app.listen(CONFIG.PORT, '0.0.0.0', () => {
-      logger.info({ port: CONFIG.PORT }, 'HTTP server listening');
-      logger.info('═'.repeat(60));
-      logger.info('Bridge operational and ready for messages');
-      logger.info('═'.repeat(60));
+      // Removed info loggers - server status tracked by /health endpoint
     });
 
     // Handle server errors

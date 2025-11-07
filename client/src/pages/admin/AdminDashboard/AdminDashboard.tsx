@@ -1,99 +1,109 @@
-import { AdminLayout } from '../../../components/layouts/AdminLayout';
-import { Typography, Space, Row, Col } from 'antd';
+import { Space, Row, Col, Typography, Alert, Divider } from 'antd';
+import { memo, useMemo } from 'react';
+import { AdminLayout } from "../../../components/layouts";
+import { useMqttBridgeStatus } from './hooks';
 import {
-  StatisticsCards,
-  SensorReadingsCard,
-  HistoricalTrendsCard,
-  RecentAlertsCard,
-  MQTTBridgeHealthCard,
+  HealthOverview,
+  MetricsGrid,
+  MemoryMonitor,
+  BufferMonitor,
+  SystemInfo,
+  RefreshControl
 } from './components';
-import {
-  useAlerts,
-  useDevices,
-  useHistoricalData,
-  useDashboardStats,
-} from './hooks';
-import { useState } from 'react';
 
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
+export const AdminDashboard = memo(() => {
+  const { health, status, loading, error, lastUpdate, refresh } = useMqttBridgeStatus();
 
-export const AdminDashboard = () => {
-  // UI State
-  const [selectedDevice, setSelectedDevice] = useState<string>('all');
+  // Memoize static styles
+  const containerStyle = useMemo(() => ({ 
+    width: '100%', 
+    padding: '24px' 
+  }), []);
 
-  // Custom Hooks
-  const { alerts, loading: alertsLoading } = useAlerts();
-  const { devices, loading: devicesLoading } = useDevices();
-  const { historicalData } = useHistoricalData(selectedDevice);
-  const stats = useDashboardStats(devices, alerts);
+  const headerStyle = useMemo(() => ({ 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    flexWrap: 'wrap' as const,
+    gap: '16px'
+  }), []);
 
-  // Combined loading state
-  const loading = alertsLoading || devicesLoading;
+  const dividerStyle = useMemo(() => ({ 
+    margin: '8px 0' 
+  }), []);
 
-  // ============================================================================
-  // RENDER
-  // ============================================================================
+  const titleStyle = useMemo(() => ({ 
+    margin: 0 
+  }), []);
+
+  const sectionTitleStyle = useMemo(() => ({ 
+    marginBottom: '16px' 
+  }), []);
+
   return (
     <AdminLayout>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        
-        {/* ====== PAGE HEADER ====== */}
-        <div>
-          <Title level={2}>Real-Time Dashboard</Title>
-          <Text type="secondary">
-            Monitor water quality sensors, alerts, and MQTT Bridge in real-time
-          </Text>
+      <Space direction="vertical" size="large" style={containerStyle}>
+        {/* Header Section */}
+        <div style={headerStyle}>
+          <Title level={2} style={titleStyle}>
+            Admin Dashboard
+          </Title>
+          <RefreshControl 
+            onRefresh={refresh} 
+            loading={loading} 
+            lastUpdate={lastUpdate} 
+          />
         </div>
 
-        {/* ====== STATISTICS CARDS ====== */}
-        <StatisticsCards
-          totalDevices={stats.totalDevices}
-          onlineDevices={stats.onlineDevices}
-          activeAlerts={stats.activeAlerts}
-          criticalAlerts={stats.criticalAlerts}
-        />
+        <Divider style={dividerStyle} />
 
-        {/* ====== MQTT BRIDGE HEALTH MONITOR ====== */}
-        <MQTTBridgeHealthCard />
+        {/* Error Alert */}
+        {error && (
+          <Alert
+            message="Connection Error"
+            description={error}
+            type="error"
+            showIcon
+            closable
+          />
+        )}
 
-        {/* ====== TWO-COLUMN LAYOUT FOR DESKTOP ====== */}
-        <Row gutter={[16, 16]}>
-          {/* Left Column - Sensor Readings & Historical Trends */}
-          <Col xs={24} lg={14} xl={16}>
-            <Space direction="vertical" size="large" style={{ width: '100%' }}>
-              {/* REAL-TIME SENSOR READINGS */}
-              <SensorReadingsCard
-                devices={devices}
-                loading={loading}
-                onlineDevices={stats.onlineDevices}
-                onDeviceSelect={setSelectedDevice}
-              />
+        {/* Health Overview - Full Width Hero Section */}
+        <HealthOverview health={health} loading={loading} />
 
-              {/* DATA VISUALIZATION (Historical Trends) */}
-              <HistoricalTrendsCard
-                selectedDevice={selectedDevice}
-                devices={devices}
-                historicalData={historicalData}
-                onDeviceChange={setSelectedDevice}
-              />
-            </Space>
-          </Col>
+        {/* Metrics Grid - Primary Metrics */}
+        <div>
+          <Title level={4} style={sectionTitleStyle}>
+            Real-time Metrics
+          </Title>
+          <MetricsGrid status={status} loading={loading} />
+        </div>
 
-          {/* Right Column - Recent Alerts */}
-          <Col xs={24} lg={10} xl={8}>
-            <RecentAlertsCard
-              alerts={alerts}
-              loading={loading}
-              activeAlerts={stats.activeAlerts}
-              criticalAlerts={stats.criticalAlerts}
-            />
-          </Col>
-        </Row>
+        {/* Detailed Monitoring Section */}
+        <div>
+          <Title level={4} style={sectionTitleStyle}>
+            System Monitoring
+          </Title>
+          <Row gutter={[16, 16]}>
+            {/* Memory Monitor - Takes 2/3 width on desktop */}
+            <Col xs={24} lg={16}>
+              <MemoryMonitor health={health} loading={loading} />
+            </Col>
+
+            {/* System Info - Takes 1/3 width on desktop */}
+            <Col xs={24} lg={8}>
+              <SystemInfo status={status} loading={loading} />
+            </Col>
+
+            {/* Buffer Monitor - Full Width */}
+            <Col span={24}>
+              <BufferMonitor health={health} loading={loading} />
+            </Col>
+          </Row>
+        </div>
       </Space>
     </AdminLayout>
   );
-};
+});
