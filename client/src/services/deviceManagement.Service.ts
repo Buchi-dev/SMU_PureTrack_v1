@@ -8,6 +8,7 @@ import type {
   DeviceData, 
   DeviceResponse 
 } from '../schemas';
+import { dataFlowLogger, DataSource, FlowLayer } from '../utils/dataFlowLogger';
 
 export interface ErrorResponse {
   code: string;
@@ -92,10 +93,59 @@ export class DeviceManagementService {
     onUpdate: (reading: SensorReading | null) => void,
     onError: (error: Error) => void
   ): Unsubscribe {
+    // Cache last valid reading to prevent null propagation during RTDB stalls
+    let lastValidReading: SensorReading | null = null;
+    let isFirstSnapshot = true;
+
     return onValue(
       ref(this.db, `sensorReadings/${deviceId}/latestReading`),
-      (snapshot) => onUpdate(snapshot.val()),
-      (err) => onError(err instanceof Error ? err : new Error('Failed to fetch sensor data'))
+      (snapshot) => {
+        const reading = snapshot.val() as SensorReading | null;
+        
+        dataFlowLogger.log(
+          DataSource.RTDB,
+          FlowLayer.SERVICE,
+          `Device ${deviceId}: Reading received`,
+          { reading: reading ? 'valid' : 'null', isFirstSnapshot }
+        );
+        
+        // DEFENSIVE: If we get null on a subsequent update and had valid data before,
+        // this might be a temporary RTDB disconnection - don't propagate it
+        if (!isFirstSnapshot && reading === null && lastValidReading !== null) {
+          dataFlowLogger.logStateRejection(
+            DataSource.RTDB,
+            FlowLayer.SERVICE,
+            `Device ${deviceId}: Null reading during active session - likely RTDB stall`,
+            reading,
+            lastValidReading
+          );
+          console.warn(`[DeviceService] Device ${deviceId}: Rejecting null reading - likely RTDB stall`);
+          console.warn(`[DeviceService] Device ${deviceId}: Maintaining cached reading`);
+          return; // Don't propagate null
+        }
+
+        // Valid data (including legitimate null on first load) - cache and propagate
+        lastValidReading = reading;
+        isFirstSnapshot = false;
+        
+        dataFlowLogger.log(
+          DataSource.RTDB,
+          FlowLayer.SERVICE,
+          `Device ${deviceId}: Propagating reading`,
+          { reading }
+        );
+        
+        onUpdate(reading);
+      },
+      (err) => {
+        dataFlowLogger.log(
+          DataSource.RTDB,
+          FlowLayer.SERVICE,
+          `Device ${deviceId}: Subscription error`,
+          { error: err instanceof Error ? err.message : 'Unknown error' }
+        );
+        onError(err instanceof Error ? err : new Error('Failed to fetch sensor data'));
+      }
     );
   }
 

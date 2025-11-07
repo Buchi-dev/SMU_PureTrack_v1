@@ -1,6 +1,7 @@
 import { Card, Badge, Typography, Space } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
+import { useThemeToken } from '../../../../theme';
 import type { MqttBridgeHealth } from '../hooks';
 
 const { Title, Text } = Typography;
@@ -11,6 +12,7 @@ interface HealthOverviewProps {
 }
 
 export const HealthOverview = memo(({ health, loading }: HealthOverviewProps) => {
+  const token = useThemeToken();
   const isHealthy = health?.status === 'healthy';
   
   const formatUptime = useMemo(() => {
@@ -34,12 +36,12 @@ export const HealthOverview = memo(({ health, loading }: HealthOverviewProps) =>
 
   const cardStyle = useMemo(() => ({
     background: isHealthy 
-      ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-      : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+      ? `linear-gradient(135deg, ${token.colorPrimary} 0%, ${token.colorPrimaryActive} 100%)` 
+      : `linear-gradient(135deg, ${token.colorError} 0%, ${token.colorErrorActive} 100%)`,
     border: 'none',
     borderRadius: '12px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-  }), [isHealthy]);
+  }), [isHealthy, token]);
 
   return (
     <Card 

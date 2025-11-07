@@ -4,3 +4,7 @@ export { MemoryMonitor } from './MemoryMonitor';
 export { BufferMonitor } from './BufferMonitor';
 export { SystemInfo } from './SystemInfo';
 export { RefreshControl } from './RefreshControl';
+export { DeviceMonitor } from './DeviceMonitor';
+export { AlertsMonitor } from './AlertsMonitor';
+export { DashboardSummary } from './DashboardSummary';
+export * from './types';

@@ -56,8 +56,8 @@ const CONFIG = {
   
   // Hardcoded Memory Monitoring (reduced frequency)
   MEMORY_CHECK_INTERVAL: 60000, // Increased from 30s to 60s to reduce overhead
-  MEMORY_WARNING_PERCENT: 70, // Lowered threshold for earlier warnings
-  MEMORY_CRITICAL_PERCENT: 85, // Lowered from 95 to take action sooner
+  MEMORY_WARNING_PERCENT: 90, // Degraded state threshold (90-95%)
+  MEMORY_CRITICAL_PERCENT: 95, // Unhealthy state threshold (95-100%)
   
   // Hardcoded Graceful Shutdown
   SHUTDOWN_GRACE_PERIOD: 8000

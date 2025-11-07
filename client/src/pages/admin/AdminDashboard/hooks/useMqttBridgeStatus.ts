@@ -80,6 +80,8 @@ export const useMqttBridgeStatus = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
   const errorCountRef = useRef(0);
+  const lastValidHealthRef = useRef<MqttBridgeHealth | null>(null); // Cache last valid health
+  const lastValidStatusRef = useRef<MqttBridgeStatus | null>(null); // Cache last valid status
 
   // Memoized fetch function with abort controller for cleanup
   const fetchHealth = useCallback(async (signal?: AbortSignal): Promise<MqttBridgeHealth | null> => {
@@ -173,12 +175,22 @@ export const useMqttBridgeStatus = () => {
       
       if (healthData !== null) {
         shouldUpdate = true;
+        lastValidHealthRef.current = healthData; // Cache valid data
         updates.push(() => setHealth(healthData));
+      } else if (lastValidHealthRef.current && !health) {
+        // If we have cached data but current is null, restore it
+        updates.push(() => setHealth(lastValidHealthRef.current));
+        shouldUpdate = true;
       }
       
       if (statusData !== null) {
         shouldUpdate = true;
+        lastValidStatusRef.current = statusData; // Cache valid data
         updates.push(() => setStatus(statusData));
+      } else if (lastValidStatusRef.current && !status) {
+        // If we have cached data but current is null, restore it
+        updates.push(() => setStatus(lastValidStatusRef.current));
+        shouldUpdate = true;
       }
       
       if (shouldUpdate) {
@@ -202,6 +214,15 @@ export const useMqttBridgeStatus = () => {
       if (!signal.aborted) {
         errorCountRef.current++;
         const errorMsg = err instanceof Error ? err.message : 'Connection failed';
+        
+        // On error, restore cached data if available
+        if (lastValidHealthRef.current && !health) {
+          setHealth(lastValidHealthRef.current);
+        }
+        if (lastValidStatusRef.current && !status) {
+          setStatus(lastValidStatusRef.current);
+        }
+        
         setError(errorMsg);
         
         if (showError) {
@@ -213,7 +234,7 @@ export const useMqttBridgeStatus = () => {
         }
       }
     }
-  }, [fetchHealth, fetchStatus, loading, error]);
+  }, [fetchHealth, fetchStatus, loading, error, health, status]);
 
   // Optimized refresh - doesn't set loading state unnecessarily
   const refresh = useCallback(() => {
@@ -258,9 +279,10 @@ export const useMqttBridgeStatus = () => {
   }, [fetchAll]);
 
   // Memoize return value to prevent unnecessary re-renders in consuming components
+  // Use cached data as fallback if current state is null
   return useMemo(() => ({
-    health,
-    status,
+    health: health || lastValidHealthRef.current,
+    status: status || lastValidStatusRef.current,
     loading,
     error,
     lastUpdate,
