@@ -1,1 +1,1 @@
-export { useAnalyticsData } from './useAnalyticsData';
+export { useAnalyticsProcessing } from './useAnalyticsProcessing';

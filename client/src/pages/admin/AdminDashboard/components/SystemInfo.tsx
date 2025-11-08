@@ -1,7 +1,7 @@
 import { Card, Descriptions, Tag, Typography, Space } from 'antd';
 import { InfoCircleOutlined, ThunderboltOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { memo, useMemo, useCallback } from 'react';
-import type { MqttBridgeStatus } from '../hooks';
+import type { MqttBridgeStatus } from '../../../../services/mqtt.service';
 import { HEALTH_COLORS } from '../config';
 
 const { Text } = Typography;

@@ -1,7 +1,7 @@
 import { Card, Progress, Typography, Space, Row, Col, Statistic } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
-import type { MqttBridgeHealth, MqttBridgeStatus } from '../hooks';
+import type { MqttBridgeHealth, MqttBridgeStatus } from '../../../../services/mqtt.service';
 import { HEALTH_COLORS } from '../config';
 
 const { Text } = Typography;

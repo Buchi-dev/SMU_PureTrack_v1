@@ -12,8 +12,14 @@ export interface AlertStats {
 }
 
 /**
- * Custom hook to calculate alert statistics
- * @param alerts - Array of water quality alerts
+ * ✅ UI-SPECIFIC LOCAL HOOK - Alert Statistics Calculation
+ * 
+ * This hook is ACCEPTABLE as a local hook because it only performs
+ * client-side calculations and does NOT wrap service layer calls.
+ * 
+ * Purpose: Calculate statistics from filtered alerts for dashboard display
+ * 
+ * @param alerts - Array of water quality alerts (from global hook or filtered)
  * @returns Statistics object with counts for different alert states
  */
 export const useAlertStats = (alerts: WaterQualityAlert[]): AlertStats => {

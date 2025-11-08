@@ -1,5 +1,12 @@
-import { Space, Spin } from 'antd';
+import { useState, useEffect } from 'react';
+import { Space, Spin, message } from 'antd';
 import { AdminLayout } from '../../../components/layouts';
+import { useCall_Reports } from '../../../hooks';
+import { useAnalyticsProcessing } from './hooks';
+import type { 
+  WaterQualityReportData, 
+  DeviceStatusSummary 
+} from '../../../schemas';
 import {
   AnalyticsHeader,
   KeyMetrics,
@@ -10,19 +17,47 @@ import {
   TimeSeriesCharts,
   WaterQualityAssessment,
 } from './components';
-import { useAnalyticsData } from './hooks';
 
 export const AdminAnalytics = () => {
-  const {
-    loading,
-    waterQualityData,
-    deviceStatusData,
-    timeSeriesData,
-    parameterDistribution,
-    alerts,
-  } = useAnalyticsData();
+  // GLOBAL WRITE HOOK - Generate reports
+  const { 
+    generateWaterQualityReport,
+    generateDeviceStatusReport,
+    isLoading: reportsLoading,
+  } = useCall_Reports();
 
-  if (loading) {
+  // LOCAL STATE - Store report data
+  const [waterQualityData, setWaterQualityData] = useState<WaterQualityReportData | null>(null);
+  const [deviceStatusData, setDeviceStatusData] = useState<DeviceStatusSummary | null>(null);
+
+  // LOCAL HOOK - Process data for charts (UI logic only)
+  const { 
+    timeSeriesData, 
+    parameterDistribution, 
+    parameterComparisonData 
+  } = useAnalyticsProcessing(waterQualityData);
+
+  // Fetch reports on mount
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const [wqReport, dsReport] = await Promise.all([
+          generateWaterQualityReport(),
+          generateDeviceStatusReport()
+        ]);
+        setWaterQualityData(wqReport);
+        setDeviceStatusData(dsReport.summary);
+      } catch (error) {
+        console.error('Error fetching analytics data:', error);
+        message.error('Failed to load analytics data');
+      }
+    };
+    fetchReports();
+  }, [generateWaterQualityReport, generateDeviceStatusReport]);
+
+  const loading = reportsLoading;
+
+  if (loading && !waterQualityData) {
     return (
       <AdminLayout>
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
@@ -33,27 +68,7 @@ export const AdminAnalytics = () => {
   }
 
   const metrics = waterQualityData?.devices?.[0]?.metrics;
-
-  const parameterComparisonData = metrics ? [
-    {
-      parameter: 'pH',
-      Average: metrics.avgPH,
-      Maximum: metrics.maxPH,
-      Minimum: metrics.minPH,
-    },
-    {
-      parameter: 'TDS',
-      Average: metrics.avgTDS / 10,
-      Maximum: metrics.maxTDS / 10,
-      Minimum: metrics.minTDS / 10,
-    },
-    {
-      parameter: 'Turbidity',
-      Average: metrics.avgTurbidity,
-      Maximum: metrics.maxTurbidity,
-      Minimum: metrics.minTurbidity,
-    },
-  ] : [];
+  const alerts = waterQualityData?.devices?.[0]?.alerts || [];
 
   return (
     <AdminLayout>

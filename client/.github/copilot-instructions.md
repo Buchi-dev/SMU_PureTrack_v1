@@ -117,6 +117,20 @@ pages/admin/AdminDashboard/
    - `reportsService` ✅ (from `reports.Service.ts`)
    - `mqttService` ✅ (from `mqtt.service.ts`)
 
+7. **Code Cleanliness (CRITICAL)**
+   - **DELETE dead code, unused imports, exports, and files** - DO NOT comment them out
+   - Remove unused variables, functions, components, and type definitions
+   - Clean up unused dependencies and imports after refactoring
+   - Delete entire files that are no longer referenced anywhere in the codebase
+   - Use ESLint warnings as indicators for cleanup opportunities
+
+8. **Documentation Standards (CRITICAL)**
+   - **Use JSDoc for all exported functions, hooks, services, and components**
+   - JSDoc should document: purpose, parameters, return values, and examples
+   - **NO excessive inline comments** - code should be self-documenting
+   - Only add inline comments for complex business logic or non-obvious workarounds
+   - Prefer clear variable/function names over explanatory comments
+
 ### ❌ DON'T:
 1. ❌ **Define multiple components in a single file**
 2. ❌ **Create helper components in the same file as the main component**
@@ -128,7 +142,328 @@ pages/admin/AdminDashboard/
 8. ❌ **Create local/page-specific hooks that duplicate global hooks functionality**
 9. ❌ Create hooks in `pages/**/hooks/` that wrap service layer (use global hooks)
 10. ❌ Import services with wrong names (`deviceManagementService` ❌, `userManagementService` ❌)
+11. ❌ **Comment out dead code** - DELETE it instead (use version control to recover if needed)
+12. ❌ **Leave unused imports** - Remove them immediately
+13. ❌ **Keep orphaned files** - Delete files that are no longer imported or used
+14. ❌ **Export unused functions/components** - If not used elsewhere, make them internal or delete them
+15. ❌ **Write excessive inline comments** - Code should be self-explanatory with proper naming
+16. ❌ **Skip JSDoc on exported functions** - All exports MUST have JSDoc documentation
 
+
+---
+
+## Code Cleanup & Dead Code Removal (CRITICAL)
+
+### Philosophy: Delete, Don't Comment
+- **Version control (Git) is your safety net** - you can always recover deleted code
+- Commented-out code creates noise and confusion
+- Clean code is readable code
+
+### What to DELETE Immediately:
+
+1. **Unused Imports:**
+```typescript
+// ❌ BAD - Unused imports left in file
+import React, { useState, useEffect, useMemo } from 'react';
+import { Button, Card, Modal } from 'antd'; // Only using Button
+import { formatDate } from '@/utils/dateUtils'; // Not used anywhere
+
+// ✅ GOOD - Only necessary imports
+import React, { useState } from 'react';
+import { Button } from 'antd';
+```
+
+2. **Unused Exports:**
+```typescript
+// ❌ BAD - Exporting unused helper functions
+export const formatDate = () => { /* ... */ };        // Not imported anywhere
+export const calculateTotal = () => { /* ... */ };    // Not imported anywhere
+export const UserProfile = () => { /* ... */ };       // Actually used
+
+// ✅ GOOD - Only export what's used elsewhere
+export const UserProfile = () => { /* ... */ };
+```
+
+3. **Dead Code & Unused Variables:**
+```typescript
+// ❌ BAD - Commented out code and unused variables
+const MyComponent = () => {
+  const [data, setData] = useState([]); // Declared but never used
+  // const [oldState, setOldState] = useState(null); // Old implementation
+  
+  // const fetchOldData = async () => {
+  //   // Old API call we're no longer using
+  // };
+
+  return <div>Content</div>;
+};
+
+// ✅ GOOD - Clean, only what's needed
+const MyComponent = () => {
+  return <div>Content</div>;
+};
+```
+
+4. **Orphaned Files (DELETE entire files):**
+```
+❌ DELETE these if unused:
+- pages/admin/OldDashboard.tsx (replaced by AdminDashboard.tsx)
+- hooks/useDeprecatedHook.ts (replaced by global hook)
+- components/LegacyComponent.tsx (no longer imported)
+- services/old-api.service.ts (replaced by new service)
+- utils/deprecatedHelpers.ts (functions not used)
+```
+
+5. **Unused Type Definitions:**
+```typescript
+// ❌ BAD - Type definitions that are never used
+type OldUserType = { id: string; name: string }; // Not referenced
+interface DeprecatedConfig { /* ... */ }          // Not referenced
+
+// ✅ GOOD - Only types that are actually used
+export type User = { id: string; name: string };  // Used in components
+```
+
+### Cleanup Workflow:
+
+**When Refactoring:**
+1. Identify what's being replaced/removed
+2. DELETE old implementation completely (no comments)
+3. Remove all imports related to deleted code
+4. Remove exports that are no longer used
+5. Run ESLint to catch unused imports/variables
+6. Search workspace for orphaned files (`Ctrl+Shift+F` for file references)
+7. Commit with clear message: `"Remove deprecated X, replaced by Y"`
+
+**When Adding New Code:**
+1. Only import what you need
+2. Don't copy-paste unused helper functions
+3. Clean up imports as you go
+
+**Regular Maintenance:**
+- Run `npm run lint` or ESLint regularly
+- Review "unused variable" warnings
+- Search for `TODO`, `FIXME`, commented code blocks
+- Delete them after resolving
+
+### Tools for Detection:
+
+```bash
+# Find unused exports (TypeScript)
+npx ts-prune
+
+# Find unused imports (ESLint)
+npm run lint
+
+# Search for commented code (manual review)
+# Search workspace for: ^\s*//.*(?:function|const|import|export)
+```
+
+### Examples of Clean Refactoring:
+
+**Before (BAD):**
+```typescript
+// src/pages/admin/AdminAlerts/hooks/useRealtimeAlerts.ts
+import { useState, useEffect } from 'react';
+import { alertsService } from '@/services/alerts.Service';
+// import { devicesService } from '@/services/devices.Service'; // Old dependency
+
+export const useRealtimeAlerts = () => {
+  const [alerts, setAlerts] = useState([]);
+  // const [devices, setDevices] = useState([]); // No longer needed
+  
+  // useEffect(() => {
+  //   // Old implementation
+  //   const unsubscribe = alertsService.subscribeToAlerts(setAlerts);
+  //   return () => unsubscribe();
+  // }, []);
+
+  useEffect(() => {
+    const unsubscribe = alertsService.subscribeToAlerts(setAlerts);
+    return () => unsubscribe();
+  }, []);
+
+  return { alerts };
+};
+```
+
+**After (GOOD) - File DELETED, use global hook instead:**
+```typescript
+// ✅ File deleted: src/pages/admin/AdminAlerts/hooks/useRealtimeAlerts.ts
+// Components now use: import { useRealtime_Alerts } from '@/hooks';
+```
+
+---
+
+## JSDoc Documentation Standards (CRITICAL)
+
+### Philosophy: Code Over Comments
+- **Self-documenting code** through clear naming (functions, variables, components)
+- **JSDoc for API documentation** (exported functions, hooks, services)
+- **Minimal inline comments** only for complex logic or workarounds
+
+### JSDoc Requirements:
+
+**All exported functions, hooks, and services MUST have JSDoc:**
+
+```typescript
+// ✅ GOOD - Proper JSDoc documentation
+
+/**
+ * Acknowledges an alert and updates its status in Firestore
+ * @param alertId - The unique identifier of the alert to acknowledge
+ * @param acknowledgedBy - The user ID of the person acknowledging the alert
+ * @returns Promise that resolves when the alert is acknowledged
+ * @throws {Error} If the alert doesn't exist or update fails
+ * @example
+ * await alertsService.acknowledgeAlert('alert-123', 'user-456');
+ */
+export const acknowledgeAlert = async (
+  alertId: string,
+  acknowledgedBy: string
+): Promise<void> => {
+  const alertRef = doc(db, 'alerts', alertId);
+  await updateDoc(alertRef, {
+    status: 'acknowledged',
+    acknowledgedBy,
+    acknowledgedAt: serverTimestamp(),
+  });
+};
+
+/**
+ * Custom hook for real-time alerts subscription
+ * @returns Object containing alerts array, loading state, and error state
+ * @example
+ * const { data: alerts, isLoading, error } = useRealtime_Alerts();
+ */
+export const useRealtime_Alerts = () => {
+  const [data, setData] = useState<Alert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  
+  useEffect(() => {
+    const unsubscribe = alertsService.subscribeToAlerts(setData, setError);
+    setIsLoading(false);
+    return unsubscribe;
+  }, []);
+
+  return { data, isLoading, error };
+};
+```
+
+### What NOT to Comment:
+
+```typescript
+// ❌ BAD - Excessive inline comments for obvious code
+const MyComponent = () => {
+  // Create state for alerts
+  const [alerts, setAlerts] = useState([]);
+  
+  // Use the realtime alerts hook
+  const { data } = useRealtime_Alerts();
+  
+  // Update alerts when data changes
+  useEffect(() => {
+    // Set the alerts to the data from the hook
+    setAlerts(data);
+  }, [data]);
+
+  // Render the component
+  return (
+    <div>
+      {/* Map over alerts and display them */}
+      {alerts.map(alert => (
+        // Display each alert
+        <div key={alert.id}>{alert.message}</div>
+      ))}
+    </div>
+  );
+};
+
+// ✅ GOOD - Clean, self-documenting code with JSDoc only on export
+/**
+ * Displays real-time alerts in a responsive card layout
+ */
+export default function MyComponent() {
+  const { data: alerts } = useRealtime_Alerts();
+
+  return (
+    <div>
+      {alerts.map(alert => (
+        <div key={alert.id}>{alert.message}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+### When Inline Comments ARE Acceptable:
+
+```typescript
+// ✅ GOOD - Complex business logic explanation
+export const calculateWaterQualityScore = (readings: DeviceReading[]) => {
+  const weights = { ph: 0.3, turbidity: 0.3, tds: 0.2, temperature: 0.2 };
+  
+  // WHO guidelines: pH 6.5-8.5, Turbidity <5 NTU, TDS <500 ppm
+  const normalizedScores = readings.map(reading => ({
+    ph: Math.max(0, 1 - Math.abs(reading.ph - 7) / 1.5),
+    turbidity: Math.max(0, 1 - reading.turbidity / 5),
+    tds: Math.max(0, 1 - reading.tds / 500),
+    temperature: Math.max(0, 1 - Math.abs(reading.temperature - 25) / 15),
+  }));
+
+  return normalizedScores.reduce((acc, score) => 
+    acc + (score.ph * weights.ph + score.turbidity * weights.turbidity + 
+           score.tds * weights.tds + score.temperature * weights.temperature), 0
+  ) / readings.length;
+};
+
+// ✅ GOOD - Workaround explanation
+useEffect(() => {
+  // WORKAROUND: Firestore onSnapshot doesn't guarantee order on initial load
+  // Manually sort by timestamp after receiving data
+  const sortedAlerts = [...data].sort((a, b) => 
+    b.timestamp.toMillis() - a.timestamp.toMillis()
+  );
+  setAlerts(sortedAlerts);
+}, [data]);
+```
+
+### JSDoc Template for Services:
+
+```typescript
+/**
+ * [Brief description of what the function does]
+ * @param paramName - [Description of parameter]
+ * @returns [Description of return value]
+ * @throws {ErrorType} [When this error is thrown]
+ * @example
+ * [Usage example]
+ */
+```
+
+### JSDoc Template for Hooks:
+
+```typescript
+/**
+ * [Brief description of hook purpose]
+ * @param [Optional params] - [Description]
+ * @returns Object containing [list key return values]
+ * @example
+ * [Usage example with destructuring]
+ */
+```
+
+### JSDoc Template for Components:
+
+```typescript
+/**
+ * [Brief description of component purpose and main features]
+ * @param props - [Description of props if complex]
+ * @example
+ * <ComponentName prop1="value" />
+ */
+```
 
 ---
 

@@ -6,7 +6,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
-import type { MqttBridgeStatus } from '../hooks';
+import type { MqttBridgeStatus } from '../../../../services/mqtt.service';
 import { HEALTH_COLORS } from '../config';
 
 interface MetricsGridProps {

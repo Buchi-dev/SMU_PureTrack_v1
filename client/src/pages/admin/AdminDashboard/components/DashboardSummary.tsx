@@ -9,7 +9,7 @@ import { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { LiveMetricIndicator } from './LiveMetricIndicator';
 import { RecentAlertsList } from './RecentAlertsList';
 import { Row, Col } from 'antd';
-import type { MqttBridgeHealth } from '../hooks';
+import type { MqttBridgeHealth } from '../../../../services/mqtt.service';
 import type { WaterQualityAlert } from '../../../../schemas';
 import {
   calculateMqttBridgeHealthScore,

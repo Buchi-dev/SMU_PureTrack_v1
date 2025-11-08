@@ -1,7 +1,7 @@
 import { Card, Progress, Typography, Space, Row, Col } from 'antd';
 import { DatabaseOutlined } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
-import type { MqttBridgeHealth, MqttBridgeStatus } from '../hooks';
+import type { MqttBridgeHealth, MqttBridgeStatus } from '../../../../services/mqtt.service';
 import { getMemoryHealth, getProgressStatus } from '../config';
 
 const { Text } = Typography;

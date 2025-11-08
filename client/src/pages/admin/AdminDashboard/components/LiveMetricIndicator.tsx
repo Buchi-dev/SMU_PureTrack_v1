@@ -1,3 +1,9 @@
+/**
+ * LiveMetricIndicator Component
+ * 
+ * Displays real-time metrics with animated value changes, trend arrows,
+ * and mini sparkline charts showing historical data.
+ */
 import { Card, Space, Typography, Badge } from 'antd';
 import { memo, useState, useEffect, useRef } from 'react';
 
@@ -16,6 +22,12 @@ interface LiveMetricIndicatorProps {
   dataHistory?: number[]; // Array of historical values for mini graph
 }
 
+/**
+ * Real-time metric display with trends and sparkline visualization
+ * 
+ * @param props - Component props including metric values and styling
+ * @returns Animated metric card with live updates
+ */
 export const LiveMetricIndicator = memo<LiveMetricIndicatorProps>(({ 
   title, 
   currentValue,

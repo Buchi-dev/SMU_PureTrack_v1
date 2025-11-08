@@ -1,11 +1,16 @@
-import { Space, Row, Col, Typography, Alert, Divider, Tabs } from 'antd';
+import { Space, Typography, Alert, Divider, Tabs, Row, Col } from 'antd';
 import { 
   DashboardOutlined, 
   CloudServerOutlined 
 } from '@ant-design/icons';
 import { memo, useMemo, useState } from 'react';
 import { AdminLayout } from "../../../components/layouts";
-import { useMqttBridgeStatus, useRealtimeDevices, useRealtimeAlerts } from './hooks';
+import { 
+  useRealtime_MQTTMetrics, 
+  useRealtime_Devices, 
+  useRealtime_Alerts 
+} from '../../../hooks';
+import { useDashboardStats } from './hooks';
 import {
   HealthOverview,
   MetricsGrid,
@@ -19,35 +24,63 @@ import {
 
 const { Title } = Typography;
 
+/**
+ * AdminDashboard - Admin Dashboard Page
+ * 
+ * Displays comprehensive system overview including:
+ * - Device status and sensor readings
+ * - Water quality alerts
+ * - MQTT Bridge health metrics
+ * - Real-time monitoring charts
+ * 
+ * Architecture: Uses GLOBAL hooks only for data fetching
+ */
 export const AdminDashboard = memo(() => {
   const [activeTab, setActiveTab] = useState('overview');
   
-  // Load all data with 2-second real-time updates
-  const mqttBridge = useMqttBridgeStatus();
-  const realtimeDevices = useRealtimeDevices();
-  const realtimeAlerts = useRealtimeAlerts(50);
+  // ✅ GLOBAL HOOKS - Real-time data from service layer
+  const {
+    health: mqttHealth,
+    status: mqttStatus,
+    isLoading: mqttLoading,
+    error: mqttError,
+    lastUpdate: mqttLastUpdate,
+    refetch: mqttRefetch,
+  } = useRealtime_MQTTMetrics({ pollInterval: 2000 });
 
-  // Refresh all data
+  const {
+    devices,
+    isLoading: devicesLoading,
+    error: devicesError,
+    refetch: devicesRefetch,
+  } = useRealtime_Devices({ includeMetadata: true });
+
+  const {
+    alerts,
+    isLoading: alertsLoading,
+    error: alertsError,
+    refetch: alertsRefetch,
+  } = useRealtime_Alerts({ maxAlerts: 50 });
+
+  // ✅ LOCAL HOOK - UI-specific statistics calculation
+  const { deviceStats, alertStats } = useDashboardStats(devices, alerts);
+
+  // Refresh all data sources
   const handleRefreshAll = () => {
-    mqttBridge.refresh();
-    realtimeDevices.refresh();
-    realtimeAlerts.refresh();
+    mqttRefetch();
+    devicesRefetch();
+    alertsRefetch();
   };
 
-  // Get the most recent update time across all sources
+  // Calculate most recent update time across all sources
   const lastUpdate = useMemo(() => {
-    const times = [
-      mqttBridge.lastUpdate,
-      realtimeDevices.lastUpdate,
-      realtimeAlerts.lastUpdate,
-    ].filter(Boolean) as Date[];
-    
+    const times = [mqttLastUpdate].filter(Boolean) as Date[];
     if (times.length === 0) return null;
-    return new Date(Math.max(...times.map(t => t.getTime())));
-  }, [mqttBridge.lastUpdate, realtimeDevices.lastUpdate, realtimeAlerts.lastUpdate]);
+    return new Date(Math.max(...times.map((t) => t.getTime())));
+  }, [mqttLastUpdate]);
 
-  // Calculate loading state
-  const isLoading = mqttBridge.loading || realtimeDevices.loading || realtimeAlerts.loading;
+  // Combined loading state
+  const isLoading = mqttLoading || devicesLoading || alertsLoading;
 
   // Tab items
   const tabItems = [
@@ -61,28 +94,28 @@ export const AdminDashboard = memo(() => {
       children: (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Error Alerts */}
-          {mqttBridge.error && (
+          {mqttError && (
             <Alert
               message="MQTT Bridge Connection Error"
-              description={mqttBridge.error}
+              description={mqttError.message}
               type="error"
               showIcon
               closable
             />
           )}
-          {realtimeDevices.error && (
+          {devicesError && (
             <Alert
               message="Device Monitoring Error"
-              description={realtimeDevices.error.message}
+              description={devicesError.message}
               type="error"
               showIcon
               closable
             />
           )}
-          {realtimeAlerts.error && (
+          {alertsError && (
             <Alert
               message="Alerts Monitoring Error"
-              description={realtimeAlerts.error.message}
+              description={alertsError.message}
               type="error"
               showIcon
               closable
@@ -91,16 +124,16 @@ export const AdminDashboard = memo(() => {
 
           {/* Comprehensive Dashboard Summary */}
           <DashboardSummary
-            deviceStats={realtimeDevices.stats}
-            alertStats={realtimeAlerts.stats}
-            alerts={realtimeAlerts.alerts}
-            mqttHealth={mqttBridge.health ? {
-              status: mqttBridge.health.status,
-              connected: mqttBridge.health.checks.mqtt.connected,
-              metrics: mqttBridge.health.metrics,
+            deviceStats={deviceStats}
+            alertStats={alertStats}
+            alerts={alerts}
+            mqttHealth={mqttHealth ? {
+              status: mqttHealth.status,
+              connected: mqttHealth.checks.mqtt.connected,
+              metrics: mqttHealth.metrics,
             } : null}
-            mqttMemory={mqttBridge.status?.memory || null}
-            mqttFullHealth={mqttBridge.health}
+            mqttMemory={mqttStatus?.memory || null}
+            mqttFullHealth={mqttHealth}
             loading={isLoading}
           />
         </Space>
@@ -116,10 +149,10 @@ export const AdminDashboard = memo(() => {
       children: (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Error Alert */}
-          {mqttBridge.error && (
+          {mqttError && (
             <Alert
               message="Connection Error"
-              description={mqttBridge.error}
+              description={mqttError.message}
               type="error"
               showIcon
               closable
@@ -127,14 +160,14 @@ export const AdminDashboard = memo(() => {
           )}
 
           {/* Health Overview */}
-          <HealthOverview health={mqttBridge.health} loading={mqttBridge.loading} />
+          <HealthOverview health={mqttHealth} loading={mqttLoading} />
 
           {/* Metrics Grid */}
           <div>
             <Title level={4} style={{ marginBottom: '16px' }}>
               Real-time Metrics
             </Title>
-            <MetricsGrid status={mqttBridge.status} loading={mqttBridge.loading} />
+            <MetricsGrid status={mqttStatus} loading={mqttLoading} />
           </div>
 
           {/* Detailed Monitoring Section */}
@@ -145,23 +178,23 @@ export const AdminDashboard = memo(() => {
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={12}>
                 <MemoryMonitor 
-                  health={mqttBridge.health} 
-                  status={mqttBridge.status} 
-                  loading={mqttBridge.loading} 
+                  health={mqttHealth} 
+                  status={mqttStatus} 
+                  loading={mqttLoading} 
                 />
               </Col>
               <Col xs={24} lg={12}>
                 <CpuMonitor 
-                  health={mqttBridge.health} 
-                  status={mqttBridge.status} 
-                  loading={mqttBridge.loading} 
+                  health={mqttHealth} 
+                  status={mqttStatus} 
+                  loading={mqttLoading} 
                 />
               </Col>
               <Col xs={24} lg={12}>
-                <SystemInfo status={mqttBridge.status} loading={mqttBridge.loading} />
+                <SystemInfo status={mqttStatus} loading={mqttLoading} />
               </Col>
               <Col xs={24} lg={12}>
-                <BufferMonitor health={mqttBridge.health} loading={mqttBridge.loading} />
+                <BufferMonitor health={mqttHealth} loading={mqttLoading} />
               </Col>
             </Row>
           </div>

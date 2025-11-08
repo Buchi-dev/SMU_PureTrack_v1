@@ -41,9 +41,9 @@ interface AlertDetailsDrawerProps {
   alert: WaterQualityAlert | null;
   onClose: () => void;
   onAcknowledge: (alertId: string) => void;
-  onResolve: (alertId: string, notes?: string) => Promise<boolean>;
-  isAcknowledging?: (alertId: string) => boolean;
-  isResolving?: (alertId: string) => boolean;
+  onResolve: (alertId: string, notes?: string) => Promise<void>;
+  isAcknowledging?: boolean; // ✅ Updated to boolean for global hook compatibility
+  isResolving?: boolean; // ✅ Updated to boolean for global hook compatibility
 }
 
 /**
@@ -56,35 +56,41 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
   onClose,
   onAcknowledge,
   onResolve,
-  isAcknowledging = () => false,
-  isResolving = () => false,
+  isAcknowledging = false,
+  isResolving = false,
 }) => {
   const token = useThemeToken();
   const [form] = Form.useForm();
 
   const handleResolve = async (values: { notes?: string }) => {
     if (alert) {
-      const success = await onResolve(alert.alertId, values.notes);
-      if (success) {
+      try {
+        await onResolve(alert.alertId, values.notes);
         form.resetFields();
         onClose();
+      } catch (error) {
+        // Error handling is done in the parent component
+        console.error('Error resolving alert:', error);
       }
     }
   };
 
   const handleQuickResolve = async () => {
     if (alert) {
-      const success = await onResolve(alert.alertId, 'Quick resolved by admin');
-      if (success) {
+      try {
+        await onResolve(alert.alertId, 'Quick resolved by admin');
         onClose();
+      } catch (error) {
+        // Error handling is done in the parent component
+        console.error('Error resolving alert:', error);
       }
     }
   };
 
   if (!alert) return null;
 
-  const acknowledging = isAcknowledging(alert.alertId);
-  const resolving = isResolving(alert.alertId);
+  const acknowledging = isAcknowledging;
+  const resolving = isResolving;
 
   return (
     <Drawer

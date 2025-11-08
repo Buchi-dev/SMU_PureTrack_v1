@@ -2,7 +2,7 @@ import { Card, Badge, Typography, Space } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
 import { useThemeToken } from '../../../../theme';
-import type { MqttBridgeHealth } from '../hooks';
+import type { MqttBridgeHealth } from '../../../../services/mqtt.service';
 
 const { Title, Text } = Typography;
 

@@ -1,3 +1,9 @@
+/**
+ * RecentAlertsList Component
+ * 
+ * Displays a list of the most recent water quality alerts with
+ * severity badges, timestamps, and device information.
+ */
 import { Card, List, Badge, Typography, Space, Tag, Empty } from 'antd';
 import { 
   WarningOutlined, 
@@ -16,6 +22,12 @@ interface RecentAlertsListProps {
   maxItems?: number;
 }
 
+/**
+ * List of recent alerts sorted by creation time
+ * 
+ * @param props - Component props including alerts array
+ * @returns Alert list with severity indicators
+ */
 export const RecentAlertsList = memo<RecentAlertsListProps>(({ 
   alerts, 
   loading = false,

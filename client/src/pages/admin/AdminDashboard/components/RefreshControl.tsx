@@ -1,3 +1,9 @@
+/**
+ * RefreshControl Component
+ * 
+ * Displays a manual refresh button with last update timestamp.
+ * Shows real-time monitoring status badge.
+ */
 import { Button, Space, Typography, Tag, Tooltip } from 'antd';
 import { ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
@@ -10,6 +16,12 @@ interface RefreshControlProps {
   lastUpdate: Date | null;
 }
 
+/**
+ * Control panel for manual data refresh with status indicators
+ * 
+ * @param props - Component props
+ * @returns Refresh control UI with last update time
+ */
 export const RefreshControl = memo(({ onRefresh, loading, lastUpdate }: RefreshControlProps) => {
   const timeSinceUpdate = useMemo(() => {
     if (!lastUpdate) return 'Never';

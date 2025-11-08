@@ -1,15 +1,26 @@
 /**
- * Manage Alerts Page
- * View, manage, and configure water quality alerts
+ * AdminAlerts - Manage Alerts Page
+ * 
+ * View, manage, and configure water quality alerts with real-time updates.
+ * 
+ * Architecture:
+ * ✅ Service Layer → Global Hooks → UI Components
+ * 
+ * Data Flow:
+ * - READ: useRealtime_Alerts() - Real-time Firestore subscription for alerts
+ * - WRITE: useCall_Alerts() - Alert operations (acknowledge, resolve)
+ * - UI Logic: Local hooks for filtering and statistics (useAlertFilters, useAlertStats)
+ * 
+ * @module pages/admin/AdminAlerts
  */
 
 import { useState, useEffect } from 'react';
 import { Typography, message } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
-import { alertsService } from '../../../services/alerts.Service';
 import type { WaterQualityAlert } from '../../../schemas';
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
-import { useAlertStats, useAlertFilters, useAlertActions } from './hooks';
+import { useRealtime_Alerts, useCall_Alerts } from '../../../hooks';
+import { useAlertStats, useAlertFilters } from './hooks';
 import {
   AlertStatistics,
   AlertFilters,
@@ -20,15 +31,49 @@ import {
 const { Title, Text } = Typography;
 
 export const AdminAlerts = () => {
-  const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
   const [detailsVisible, setDetailsVisible] = useState(false);
 
-  // Use custom hooks
+  // ✅ GLOBAL READ HOOK - Real-time alerts subscription
+  const { alerts, isLoading: loading, error: alertsError } = useRealtime_Alerts({ maxAlerts: 100 });
+
+  // ✅ GLOBAL WRITE HOOK - Alert operations (acknowledge, resolve)
+  const { 
+    acknowledgeAlert, 
+    resolveAlert, 
+    isLoading: isOperating,
+    error: operationError,
+    isSuccess,
+    reset: resetOperation 
+  } = useCall_Alerts();
+
+  // ✅ LOCAL UI HOOKS - UI-specific filtering and statistics
   const { filteredAlerts, filters, setFilters, clearFilters } = useAlertFilters(alerts);
   const stats = useAlertStats(filteredAlerts);
-  const { acknowledgeAlert, resolveAlert, isAcknowledging, isResolving } = useAlertActions();
+
+  // Handle errors from global hooks
+  useEffect(() => {
+    if (alertsError) {
+      console.error('Error loading alerts:', alertsError);
+      message.error('Failed to load alerts');
+    }
+  }, [alertsError]);
+
+  useEffect(() => {
+    if (operationError) {
+      console.error('Alert operation error:', operationError);
+      message.error(operationError.message);
+      resetOperation();
+    }
+  }, [operationError, resetOperation]);
+
+  // Handle successful operations
+  useEffect(() => {
+    if (isSuccess) {
+      message.success('Alert operation completed successfully');
+      resetOperation();
+    }
+  }, [isSuccess, resetOperation]);
 
   const handleClearFilters = () => {
     clearFilters();
@@ -40,10 +85,10 @@ export const AdminAlerts = () => {
     setDetailsVisible(true);
   };
 
-  // Batch acknowledge multiple alerts
+  // ✅ Use global write hook for batch operations
   const handleBatchAcknowledge = async (alertIds: string[]) => {
     const results = await Promise.allSettled(
-      alertIds.map((id) => alertsService.acknowledgeAlert(id))
+      alertIds.map((id) => acknowledgeAlert(id))
     );
     
     const failed = results
@@ -60,24 +105,6 @@ export const AdminAlerts = () => {
       );
     }
   };
-
-  // READ: Subscribe to real-time alerts from Firestore
-  useEffect(() => {
-    const unsubscribe = alertsService.subscribeToAlerts(
-      (alertsData) => {
-        setAlerts(alertsData);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error loading alerts:', error);
-        message.error('Failed to load alerts');
-        setLoading(false);
-      },
-      100 // Get more alerts for management page
-    );
-
-    return () => unsubscribe();
-  }, []);
 
   return (
     <AdminLayout>
@@ -108,7 +135,7 @@ export const AdminAlerts = () => {
           onViewDetails={viewAlertDetails}
           onAcknowledge={acknowledgeAlert}
           onBatchAcknowledge={handleBatchAcknowledge}
-          isAcknowledging={isAcknowledging}
+          isAcknowledging={isOperating}
         />
 
         {/* Alert Details Drawer */}
@@ -118,8 +145,8 @@ export const AdminAlerts = () => {
           onClose={() => setDetailsVisible(false)}
           onAcknowledge={acknowledgeAlert}
           onResolve={resolveAlert}
-          isAcknowledging={isAcknowledging}
-          isResolving={isResolving}
+          isAcknowledging={isOperating}
+          isResolving={isOperating}
         />
       </div>
     </AdminLayout>

@@ -28,7 +28,7 @@ interface AlertsTableProps {
   onViewDetails: (alert: WaterQualityAlert) => void;
   onAcknowledge: (alertId: string) => void;
   onBatchAcknowledge?: (alertIds: string[]) => Promise<void>;
-  isAcknowledging?: (alertId: string) => boolean;
+  isAcknowledging?: boolean; // ✅ Updated to boolean for global hook compatibility
 }
 
 /**
@@ -41,7 +41,7 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
   onViewDetails,
   onAcknowledge,
   onBatchAcknowledge,
-  isAcknowledging = () => false,
+  isAcknowledging = false,
 }) => {
   const token = useThemeToken();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -194,10 +194,10 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
                 size="small"
                 icon={<CheckCircleOutlined />}
                 onClick={() => onAcknowledge(record.alertId)}
-                loading={isAcknowledging(record.alertId)}
-                disabled={isAcknowledging(record.alertId)}
+                loading={isAcknowledging}
+                disabled={isAcknowledging}
               >
-                {isAcknowledging(record.alertId) ? 'Acknowledging...' : 'Acknowledge'}
+                {isAcknowledging ? 'Acknowledging...' : 'Acknowledge'}
               </Button>
             </Tooltip>
           )}
