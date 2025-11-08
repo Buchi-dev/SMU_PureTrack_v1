@@ -20,6 +20,7 @@ import {
   calculateAlertHealthScore,
   calculateOverallSystemHealth,
   getOverallHealth,
+  HEALTH_COLORS,
 } from '../config';
 
 const { Text, Title } = Typography;
@@ -324,7 +325,7 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
                 currentValue={receivedRate}
                 totalValue={mqttFullHealth?.metrics?.received || 0}
                 icon={<ArrowDownOutlined />}
-                color="#52c41a"
+                color={HEALTH_COLORS.EXCELLENT}
                 dataHistory={receivedHistory}
                 tooltip={`Real-time incoming message rate\nTotal received: ${mqttFullHealth?.metrics?.received?.toLocaleString() || 0}`}
                 loading={loading}
@@ -338,7 +339,7 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
                 currentValue={publishedRate}
                 totalValue={mqttFullHealth?.metrics?.published || 0}
                 icon={<ArrowUpOutlined />}
-                color="#1890ff"
+                color={HEALTH_COLORS.INFO}
                 dataHistory={publishedHistory}
                 tooltip={`Real-time outgoing message rate\nTotal published: ${mqttFullHealth?.metrics?.published?.toLocaleString() || 0}`}
                 loading={loading}

@@ -1,4 +1,4 @@
-import { Card, Progress, Space, Typography, Tooltip } from 'antd';
+import { Card, Space, Typography, Progress, Tooltip } from 'antd';
 import { memo } from 'react';
 import { OVERALL_HEALTH_THRESHOLDS, HEALTH_COLORS } from '../config';
 
@@ -85,10 +85,14 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
             </Text>
             {subtitle && (
               <Text type="secondary" style={{ 
-                fontSize: '11px',
+                fontSize: '11px', 
                 display: 'block',
-                marginTop: '2px',
-                lineHeight: '1.2'
+                lineHeight: '1.3',
+                marginTop: '4px',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}>
                 {subtitle}
               </Text>
@@ -113,5 +117,7 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
     </Tooltip>
   ) : content;
 });
+
+MetricIndicator.displayName = 'MetricIndicator';
 
 MetricIndicator.displayName = 'MetricIndicator';

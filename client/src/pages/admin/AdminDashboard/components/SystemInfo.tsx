@@ -2,6 +2,7 @@ import { Card, Descriptions, Tag, Typography, Space } from 'antd';
 import { InfoCircleOutlined, ThunderboltOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { memo, useMemo, useCallback } from 'react';
 import type { MqttBridgeStatus } from '../hooks';
+import { HEALTH_COLORS } from '../config';
 
 const { Text } = Typography;
 
@@ -71,7 +72,7 @@ export const SystemInfo = memo(({ status, loading }: SystemInfoProps) => {
       <Descriptions column={1} size="small">
         <Descriptions.Item label="System Uptime">
           <Space>
-            <ThunderboltOutlined style={{ color: '#52c41a' }} />
+            <ThunderboltOutlined style={{ color: HEALTH_COLORS.EXCELLENT }} />
             <Text strong>{uptimeDisplay}</Text>
           </Space>
         </Descriptions.Item>

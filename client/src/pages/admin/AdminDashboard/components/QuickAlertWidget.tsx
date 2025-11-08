@@ -4,6 +4,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { memo } from 'react';
+import { HEALTH_COLORS } from '../config';
 
 const { Text } = Typography;
 
@@ -27,7 +28,7 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
       loading={loading}
       style={{ 
         backgroundColor: hasIssues ? '#fff1f0' : '#f6ffed',
-        borderLeft: `4px solid ${hasIssues ? '#ff4d4f' : '#52c41a'}`,
+        borderLeft: `4px solid ${hasIssues ? HEALTH_COLORS.ERROR : HEALTH_COLORS.EXCELLENT}`,
         minHeight: '155px',
         height: '100%',
         display: 'flex',
@@ -50,7 +51,7 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
           <Space align="center" size={8}>
             <div style={{ 
               fontSize: '20px', 
-              color: hasIssues ? '#ff4d4f' : '#52c41a',
+              color: hasIssues ? HEALTH_COLORS.ERROR : HEALTH_COLORS.EXCELLENT,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center'
@@ -65,7 +66,7 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
             </Text>
           </Space>
           {hasIssues && (
-            <Badge count={totalIssues} style={{ backgroundColor: '#ff4d4f' }} />
+            <Badge count={totalIssues} style={{ backgroundColor: HEALTH_COLORS.ERROR }} />
           )}
         </div>
 
@@ -74,8 +75,8 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
           {criticalCount > 0 ? (
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: '16px' }} />
-                <Text strong style={{ fontSize: '20px', color: '#ff4d4f' }}>
+                <ExclamationCircleOutlined style={{ color: HEALTH_COLORS.ERROR, fontSize: '16px' }} />
+                <Text strong style={{ fontSize: '20px', color: HEALTH_COLORS.ERROR }}>
                   {criticalCount}
                 </Text>
                 <Text type="secondary" style={{ fontSize: '12px' }}>
@@ -85,8 +86,8 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
             </Space>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ExclamationCircleOutlined style={{ color: '#52c41a', fontSize: '16px' }} />
-              <Text style={{ fontSize: '14px', color: '#52c41a' }}>
+              <ExclamationCircleOutlined style={{ color: HEALTH_COLORS.EXCELLENT, fontSize: '16px' }} />
+              <Text style={{ fontSize: '14px', color: HEALTH_COLORS.EXCELLENT }}>
                 No Critical Alerts
               </Text>
             </div>
@@ -97,14 +98,14 @@ export const QuickAlertWidget = memo<QuickAlertWidgetProps>(({
         <div style={{ marginTop: '4px' }}>
           {offlineDevices > 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <WarningOutlined style={{ color: '#faad14', fontSize: '14px' }} />
+              <WarningOutlined style={{ color: HEALTH_COLORS.WARNING, fontSize: '14px' }} />
               <Text style={{ fontSize: '12px', color: '#666' }}>
                 {offlineDevices} device{offlineDevices > 1 ? 's' : ''} offline
               </Text>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <WarningOutlined style={{ color: '#52c41a', fontSize: '14px' }} />
+              <WarningOutlined style={{ color: HEALTH_COLORS.EXCELLENT, fontSize: '14px' }} />
               <Text type="secondary" style={{ fontSize: '11px' }}>
                 All devices online
               </Text>

@@ -10,10 +10,6 @@ export interface RealtimeDeviceData {
   lastUpdateTime: Date | null;
 }
 
-// REMOVED: READING_TIMEOUT_MS and POLL_INTERVAL
-// We trust Firestore's device status as the single source of truth
-// The frontend no longer overrides Firestore status based on reading delays
-
 export const useRealtimeDevices = () => {
   const [devices, setDevices] = useState<RealtimeDeviceData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,13 +18,12 @@ export const useRealtimeDevices = () => {
   
   const unsubscribersRef = useRef<Map<string, () => void>>(new Map());
   const isActiveRef = useRef(true);
-  const lastValidDevicesRef = useRef<RealtimeDeviceData[]>([]); // Cache last valid state
-  const isInitialLoadRef = useRef(true); // Track initial load vs refresh
+  const lastValidDevicesRef = useRef<RealtimeDeviceData[]>([]);
+  const isInitialLoadRef = useRef(true);
 
-  // Fetch initial devices list
+  // Fetch devices list from Firestore
   const fetchDevices = useCallback(async () => {
     try {
-      // Only show loading on initial load, not on refresh
       if (isInitialLoadRef.current) {
         setLoading(true);
       }
@@ -54,7 +49,7 @@ export const useRealtimeDevices = () => {
       
       if (isActiveRef.current) {
         setDevices(initialData);
-        lastValidDevicesRef.current = initialData; // Update cache
+        lastValidDevicesRef.current = initialData;
         setLastUpdate(new Date());
       }
       
@@ -63,7 +58,7 @@ export const useRealtimeDevices = () => {
       const error = err instanceof Error ? err : new Error('Failed to fetch devices');
       if (isActiveRef.current) {
         setError(error);
-        // On error, keep displaying cached data instead of clearing it
+        // Keep displaying cached data on error
         if (lastValidDevicesRef.current.length > 0) {
           console.warn('Using cached device data due to fetch error');
         }
@@ -72,7 +67,7 @@ export const useRealtimeDevices = () => {
     } finally {
       if (isActiveRef.current) {
         setLoading(false);
-        isInitialLoadRef.current = false; // Mark initial load complete
+        isInitialLoadRef.current = false;
       }
     }
   }, []);
@@ -96,19 +91,16 @@ export const useRealtimeDevices = () => {
             if (d.device.deviceId === deviceId) {
               const now = new Date();
               
-              // FIXED: Only update reading and timestamp, NOT online status
-              // Online status comes from Firestore device.status only
+              // Update reading and timestamp, preserve Firestore device status
               return {
                 ...d,
-                latestReading: reading || d.latestReading, // Preserve last reading if null
-                // isOnline: Keep existing status from Firestore, don't override
-                lastUpdateTime: reading ? now : d.lastUpdateTime, // Only update if valid reading
+                latestReading: reading || d.latestReading,
+                lastUpdateTime: reading ? now : d.lastUpdateTime,
               };
             }
             return d;
           });
           
-          // Update cache with latest data
           lastValidDevicesRef.current = updated;
           return updated;
         });
@@ -117,7 +109,6 @@ export const useRealtimeDevices = () => {
       },
       (err) => {
         console.error(`Error subscribing to device ${deviceId}:`, err);
-        // Don't clear device data on subscription errors
       }
     );
     
@@ -130,14 +121,12 @@ export const useRealtimeDevices = () => {
     unsubscribersRef.current.clear();
   }, []);
 
-  // Manual refresh function - doesn't clear existing data
+  // Manual refresh function
   const refresh = useCallback(async () => {
-    // Don't unsubscribe during refresh to maintain data flow
     try {
       await fetchDevices();
     } catch (err) {
       console.error('Refresh failed, maintaining current state:', err);
-      // Keep current subscriptions and data on error
     }
   }, [fetchDevices]);
 
@@ -153,10 +142,6 @@ export const useRealtimeDevices = () => {
         devicesList.forEach(device => {
           subscribeToDevice(device.deviceId);
         });
-        
-        // REMOVED: Stale reading checker interval
-        // We no longer override Firestore's device status based on reading timeouts
-        
       } catch (err) {
         console.error('Failed to initialize real-time devices:', err);
       }
@@ -167,16 +152,11 @@ export const useRealtimeDevices = () => {
     return () => {
       isActiveRef.current = false;
       unsubscribeAll();
-      
-      // REMOVED: pollTimeoutRef cleanup - no longer needed
     };
   }, [fetchDevices, subscribeToDevice, unsubscribeAll]);
 
-  // Statistics - ALWAYS use the most reliable data source
-  // Priority: current devices > cached devices > empty array
-  const statsSource = devices.length > 0 ? devices : 
-                      lastValidDevicesRef.current.length > 0 ? lastValidDevicesRef.current : 
-                      [];
+  // Calculate statistics from current or cached devices
+  const statsSource = devices.length > 0 ? devices : lastValidDevicesRef.current;
   
   const stats = {
     total: statsSource.length,
@@ -185,7 +165,7 @@ export const useRealtimeDevices = () => {
     withReadings: statsSource.filter(d => d.latestReading !== null).length,
   };
 
-  // DEFENSIVE: Return cached devices if current is empty (prevents UI zeros)
+  // Return cached devices as fallback
   const safeDevices = devices.length > 0 ? devices : lastValidDevicesRef.current;
 
   return {

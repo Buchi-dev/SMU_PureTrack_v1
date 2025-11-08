@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
 import type { MqttBridgeStatus } from '../hooks';
+import { HEALTH_COLORS } from '../config';
 
 interface MetricsGridProps {
   status: MqttBridgeStatus | null;
@@ -24,12 +25,12 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
   const metrics = status?.metrics;
 
   const failedColor = useMemo(() => 
-    metrics?.failed ? '#ff4d4f' : '#8c8c8c',
+    metrics?.failed ? HEALTH_COLORS.ERROR : HEALTH_COLORS.UNKNOWN,
     [metrics?.failed]
   );
 
   const dlqColor = useMemo(() => 
-    metrics?.messagesInDLQ ? '#ff4d4f' : '#52c41a',
+    metrics?.messagesInDLQ ? HEALTH_COLORS.ERROR : HEALTH_COLORS.EXCELLENT,
     [metrics?.messagesInDLQ]
   );
 
@@ -44,7 +45,7 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
   );
 
   const circuitBreakerColor = useMemo(() => 
-    metrics?.circuitBreakerOpen ? '#ff4d4f' : '#52c41a',
+    metrics?.circuitBreakerOpen ? HEALTH_COLORS.ERROR : HEALTH_COLORS.EXCELLENT,
     [metrics?.circuitBreakerOpen]
   );
 
@@ -59,8 +60,8 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
           <Statistic
             title="Messages Received"
             value={metrics?.received || 0}
-            prefix={<ArrowDownOutlined style={{ color: '#52c41a' }} />}
-            valueStyle={{ color: '#52c41a', fontWeight: 600 }}
+            prefix={<ArrowDownOutlined style={{ color: HEALTH_COLORS.EXCELLENT }} />}
+            valueStyle={{ color: HEALTH_COLORS.EXCELLENT, fontWeight: 600 }}
           />
         </Card>
       </Col>
@@ -74,8 +75,8 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
           <Statistic
             title="Messages Published"
             value={metrics?.published || 0}
-            prefix={<ArrowUpOutlined style={{ color: '#1890ff' }} />}
-            valueStyle={{ color: '#1890ff', fontWeight: 600 }}
+            prefix={<ArrowUpOutlined style={{ color: HEALTH_COLORS.INFO }} />}
+            valueStyle={{ color: HEALTH_COLORS.INFO, fontWeight: 600 }}
           />
         </Card>
       </Col>
@@ -107,8 +108,8 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
           <Statistic
             title="Buffer Flushes"
             value={metrics?.flushes || 0}
-            prefix={<SyncOutlined style={{ color: '#722ed1' }} />}
-            valueStyle={{ color: '#722ed1', fontWeight: 600 }}
+            prefix={<SyncOutlined style={{ color: HEALTH_COLORS.WARNING }} />}
+            valueStyle={{ color: HEALTH_COLORS.WARNING, fontWeight: 600 }}
           />
         </Card>
       </Col>
@@ -122,8 +123,8 @@ export const MetricsGrid = memo(({ status, loading }: MetricsGridProps) => {
           <Statistic
             title="Commands Processed"
             value={metrics?.commands || 0}
-            prefix={<ThunderboltOutlined style={{ color: '#fa8c16' }} />}
-            valueStyle={{ color: '#fa8c16', fontWeight: 600 }}
+            prefix={<ThunderboltOutlined style={{ color: HEALTH_COLORS.CRITICAL }} />}
+            valueStyle={{ color: HEALTH_COLORS.CRITICAL, fontWeight: 600 }}
           />
         </Card>
       </Col>

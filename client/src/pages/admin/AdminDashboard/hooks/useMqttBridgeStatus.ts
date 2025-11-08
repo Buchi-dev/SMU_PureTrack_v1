@@ -63,8 +63,8 @@ export interface MqttBridgeStatus {
 const MQTT_BRIDGE_BASE_URL = 'https://mqtt-bridge-8158575421.us-central1.run.app';
 const HEALTH_ENDPOINT = `${MQTT_BRIDGE_BASE_URL}/health`;
 const STATUS_ENDPOINT = `${MQTT_BRIDGE_BASE_URL}/status`;
-const POLL_INTERVAL = 2000; // Optimized: Reduced polling frequency to 2s for better performance
-const ERROR_RETRY_DELAY = 5000; // Wait longer before retrying after errors
+const POLL_INTERVAL = 2000; // Poll every 2 seconds for real-time updates
+const ERROR_RETRY_DELAY = 5000; // Wait 5 seconds before retrying after errors
 
 export const useMqttBridgeStatus = () => {
   const [health, setHealth] = useState<MqttBridgeHealth | null>(null);
@@ -73,17 +73,17 @@ export const useMqttBridgeStatus = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   
-  // Refs for optimization - avoid unnecessary re-renders
+  // Refs for cleanup and optimization
   const prevHealthRef = useRef<string | null>(null);
   const prevStatusRef = useRef<string | null>(null);
   const isActiveRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
   const errorCountRef = useRef(0);
-  const lastValidHealthRef = useRef<MqttBridgeHealth | null>(null); // Cache last valid health
-  const lastValidStatusRef = useRef<MqttBridgeStatus | null>(null); // Cache last valid status
+  const lastValidHealthRef = useRef<MqttBridgeHealth | null>(null);
+  const lastValidStatusRef = useRef<MqttBridgeStatus | null>(null);
 
-  // Memoized fetch function with abort controller for cleanup
+  // Fetch health endpoint with deduplication
   const fetchHealth = useCallback(async (signal?: AbortSignal): Promise<MqttBridgeHealth | null> => {
     try {
       const response = await fetch(HEALTH_ENDPOINT, { 
@@ -97,7 +97,7 @@ export const useMqttBridgeStatus = () => {
       
       const data: MqttBridgeHealth = await response.json();
       
-      // Optimized: Only stringify and compare if we have previous data
+      // Only update if data has changed
       if (prevHealthRef.current) {
         const dataStr = JSON.stringify(data);
         if (prevHealthRef.current === dataStr) {
@@ -117,6 +117,7 @@ export const useMqttBridgeStatus = () => {
     }
   }, []);
 
+  // Fetch status endpoint with deduplication
   const fetchStatus = useCallback(async (signal?: AbortSignal): Promise<MqttBridgeStatus | null> => {
     try {
       const response = await fetch(STATUS_ENDPOINT, { 
@@ -130,7 +131,7 @@ export const useMqttBridgeStatus = () => {
       
       const data: MqttBridgeStatus = await response.json();
       
-      // Optimized: Only stringify and compare if we have previous data
+      // Only update if data has changed
       if (prevStatusRef.current) {
         const dataStr = JSON.stringify(data);
         if (prevStatusRef.current === dataStr) {
@@ -150,7 +151,7 @@ export const useMqttBridgeStatus = () => {
     }
   }, []);
 
-  // Optimized fetch with batched state updates
+  // Fetch both endpoints in parallel
   const fetchAll = useCallback(async (showError = false) => {
     if (!isActiveRef.current) return;
     
@@ -163,48 +164,33 @@ export const useMqttBridgeStatus = () => {
     const signal = abortControllerRef.current.signal;
     
     try {
-      // Fetch both endpoints in parallel for speed
+      // Fetch both endpoints in parallel
       const [healthData, statusData] = await Promise.all([
         fetchHealth(signal),
         fetchStatus(signal),
       ]);
       
-      // Batch state updates to avoid multiple re-renders
-      let shouldUpdate = false;
-      const updates: (() => void)[] = [];
-      
+      // Update state only if data has changed
       if (healthData !== null) {
-        shouldUpdate = true;
-        lastValidHealthRef.current = healthData; // Cache valid data
-        updates.push(() => setHealth(healthData));
+        lastValidHealthRef.current = healthData;
+        setHealth(healthData);
+        setLastUpdate(new Date());
       } else if (lastValidHealthRef.current && !health) {
-        // If we have cached data but current is null, restore it
-        updates.push(() => setHealth(lastValidHealthRef.current));
-        shouldUpdate = true;
+        setHealth(lastValidHealthRef.current);
       }
       
       if (statusData !== null) {
-        shouldUpdate = true;
-        lastValidStatusRef.current = statusData; // Cache valid data
-        updates.push(() => setStatus(statusData));
-      } else if (lastValidStatusRef.current && !status) {
-        // If we have cached data but current is null, restore it
-        updates.push(() => setStatus(lastValidStatusRef.current));
-        shouldUpdate = true;
-      }
-      
-      if (shouldUpdate) {
-        // Execute all updates in a single batch
-        updates.forEach(update => update());
+        lastValidStatusRef.current = statusData;
+        setStatus(statusData);
         setLastUpdate(new Date());
+      } else if (lastValidStatusRef.current && !status) {
+        setStatus(lastValidStatusRef.current);
       }
       
-      // Clear error on success
       if (error) {
         setError(null);
       }
       
-      // Reset error count on success
       errorCountRef.current = 0;
       
       if (loading) {
@@ -215,7 +201,7 @@ export const useMqttBridgeStatus = () => {
         errorCountRef.current++;
         const errorMsg = err instanceof Error ? err.message : 'Connection failed';
         
-        // On error, restore cached data if available
+        // Restore cached data on error
         if (lastValidHealthRef.current && !health) {
           setHealth(lastValidHealthRef.current);
         }
@@ -236,13 +222,13 @@ export const useMqttBridgeStatus = () => {
     }
   }, [fetchHealth, fetchStatus, loading, error, health, status]);
 
-  // Optimized refresh - doesn't set loading state unnecessarily
+  // Manual refresh function
   const refresh = useCallback(() => {
     setLoading(true);
     return fetchAll(true);
   }, [fetchAll]);
 
-  // Optimized polling effect with dynamic retry delay
+  // Polling effect with dynamic retry delay
   useEffect(() => {
     isActiveRef.current = true;
     let mounted = true;
@@ -251,24 +237,21 @@ export const useMqttBridgeStatus = () => {
       while (isActiveRef.current && mounted) {
         await fetchAll(false);
         
-        // Use longer delay if we're experiencing errors
+        // Use longer delay after errors
         const delay = errorCountRef.current > 0 ? ERROR_RETRY_DELAY : POLL_INTERVAL;
         
-        // Use timeout ref for proper cleanup
         await new Promise(resolve => {
           timeoutIdRef.current = setTimeout(resolve, delay);
         });
       }
     };
     
-    // Start polling
     poll();
 
     return () => {
       mounted = false;
       isActiveRef.current = false;
       
-      // Cleanup: abort pending requests and clear timeouts
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
@@ -278,8 +261,7 @@ export const useMqttBridgeStatus = () => {
     };
   }, [fetchAll]);
 
-  // Memoize return value to prevent unnecessary re-renders in consuming components
-  // Use cached data as fallback if current state is null
+  // Return cached data as fallback
   return useMemo(() => ({
     health: health || lastValidHealthRef.current,
     status: status || lastValidStatusRef.current,

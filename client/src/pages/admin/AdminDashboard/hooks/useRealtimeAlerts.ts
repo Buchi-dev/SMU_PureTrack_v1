@@ -21,7 +21,7 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
   
   const isActiveRef = useRef(true);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const lastValidAlertsRef = useRef<WaterQualityAlert[]>([]); // Cache last valid state
+  const lastValidAlertsRef = useRef<WaterQualityAlert[]>([]);
   const lastValidStatsRef = useRef<AlertStats>({
     total: 0,
     active: 0,
@@ -69,8 +69,7 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
       (alertsData) => {
         if (!isActiveRef.current) return;
         
-        // DEFENSIVE: Validate incoming data before accepting it
-        // Reject null/undefined, but accept empty arrays as valid state
+        // Validate incoming data (accept empty arrays as valid)
         if (alertsData !== null && alertsData !== undefined) {
           const newStats = calculateStats(alertsData);
           
@@ -84,7 +83,6 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
           setAlerts(alertsData);
           setStats(newStats);
           
-          // Cache valid data (including empty arrays)
           lastValidAlertsRef.current = alertsData;
           lastValidStatsRef.current = newStats;
           
@@ -92,7 +90,7 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
           setLoading(false);
           setLastUpdate(new Date());
         } else {
-          // Null/undefined data - likely a Firestore listener stall
+          // Null/undefined data - use cached state
           dataFlowLogger.logCacheHit(
             DataSource.FIRESTORE,
             FlowLayer.HOOK,
@@ -101,7 +99,6 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
           );
           console.warn('Received null/undefined alerts data, maintaining cached state');
           
-          // Keep current state or restore from cache
           if (lastValidAlertsRef.current.length > 0) {
             setAlerts(lastValidAlertsRef.current);
             setStats(lastValidStatsRef.current);
@@ -116,7 +113,7 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
         setError(err);
         setLoading(false);
         
-        // On error, keep displaying cached data
+        // Keep cached data on error
         if (lastValidAlertsRef.current.length > 0) {
           console.warn('Using cached alerts data due to subscription error');
           setAlerts(lastValidAlertsRef.current);
@@ -134,10 +131,8 @@ export const useRealtimeAlerts = (maxAlerts: number = 50) => {
     };
   }, [maxAlerts, calculateStats]);
 
-  // DEFENSIVE: Always use the most reliable data source
-  // Priority: current alerts > cached alerts (including valid empty state)
-  // Note: Empty array is a valid state (no alerts), don't treat as null
-  const safeAlerts = alerts || (lastValidAlertsRef.current || []);
+  // Return cached data as fallback
+  const safeAlerts = alerts.length > 0 ? alerts : lastValidAlertsRef.current;
   const safeStats = stats.total > 0 || alerts.length === 0 ? stats : lastValidStatsRef.current;
   
   const activeAlerts = safeAlerts.filter(a => a.status === 'Active');
