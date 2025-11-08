@@ -1,5 +1,6 @@
 import { Card, Progress, Space, Typography, Tooltip } from 'antd';
 import { memo } from 'react';
+import { OVERALL_HEALTH_THRESHOLDS, HEALTH_COLORS } from '../config';
 
 const { Text } = Typography;
 
@@ -10,6 +11,7 @@ interface MetricIndicatorProps {
   tooltip?: string;
   loading?: boolean;
   inverse?: boolean; // For metrics where higher is worse (like RAM usage)
+  subtitle?: string; // Additional info to display below the percentage
 }
 
 export const MetricIndicator = memo<MetricIndicatorProps>(({ 
@@ -18,16 +20,17 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
   icon, 
   tooltip,
   loading = false,
-  inverse = false
+  inverse = false,
+  subtitle
 }) => {
   const getHealthColor = (value: number) => {
     // For inverse metrics (like RAM usage), invert the color logic
     const effectiveValue = inverse ? (100 - value) : value;
     
-    if (effectiveValue >= 80) return '#52c41a'; // Green
-    if (effectiveValue >= 60) return '#faad14'; // Orange
-    if (effectiveValue >= 40) return '#fa8c16'; // Dark Orange
-    return '#ff4d4f'; // Red
+    if (effectiveValue >= OVERALL_HEALTH_THRESHOLDS.EXCELLENT_MIN) return HEALTH_COLORS.EXCELLENT;
+    if (effectiveValue >= OVERALL_HEALTH_THRESHOLDS.GOOD_MIN) return HEALTH_COLORS.GOOD;
+    if (effectiveValue >= OVERALL_HEALTH_THRESHOLDS.FAIR_MIN) return HEALTH_COLORS.CRITICAL;
+    return HEALTH_COLORS.ERROR;
   };
 
   const content = (
@@ -37,7 +40,7 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
       style={{ 
         backgroundColor: '#fafafa',
         borderLeft: `4px solid ${getHealthColor(percent)}`,
-        height: '90px', // Fixed height for consistency
+        minHeight: '90px', // Changed to minHeight for flexibility
         display: 'flex',
         alignItems: 'center'
       }}
@@ -74,10 +77,21 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
             </Text>
             <Text strong style={{ 
               fontSize: '20px',
-              lineHeight: '1.2'
+              lineHeight: '1.2',
+              display: 'block'
             }}>
               {percent}%
             </Text>
+            {subtitle && (
+              <Text type="secondary" style={{ 
+                fontSize: '11px',
+                display: 'block',
+                marginTop: '2px',
+                lineHeight: '1.2'
+              }}>
+                {subtitle}
+              </Text>
+            )}
           </div>
         </Space>
         <Progress 
@@ -93,7 +107,7 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
   );
 
   return tooltip ? (
-    <Tooltip title={tooltip}>
+    <Tooltip title={<div style={{ whiteSpace: 'pre-line' }}>{tooltip}</div>}>
       {content}
     </Tooltip>
   ) : content;

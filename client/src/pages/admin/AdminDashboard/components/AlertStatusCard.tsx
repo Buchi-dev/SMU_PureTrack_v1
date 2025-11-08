@@ -1,4 +1,4 @@
-import { Card, Space, Typography, Row, Col, Tag, Tooltip, Badge } from 'antd';
+import { Card, Space, Typography, Row, Col, Tag, Tooltip, Progress } from 'antd';
 import { 
   BellOutlined,
   ExclamationCircleOutlined,
@@ -62,53 +62,74 @@ export const AlertStatusCard = memo<AlertStatusCardProps>(({ alertStats, loading
       loading={loading}
       title={
         <Space>
-          <BellOutlined />
-          <span>Alert Status</span>
+          <BellOutlined style={{ fontSize: '18px' }} />
+          <span style={{ fontSize: '16px', fontWeight: 500 }}>Alert Status</span>
         </Space>
       }
       bordered={false}
       style={{ 
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        height: '100%',
+        minHeight: '400px'
+      }}
+      bodyStyle={{ 
+        padding: '24px',
         height: '100%'
       }}
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Main Status Display */}
-        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ 
-            fontSize: '48px', 
+            fontSize: '56px', 
             color: statusColor,
-            marginBottom: '8px',
-            lineHeight: 1
+            marginBottom: '12px',
+            lineHeight: 1,
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
             {statusIcon}
           </div>
-          <Title level={4} style={{ margin: '8px 0 4px 0', color: statusColor }}>
+          <Title level={3} style={{ margin: '12px 0 8px 0', color: statusColor, fontSize: '24px' }}>
             {statusText}
           </Title>
-          <Text type="secondary">
+          <Text type="secondary" style={{ fontSize: '14px' }}>
             {safeAlertStats.active} of {safeAlertStats.total} alerts active
           </Text>
         </div>
 
-        {/* Alert Breakdown */}
-        <Row gutter={[12, 12]}>
+        {/* Alert Breakdown - 2x2 Grid */}
+        <Row gutter={[16, 16]}>
           <Col span={12}>
             <Tooltip title="Critical alerts requiring immediate attention">
               <Card 
                 size="small" 
                 style={{ 
                   textAlign: 'center',
-                  borderColor: safeAlertStats.critical > 0 ? '#ff4d4f' : '#d9d9d9',
-                  backgroundColor: safeAlertStats.critical > 0 ? '#fff1f0' : '#fafafa'
+                  borderColor: safeAlertStats.critical > 0 ? '#ff4d4f' : '#e8e8e8',
+                  backgroundColor: safeAlertStats.critical > 0 ? '#fff1f0' : '#fafafa',
+                  borderRadius: '8px',
+                  minHeight: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                bodyStyle={{ 
+                  padding: '16px 12px',
+                  width: '100%'
                 }}
               >
-                <Badge count={safeAlertStats.critical} showZero style={{ backgroundColor: '#cf1322' }}>
-                  <ExclamationCircleOutlined style={{ fontSize: '24px', color: '#ff4d4f' }} />
-                </Badge>
-                <div style={{ marginTop: '8px' }}>
-                  <Text strong style={{ color: '#ff4d4f' }}>Critical</Text>
+                <div style={{ marginBottom: '8px' }}>
+                  <ExclamationCircleOutlined style={{ fontSize: '32px', color: '#ff4d4f' }} />
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Critical</Text>
+                  <Text strong style={{ fontSize: '20px', color: '#ff4d4f' }}>
+                    {safeAlertStats.critical}
+                  </Text>
                 </div>
               </Card>
             </Tooltip>
@@ -119,15 +140,27 @@ export const AlertStatusCard = memo<AlertStatusCardProps>(({ alertStats, loading
                 size="small" 
                 style={{ 
                   textAlign: 'center',
-                  borderColor: safeAlertStats.warning > 0 ? '#faad14' : '#d9d9d9',
-                  backgroundColor: safeAlertStats.warning > 0 ? '#fffbe6' : '#fafafa'
+                  borderColor: safeAlertStats.warning > 0 ? '#faad14' : '#e8e8e8',
+                  backgroundColor: safeAlertStats.warning > 0 ? '#fffbe6' : '#fafafa',
+                  borderRadius: '8px',
+                  minHeight: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                bodyStyle={{ 
+                  padding: '16px 12px',
+                  width: '100%'
                 }}
               >
-                <Badge count={safeAlertStats.warning} showZero style={{ backgroundColor: '#fa8c16' }}>
-                  <WarningOutlined style={{ fontSize: '24px', color: '#faad14' }} />
-                </Badge>
-                <div style={{ marginTop: '8px' }}>
-                  <Text strong style={{ color: '#faad14' }}>Warning</Text>
+                <div style={{ marginBottom: '8px' }}>
+                  <WarningOutlined style={{ fontSize: '32px', color: '#faad14' }} />
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Warning</Text>
+                  <Text strong style={{ fontSize: '20px', color: '#faad14' }}>
+                    {safeAlertStats.warning}
+                  </Text>
                 </div>
               </Card>
             </Tooltip>
@@ -138,15 +171,27 @@ export const AlertStatusCard = memo<AlertStatusCardProps>(({ alertStats, loading
                 size="small" 
                 style={{ 
                   textAlign: 'center',
-                  borderColor: safeAlertStats.advisory > 0 ? '#1890ff' : '#d9d9d9',
-                  backgroundColor: safeAlertStats.advisory > 0 ? '#e6f7ff' : '#fafafa'
+                  borderColor: safeAlertStats.advisory > 0 ? '#1890ff' : '#e8e8e8',
+                  backgroundColor: safeAlertStats.advisory > 0 ? '#e6f7ff' : '#fafafa',
+                  borderRadius: '8px',
+                  minHeight: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                bodyStyle={{ 
+                  padding: '16px 12px',
+                  width: '100%'
                 }}
               >
-                <Badge count={safeAlertStats.advisory} showZero style={{ backgroundColor: '#1890ff' }}>
-                  <InfoCircleOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
-                </Badge>
-                <div style={{ marginTop: '8px' }}>
-                  <Text strong style={{ color: '#1890ff' }}>Advisory</Text>
+                <div style={{ marginBottom: '8px' }}>
+                  <InfoCircleOutlined style={{ fontSize: '32px', color: '#1890ff' }} />
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Advisory</Text>
+                  <Text strong style={{ fontSize: '20px', color: '#1890ff' }}>
+                    {safeAlertStats.advisory}
+                  </Text>
                 </div>
               </Card>
             </Tooltip>
@@ -157,28 +202,74 @@ export const AlertStatusCard = memo<AlertStatusCardProps>(({ alertStats, loading
                 size="small" 
                 style={{ 
                   textAlign: 'center',
-                  borderColor: '#d9d9d9',
-                  backgroundColor: '#fafafa'
+                  borderColor: '#52c41a',
+                  backgroundColor: '#f6ffed',
+                  borderRadius: '8px',
+                  minHeight: '100px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                bodyStyle={{ 
+                  padding: '16px 12px',
+                  width: '100%'
                 }}
               >
-                <Badge count={resolved} showZero style={{ backgroundColor: '#52c41a' }}>
-                  <CheckCircleOutlined style={{ fontSize: '24px', color: '#52c41a' }} />
-                </Badge>
-                <div style={{ marginTop: '8px' }}>
-                  <Text strong style={{ color: '#52c41a' }}>Resolved</Text>
+                <div style={{ marginBottom: '8px' }}>
+                  <CheckCircleOutlined style={{ fontSize: '32px', color: '#52c41a' }} />
+                </div>
+                <div>
+                  <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Resolved</Text>
+                  <Text strong style={{ fontSize: '20px', color: '#52c41a' }}>
+                    {resolved}
+                  </Text>
                 </div>
               </Card>
             </Tooltip>
           </Col>
         </Row>
 
+        {/* Alert Activity Progress */}
+        <div style={{ 
+          padding: '16px', 
+          backgroundColor: safeAlertStats.critical > 0 ? '#fff1f0' : safeAlertStats.warning > 0 ? '#fffbe6' : '#f6ffed',
+          borderRadius: '8px',
+          border: `1px solid ${safeAlertStats.critical > 0 ? '#ffccc7' : safeAlertStats.warning > 0 ? '#ffe58f' : '#b7eb8f'}`
+        }}>
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary" style={{ fontSize: '13px', fontWeight: 500 }}>Active Alerts</Text>
+              <Text strong style={{ 
+                fontSize: '18px',
+                color: statusColor
+              }}>
+                {safeAlertStats.active}
+              </Text>
+            </div>
+            <Progress 
+              percent={safeAlertStats.total > 0 ? Math.round((safeAlertStats.active / safeAlertStats.total) * 100) : 0}
+              strokeColor={statusColor}
+              showInfo={false}
+              strokeWidth={10}
+            />
+          </Space>
+        </div>
+
         {/* Summary Tags */}
         <div style={{ textAlign: 'center' }}>
-          <Space wrap>
-            <Tag icon={<ClockCircleOutlined />} color={safeAlertStats.active > 0 ? 'orange' : 'green'}>
+          <Space wrap size="small">
+            <Tag 
+              icon={<ClockCircleOutlined />} 
+              color={safeAlertStats.active > 0 ? 'orange' : 'green'}
+              style={{ padding: '4px 12px', fontSize: '13px' }}
+            >
               {safeAlertStats.active} Active
             </Tag>
-            <Tag icon={<CheckCircleOutlined />} color="success">
+            <Tag 
+              icon={<CheckCircleOutlined />} 
+              color="success"
+              style={{ padding: '4px 12px', fontSize: '13px' }}
+            >
               {resolved} Resolved
             </Tag>
           </Space>

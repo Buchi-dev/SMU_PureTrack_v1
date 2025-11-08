@@ -7,6 +7,13 @@ import {
   HddOutlined
 } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
+import {
+  calculateAlertHealthScore,
+  calculateRAMHealthScore,
+  calculateOverallSystemHealth,
+  getOverallHealth,
+  HEALTH_COLORS,
+} from '../config';
 
 const { Text, Title } = Typography;
 
@@ -40,17 +47,20 @@ export const SystemHealthCard = memo<SystemHealthCardProps>(({
   ramUsage,
   loading 
 }) => {
-  // Calculate component health scores
+  // Calculate component health scores using centralized functions
   const deviceHealth = useMemo(() => {
     if (!deviceStats || deviceStats.total === 0) return 100;
     return Math.round((deviceStats.online / deviceStats.total) * 100);
   }, [deviceStats]);
 
-  const alertHealth = useMemo(() => {
-    if (!alertStats || alertStats.total === 0) return 100;
-    if (alertStats.critical > 0) return 0;
-    return Math.max(0, 100 - Math.round((alertStats.active / alertStats.total) * 100));
-  }, [alertStats]);
+  const alertHealth = useMemo(() => 
+    calculateAlertHealthScore(
+      alertStats?.total ?? 0,
+      alertStats?.active ?? 0,
+      alertStats?.critical ?? 0
+    ),
+    [alertStats]
+  );
 
   const mqttHealth_score = useMemo(() => {
     if (!mqttHealth) return 0;
@@ -61,37 +71,31 @@ export const SystemHealthCard = memo<SystemHealthCardProps>(({
 
   const ramHealth = useMemo(() => {
     if (!ramUsage) return 100;
-    const usedPercent = ramUsage.percent;
-    if (usedPercent <= 60) return 100;
-    if (usedPercent <= 75) return 80;
-    if (usedPercent <= 85) return 60;
-    return Math.max(0, 100 - usedPercent);
+    return calculateRAMHealthScore(ramUsage.used, ramUsage.total);
   }, [ramUsage]);
 
-  // Overall health calculation with weighted components
-  const overallHealth = useMemo(() => {
-    // Weight: Devices 30%, Alerts 30%, MQTT 25%, RAM 15%
-    const weighted = (
-      (deviceHealth * 0.30) +
-      (alertHealth * 0.30) +
-      (mqttHealth_score * 0.25) +
-      (ramHealth * 0.15)
-    );
-    return Math.round(weighted);
-  }, [deviceHealth, alertHealth, mqttHealth_score, ramHealth]);
+  // Overall health calculation using centralized function
+  const overallHealthScore = useMemo(() => 
+    calculateOverallSystemHealth(
+      deviceHealth,
+      alertHealth,
+      mqttHealth_score,
+      ramHealth
+    ),
+    [deviceHealth, alertHealth, mqttHealth_score, ramHealth]
+  );
+
+  // Get health data using centralized function
+  const overallHealthData = useMemo(() => 
+    getOverallHealth(overallHealthScore),
+    [overallHealthScore]
+  );
 
   const getHealthColor = (percent: number) => {
-    if (percent >= 80) return '#52c41a'; // Green
-    if (percent >= 60) return '#faad14'; // Orange
-    if (percent >= 40) return '#fa8c16'; // Dark Orange
-    return '#ff4d4f'; // Red
-  };
-
-  const getHealthStatus = (percent: number) => {
-    if (percent >= 80) return 'Excellent';
-    if (percent >= 60) return 'Good';
-    if (percent >= 40) return 'Fair';
-    return 'Poor';
+    if (percent >= 80) return HEALTH_COLORS.EXCELLENT;
+    if (percent >= 60) return HEALTH_COLORS.GOOD;
+    if (percent >= 40) return HEALTH_COLORS.CRITICAL;
+    return HEALTH_COLORS.ERROR;
   };
 
   const formatBytes = (bytes: number): string => {
@@ -121,16 +125,16 @@ export const SystemHealthCard = memo<SystemHealthCardProps>(({
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <Progress
             type="dashboard"
-            percent={overallHealth}
-            strokeColor={getHealthColor(overallHealth)}
+            percent={overallHealthScore}
+            strokeColor={overallHealthData.color}
             strokeWidth={12}
             format={(percent) => (
               <Space direction="vertical" size={0}>
-                <Text strong style={{ fontSize: '48px', color: getHealthColor(percent || 0) }}>
+                <Text strong style={{ fontSize: '48px', color: overallHealthData.color }}>
                   {percent}%
                 </Text>
                 <Text type="secondary" style={{ fontSize: '16px' }}>
-                  {getHealthStatus(percent || 0)}
+                  {overallHealthData.statusText}
                 </Text>
               </Space>
             )}

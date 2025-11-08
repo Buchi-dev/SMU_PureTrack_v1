@@ -1,7 +1,8 @@
 import { Card, Progress, Typography, Space, Row, Col } from 'antd';
 import { DatabaseOutlined } from '@ant-design/icons';
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo } from 'react';
 import type { MqttBridgeHealth, MqttBridgeStatus } from '../hooks';
+import { getMemoryHealth, getProgressStatus } from '../config';
 
 const { Text } = Typography;
 
@@ -41,32 +42,25 @@ export const MemoryMonitor = memo(({ health, status, loading }: MemoryMonitorPro
 
   const ramLimitMB = 256;
 
-  const getMemoryStatus = useCallback((percent: number): 'success' | 'normal' | 'exception' => {
-    if (percent < 60) return 'success';
-    if (percent < 85) return 'normal';
-    return 'exception';
-  }, []);
+  // Use centralized health calculators
+  const memoryHealthData = useMemo(() => 
+    getMemoryHealth(memoryPercent),
+    [memoryPercent]
+  );
 
-  const memoryColor = useMemo(() => {
-    if (memoryPercent > 85) return '#ff4d4f';
-    if (memoryPercent > 60) return '#fa8c16';
-    return '#52c41a';
-  }, [memoryPercent]);
-
-  const rssColor = useMemo(() => {
-    if (rssPercent > 85) return '#ff4d4f';
-    if (rssPercent > 60) return '#fa8c16';
-    return '#52c41a';
-  }, [rssPercent]);
+  const rssHealthData = useMemo(() => 
+    getMemoryHealth(rssPercent),
+    [rssPercent]
+  );
 
   const memoryStatus = useMemo(() => 
-    getMemoryStatus(memoryPercent),
-    [memoryPercent, getMemoryStatus]
+    getProgressStatus(memoryHealthData.status),
+    [memoryHealthData.status]
   );
 
   const rssStatus = useMemo(() => 
-    getMemoryStatus(rssPercent),
-    [rssPercent, getMemoryStatus]
+    getProgressStatus(rssHealthData.status),
+    [rssHealthData.status]
   );
 
   return (
@@ -91,7 +85,7 @@ export const MemoryMonitor = memo(({ health, status, loading }: MemoryMonitorPro
           <div>
             <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text strong style={{ fontSize: '14px' }}>Overall Memory (Heap)</Text>
-              <Text strong style={{ color: memoryColor, fontSize: '16px' }}>
+              <Text strong style={{ color: memoryHealthData.color, fontSize: '16px' }}>
                 {memoryPercent}%
               </Text>
             </div>
@@ -117,7 +111,7 @@ export const MemoryMonitor = memo(({ health, status, loading }: MemoryMonitorPro
           <div>
             <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text strong style={{ fontSize: '14px' }}>Memory Usage (RSS)</Text>
-              <Text strong style={{ color: rssColor, fontSize: '16px' }}>
+              <Text strong style={{ color: rssHealthData.color, fontSize: '16px' }}>
                 {rssPercent}%
               </Text>
             </div>

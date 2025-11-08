@@ -2,6 +2,7 @@ import { Card, Progress, Typography, Space, Empty } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { memo, useMemo, useCallback } from 'react';
 import type { MqttBridgeHealth } from '../hooks';
+import { getBufferHealth } from '../config';
 
 const { Text } = Typography;
 
@@ -12,12 +13,6 @@ interface BufferMonitorProps {
 
 export const BufferMonitor = memo(({ health, loading }: BufferMonitorProps) => {
   const buffers = health?.checks?.buffers;
-
-  const getBufferColor = useCallback((utilization: number): string => {
-    if (utilization < 50) return '#52c41a';
-    if (utilization < 80) return '#fa8c16';
-    return '#ff4d4f';
-  }, []);
 
   const formatBufferName = useCallback((name: string): string => {
     return name
@@ -48,38 +43,42 @@ export const BufferMonitor = memo(({ health, loading }: BufferMonitorProps) => {
     >
       {bufferEntries.length > 0 ? (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {bufferEntries.map(([bufferName, bufferData]) => (
-            <div key={bufferName}>
-              <div style={{ 
-                marginBottom: '8px', 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center' 
-              }}>
-                <Text strong>{formatBufferName(bufferName)}</Text>
-                <Space size="large">
-                  <Text type="secondary" style={{ fontSize: '12px' }}>
-                    Messages: <Text strong>{bufferData.messages}</Text>
-                  </Text>
-                  <Text 
-                    strong 
-                    style={{ 
-                      color: getBufferColor(bufferData.utilization),
-                      fontSize: '14px'
-                    }}
-                  >
-                    {bufferData.utilization}%
-                  </Text>
-                </Space>
+          {bufferEntries.map(([bufferName, bufferData]) => {
+            const bufferHealth = getBufferHealth(bufferData.utilization);
+            
+            return (
+              <div key={bufferName}>
+                <div style={{ 
+                  marginBottom: '8px', 
+                  display: 'flex', 
+                  justifyContent: 'space-between',
+                  alignItems: 'center' 
+                }}>
+                  <Text strong>{formatBufferName(bufferName)}</Text>
+                  <Space size="large">
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      Messages: <Text strong>{bufferData.messages}</Text>
+                    </Text>
+                    <Text 
+                      strong 
+                      style={{ 
+                        color: bufferHealth.color,
+                        fontSize: '14px'
+                      }}
+                    >
+                      {bufferData.utilization}%
+                    </Text>
+                  </Space>
+                </div>
+                <Progress 
+                  percent={bufferData.utilization} 
+                  strokeColor={bufferHealth.color}
+                  strokeWidth={10}
+                  showInfo={false}
+                />
               </div>
-              <Progress 
-                percent={bufferData.utilization} 
-                strokeColor={getBufferColor(bufferData.utilization)}
-                strokeWidth={10}
-                showInfo={false}
-              />
-            </div>
-          ))}
+            );
+          })}
         </Space>
       ) : (
         <Empty 
