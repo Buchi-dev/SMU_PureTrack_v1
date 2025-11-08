@@ -6,7 +6,6 @@ export { BufferMonitor } from './BufferMonitor';
 export { SystemInfo } from './SystemInfo';
 export { RefreshControl } from './RefreshControl';
 export { DashboardSummary } from './DashboardSummary';
-export { MetricIndicator } from './MetricIndicator';
 export { LiveMetricIndicator } from './LiveMetricIndicator';
-export { QuickAlertWidget } from './QuickAlertWidget';
+export { RecentAlertsList } from './RecentAlertsList';
 export * from './types';

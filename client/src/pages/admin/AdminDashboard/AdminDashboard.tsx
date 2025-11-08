@@ -27,33 +27,6 @@ export const AdminDashboard = memo(() => {
   const realtimeDevices = useRealtimeDevices();
   const realtimeAlerts = useRealtimeAlerts(50);
 
-  // Memoize static styles
-  const containerStyle = useMemo(() => ({ 
-    width: '100%', 
-    padding: '24px' 
-  }), []);
-
-  const headerStyle = useMemo(() => ({ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    flexWrap: 'wrap' as const,
-    gap: '16px',
-    marginBottom: '16px'
-  }), []);
-
-  const dividerStyle = useMemo(() => ({ 
-    margin: '8px 0' 
-  }), []);
-
-  const titleStyle = useMemo(() => ({ 
-    margin: 0 
-  }), []);
-
-  const sectionTitleStyle = useMemo(() => ({ 
-    marginBottom: '16px' 
-  }), []);
-
   // Refresh all data
   const handleRefreshAll = () => {
     mqttBridge.refresh();
@@ -120,6 +93,7 @@ export const AdminDashboard = memo(() => {
           <DashboardSummary
             deviceStats={realtimeDevices.stats}
             alertStats={realtimeAlerts.stats}
+            alerts={realtimeAlerts.alerts}
             mqttHealth={mqttBridge.health ? {
               status: mqttBridge.health.status,
               connected: mqttBridge.health.checks.mqtt.connected,
@@ -157,7 +131,7 @@ export const AdminDashboard = memo(() => {
 
           {/* Metrics Grid */}
           <div>
-            <Title level={4} style={sectionTitleStyle}>
+            <Title level={4} style={{ marginBottom: '16px' }}>
               Real-time Metrics
             </Title>
             <MetricsGrid status={mqttBridge.status} loading={mqttBridge.loading} />
@@ -165,7 +139,7 @@ export const AdminDashboard = memo(() => {
 
           {/* Detailed Monitoring Section */}
           <div>
-            <Title level={4} style={sectionTitleStyle}>
+            <Title level={4} style={{ marginBottom: '16px' }}>
               System Monitoring
             </Title>
             <Row gutter={[16, 16]}>
@@ -198,10 +172,17 @@ export const AdminDashboard = memo(() => {
 
   return (
     <AdminLayout>
-      <Space direction="vertical" size="large" style={containerStyle}>
+      <Space direction="vertical" size="large" style={{ width: '100%', padding: '24px' }}>
         {/* Header Section */}
-        <div style={headerStyle}>
-          <Title level={2} style={titleStyle}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          marginBottom: '16px'
+        }}>
+          <Title level={2} style={{ margin: 0 }}>
             Admin Dashboard
           </Title>
           <RefreshControl 
@@ -211,7 +192,7 @@ export const AdminDashboard = memo(() => {
           />
         </div>
 
-        <Divider style={dividerStyle} />
+        <Divider style={{ margin: '8px 0' }} />
 
         {/* Tabbed Interface */}
         <Tabs

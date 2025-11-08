@@ -18,13 +18,8 @@ export const MemoryMonitor = memo(({ health, status, loading }: MemoryMonitorPro
   // Use RSS percent from health endpoint (already calculated against 256MB limit)
   const rssPercent = memory?.rssPercent || memory?.percent || 0;
 
-  // Calculate RSS memory percentage (RSS / RAM limit of 256MB)
+  // Get RSS bytes for formatting
   const rssBytes = status?.memory?.rss || 0;
-  const RAM_LIMIT_BYTES = 256 * 1024 * 1024; // 256MB in bytes
-  const rssPercentCalculated = useMemo(() => {
-    if (rssBytes === 0) return 0;
-    return Math.min(Math.round((rssBytes / RAM_LIMIT_BYTES) * 100), 100);
-  }, [rssBytes]);
 
   // Format RSS in MB
   const rssMB = useMemo(() => {
