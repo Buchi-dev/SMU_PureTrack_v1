@@ -20,7 +20,7 @@ interface AlertStatisticsProps {
  * Alert Statistics Cards Component
  * Displays key metrics about alerts with actionable insights
  */
-export const AlertStatistics: React.FC<AlertStatisticsProps> = ({ stats }) => {
+const AlertStatistics: React.FC<AlertStatisticsProps> = ({ stats }) => {
   const token = useThemeToken();
 
   const resolutionRate = stats.total > 0 ? (stats.resolved / stats.total) * 100 : 0;
@@ -151,3 +151,5 @@ export const AlertStatistics: React.FC<AlertStatisticsProps> = ({ stats }) => {
     </Row>
   );
 };
+
+export default AlertStatistics;

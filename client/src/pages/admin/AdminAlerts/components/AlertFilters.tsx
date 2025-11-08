@@ -24,7 +24,7 @@ interface AlertFiltersProps {
  * Alert Filters Component
  * Provides advanced filter controls with quick presets
  */
-export const AlertFilters: React.FC<AlertFiltersProps> = ({
+const AlertFilters: React.FC<AlertFiltersProps> = ({
   filters,
   onFiltersChange,
   onClearFilters,
@@ -276,3 +276,5 @@ export const AlertFilters: React.FC<AlertFiltersProps> = ({
     </Card>
   );
 };
+
+export default AlertFilters;

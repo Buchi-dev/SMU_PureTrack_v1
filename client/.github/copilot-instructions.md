@@ -17,7 +17,40 @@ Global Hooks Layer (hooks/reads/* OR hooks/writes/*)
 UI Layer (components/*, pages/*)
 ```
 
-### 2. Separation of Concerns
+### 2. Component Structure (STRICT)
+
+**One File = One Component Rule:**
+- ✅ **MUST**: Each React component in its own file
+- ✅ **MUST**: File name matches component name (PascalCase)
+- ✅ **MUST**: Only ONE default export per component file
+- ❌ **NEVER**: Multiple components in a single file
+- ❌ **NEVER**: Helper components defined in the same file
+
+**File Naming Convention:**
+```
+ComponentName.tsx  → export default ComponentName
+```
+
+**Example Structure:**
+```
+pages/admin/AdminDashboard/
+  ├── AdminDashboard.tsx           (Main page component)
+  ├── components/
+  │   ├── DashboardHeader.tsx      (One component)
+  │   ├── MetricsCard.tsx          (One component)
+  │   ├── AlertsList.tsx           (One component)
+  │   └── DeviceStatusChart.tsx    (One component)
+
+```
+
+**Why This Matters:**
+- Better code organization and maintainability
+- Easier to locate and update components
+- Clearer component dependencies
+- Improved reusability across the app
+- Simplified testing and debugging
+
+### 3. Separation of Concerns
 
 **Service Layer (`services/*.Service.ts`):**
 - Contains ALL SDK/API operations (Firestore, RTDB, Axios)
@@ -54,24 +87,30 @@ UI Layer (components/*, pages/*)
 ## Strict Rules
 
 ### ✅ DO:
-1. **All CRUD operations via Service Layer**
+1. **One Component Per File (STRICT)**
+   - Each React component in its own `.tsx` file
+   - File name must match component name (PascalCase)
+   - Only ONE default export per component file
+   - Organize related components in `components/` subdirectory
+
+2. **All CRUD operations via Service Layer**
    - Create, Update, Delete, Acknowledge, Edit permissions, Generate reports
    - Use function calls through service layer
 
-2. **Realtime data via Direct Firestore/RTDB listeners**
+3. **Realtime data via Direct Firestore/RTDB listeners**
    - Device readings, alerts, live metrics
    - Implement in `hooks/reads/useRealtime_*.ts`
 
-3. **MQTT operations via Axios ONLY**
+4. **MQTT operations via Axios ONLY**
    - Bridge status, health metrics, MQTT-specific endpoints
    - Centralize in `services/mqtt.service.ts`
 
-4. **ALL UI components MUST use GLOBAL hooks**
+5. **ALL UI components MUST use GLOBAL hooks**
    - Import from `@/hooks` or `../../hooks/index.ts`
    - Reuse existing hooks: `useRealtime_Alerts`, `useRealtime_Devices`, `useCall_Alerts`, etc.
    - Check `hooks/index.ts` for available hooks before creating new ones
 
-5. **Service Export Names (CRITICAL)**
+6. **Service Export Names (CRITICAL)**
    - `alertsService` ✅ (from `alerts.Service.ts`)
    - `devicesService` ✅ (from `devices.Service.ts`)
    - `usersService` ✅ (from `user.Service.ts`)
@@ -79,25 +118,88 @@ UI Layer (components/*, pages/*)
    - `mqttService` ✅ (from `mqtt.service.ts`)
 
 ### ❌ DON'T:
-1. ❌ Use Axios for Firestore/RTDB operations
-2. ❌ Perform direct writes in UI components
-3. ❌ Mix reads and writes in the same hook
-4. ❌ Import Firebase SDK directly in UI components
-5. ❌ Use service functions directly in components (use hooks instead)
-6. ❌ **Create local/page-specific hooks that duplicate global hooks functionality**
-7. ❌ Create hooks in `pages/**/hooks/` that wrap service layer (use global hooks)
-8. ❌ Import services with wrong names (`deviceManagementService` ❌, `userManagementService` ❌)
+1. ❌ **Define multiple components in a single file**
+2. ❌ **Create helper components in the same file as the main component**
+3. ❌ Use Axios for Firestore/RTDB operations
+4. ❌ Perform direct writes in UI components
+5. ❌ Mix reads and writes in the same hook
+6. ❌ Import Firebase SDK directly in UI components
+7. ❌ Use service functions directly in components (use hooks instead)
+8. ❌ **Create local/page-specific hooks that duplicate global hooks functionality**
+9. ❌ Create hooks in `pages/**/hooks/` that wrap service layer (use global hooks)
+10. ❌ Import services with wrong names (`deviceManagementService` ❌, `userManagementService` ❌)
 
 
 ---
 
-## File Naming Conventions
+## File Naming Conventions (STRICT)
 
-- Services: `services/[feature].Service.ts`
-- Global read hooks: `hooks/reads/useRealtime_[Feature].ts`
-- Global write hooks: `hooks/writes/useCall_[Feature].ts`
-- Schemas: `schemas/[feature].schema.ts`
-- **Local hooks:** Only for UI-specific logic (filters, pagination, form state) - NOT for service layer calls
+### Service Layer Files:
+```
+✅ services/alerts.Service.ts       → Export: alertsService
+✅ services/devices.Service.ts      → Export: devicesService
+✅ services/user.Service.ts         → Export: usersService
+✅ services/reports.Service.ts      → Export: reportsService
+✅ services/mqtt.service.ts         → Export: mqttService
+❌ services/alertService.ts         (Missing .Service suffix)
+❌ services/alert.Service.ts        (Singular, should be plural)
+```
+
+### Global Read Hooks (Real-time data):
+```
+✅ hooks/reads/useRealtime_Alerts.ts       → Export: useRealtime_Alerts
+✅ hooks/reads/useRealtime_Devices.ts      → Export: useRealtime_Devices
+✅ hooks/reads/useRealtime_Users.ts        → Export: useRealtime_Users
+✅ hooks/reads/useRealtime_MQTTMetrics.ts  → Export: useRealtime_MQTTMetrics
+❌ hooks/reads/useRealtimeAlerts.ts        (Missing underscore)
+❌ hooks/reads/useAlerts.ts                (Missing Realtime_ prefix)
+```
+
+### Global Write Hooks (CRUD operations):
+```
+✅ hooks/writes/useCall_Alerts.ts    → Export: useCall_Alerts
+✅ hooks/writes/useCall_Devices.ts   → Export: useCall_Devices
+✅ hooks/writes/useCall_Users.ts     → Export: useCall_Users
+✅ hooks/writes/useCall_Reports.ts   → Export: useCall_Reports
+❌ hooks/writes/useCallAlerts.ts     (Missing underscore)
+❌ hooks/writes/useAlertsWrite.ts    (Wrong pattern)
+```
+
+### Schema Files:
+```
+✅ schemas/alerts.schema.ts              → Export types: Alert, CreateAlertInput
+✅ schemas/deviceManagement.schema.ts    → Export types: Device, DeviceReading
+✅ schemas/userManagement.schema.ts      → Export types: User, UserRole
+✅ schemas/reports.schema.ts             → Export types: Report, ReportType
+❌ schemas/alert.schema.ts               (Singular, should be plural)
+❌ schemas/alertsSchema.ts               (Missing .schema suffix)
+```
+
+### Component Files (PascalCase):
+```
+✅ components/AlertNotificationCenter.tsx  → export default AlertNotificationCenter
+✅ components/UserMenu.tsx                 → export default UserMenu
+✅ pages/admin/AdminDashboard.tsx          → export default AdminDashboard
+❌ components/alertNotificationCenter.tsx  (camelCase, use PascalCase)
+❌ components/alert-notification-center.tsx (kebab-case, use PascalCase)
+```
+
+### Local UI Hooks (UI-specific logic only):
+```
+✅ pages/admin/AdminDashboard/hooks/useDashboardFilters.ts  (UI state)
+✅ pages/admin/AdminAlerts/hooks/useAlertStats.ts           (Calculations)
+✅ pages/staff/StaffDevices/hooks/useDeviceFilter.ts        (Filter logic)
+❌ pages/admin/hooks/useDeviceCRUD.ts                       (Use global useCall_Devices)
+❌ pages/staff/hooks/useRealtimeData.ts                     (Use global useRealtime_*)
+```
+
+**Pattern Summary:**
+- Services: `[feature].Service.ts` (lowercase + .Service suffix)
+- Global reads: `useRealtime_[Feature].ts` (underscore required)
+- Global writes: `useCall_[Feature].ts` (underscore required)
+- Schemas: `[feature].schema.ts` (lowercase + .schema suffix)
+- Components: `ComponentName.tsx` (PascalCase)
+- Local hooks: `use[Purpose].ts` (camelCase, UI logic only)
 
 ---
 
@@ -115,13 +217,41 @@ UI Layer (components/*, pages/*)
 - `useCall_Reports()` - Report generation (water quality, device status, compliance)
 - `useCall_Analytics()` - Analytics operations (deprecated, use Reports)
 
-### Import Pattern:
+### Import Patterns (CRITICAL):
+
+**Global Hooks (Always use these in UI components):**
 ```typescript
-// ✅ CORRECT - Use global hooks
+// ✅ CORRECT - Import from centralized hooks barrel file
 import { useRealtime_Alerts, useCall_Alerts } from '@/hooks';
+import { useRealtime_Devices, useCall_Devices } from '@/hooks';
+
+// ✅ ALSO CORRECT - Direct import if barrel unavailable
+import { useRealtime_Alerts } from '@/hooks/reads/useRealtime_Alerts';
+import { useCall_Alerts } from '@/hooks/writes/useCall_Alerts';
 
 // ❌ WRONG - Don't create local duplicates
 import { useRealtimeAlerts } from './hooks/useRealtimeAlerts';
+import { useAlertsData } from '../hooks/useAlertsData';
+```
+
+**Service Layer (Never import directly in UI components):**
+```typescript
+// ✅ CORRECT - Only import in global hooks (hooks/writes/*)
+import { alertsService } from '@/services/alerts.Service';
+import { devicesService } from '@/services/devices.Service';
+
+// ❌ WRONG - Never import services in UI components
+import { alertsService } from '@/services/alerts.Service'; // In component file
+```
+
+**Schemas (Import types anywhere needed):**
+```typescript
+// ✅ CORRECT - Import types from schemas
+import type { Alert, AlertSeverity } from '@/schemas/alerts.schema';
+import type { Device, DeviceStatus } from '@/schemas/deviceManagement.schema';
+
+// ❌ WRONG - Defining types inline
+type Alert = { id: string; message: string }; // Use schema types instead
 ```
 
 ---

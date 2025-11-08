@@ -1,4 +1,4 @@
-export { AlertStatistics } from './AlertStatistics';
-export { AlertFilters } from './AlertFilters';
-export { AlertsTable } from './AlertsTable';
-export { AlertDetailsDrawer } from './AlertDetailsDrawer';
+export { default as AlertStatistics } from './AlertStatistics';
+export { default as AlertFilters } from './AlertFilters';
+export { default as AlertsTable } from './AlertsTable';
+export { default as AlertDetailsDrawer } from './AlertDetailsDrawer';

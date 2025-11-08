@@ -31,21 +31,10 @@ import {
   getStatusColor,
 } from '../../../../schemas';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { getColorValue } from './utils';
 
 const { Text } = Typography;
 const { TextArea } = Input;
-
-// Helper to convert Ant Design color names to actual color values
-const getColorValue = (colorName: string, token: ReturnType<typeof useThemeToken>): string => {
-  const colorMap: Record<string, string> = {
-    'error': token.colorError,
-    'warning': token.colorWarning,
-    'success': token.colorSuccess,
-    'processing': token.colorInfo,
-    'default': token.colorTextSecondary,
-  };
-  return colorMap[colorName] || token.colorTextSecondary;
-};
 
 interface AlertDetailsDrawerProps {
   visible: boolean;
@@ -61,7 +50,7 @@ interface AlertDetailsDrawerProps {
  * Alert Details Drawer Component (Streamlined)
  * Tabbed interface for faster workflows
  */
-export const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
+const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
   visible,
   alert,
   onClose,
@@ -430,3 +419,5 @@ export const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
     </Drawer>
   );
 };
+
+export default AlertDetailsDrawer;

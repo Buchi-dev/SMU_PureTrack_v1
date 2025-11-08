@@ -35,7 +35,7 @@ interface AlertsTableProps {
  * Alerts Table Component
  * Displays alerts in a sortable, paginated table with batch operations
  */
-export const AlertsTable: React.FC<AlertsTableProps> = ({
+const AlertsTable: React.FC<AlertsTableProps> = ({
   alerts,
   loading,
   onViewDetails,
@@ -263,3 +263,5 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
     </Card>
   );
 };
+
+export default AlertsTable;
