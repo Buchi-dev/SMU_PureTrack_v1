@@ -4,14 +4,16 @@ import {
   CloudServerOutlined,
   ThunderboltOutlined,
   HddOutlined,
-  DashboardOutlined
+  DashboardOutlined,
+  ArrowDownOutlined,
+  ArrowUpOutlined
 } from '@ant-design/icons';
-import { memo, useMemo } from 'react';
-import { AlertStatusCard } from './AlertStatusCard';
-import { MqttBridgeStatusCard } from './MqttBridgeStatusCard';
-import { DeviceStatusCard } from './DeviceStatusCard';
+import { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { MetricIndicator } from './MetricIndicator';
+import { LiveMetricIndicator } from './LiveMetricIndicator';
+import { QuickAlertWidget } from './QuickAlertWidget';
 import { Row, Col } from 'antd';
+import type { MqttBridgeHealth } from '../hooks';
 import {
   calculateMqttBridgeHealthScore,
   calculateRAMHealthScore,
@@ -21,6 +23,8 @@ import {
 } from '../config';
 
 const { Text, Title } = Typography;
+
+const MAX_HISTORY = 30; // Keep 30 data points for mini graphs
 
 interface DashboardSummaryProps {
   deviceStats: {
@@ -50,6 +54,7 @@ interface DashboardSummaryProps {
     heapTotal: number;
     heapUsed: number;
   } | null;
+  mqttFullHealth?: MqttBridgeHealth | null; // Full health object for RealtimeDataMonitor
   loading: boolean;
 }
 
@@ -58,8 +63,47 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
   alertStats, 
   mqttHealth,
   mqttMemory,
+  mqttFullHealth,
   loading 
 }) => {
+  // Real-time metrics state for live indicators
+  const [receivedHistory, setReceivedHistory] = useState<number[]>([]);
+  const [publishedHistory, setPublishedHistory] = useState<number[]>([]);
+  const [receivedRate, setReceivedRate] = useState(0);
+  const [publishedRate, setPublishedRate] = useState(0);
+  const previousMetricsRef = useRef<{ received: number; published: number; timestamp: number } | null>(null);
+
+  // Calculate real-time throughput for live indicators
+  useEffect(() => {
+    if (!mqttFullHealth?.metrics) return;
+
+    const currentMetrics = {
+      received: mqttFullHealth.metrics.received,
+      published: mqttFullHealth.metrics.published,
+      timestamp: Date.now(),
+    };
+
+    if (previousMetricsRef.current) {
+      const timeDelta = (currentMetrics.timestamp - previousMetricsRef.current.timestamp) / 1000;
+
+      if (timeDelta > 0) {
+        const receivedDelta = currentMetrics.received - previousMetricsRef.current.received;
+        const publishedDelta = currentMetrics.published - previousMetricsRef.current.published;
+
+        const newReceivedRate = Math.round(receivedDelta / timeDelta);
+        const newPublishedRate = Math.round(publishedDelta / timeDelta);
+
+        setReceivedRate(newReceivedRate);
+        setPublishedRate(newPublishedRate);
+
+        setReceivedHistory(prev => [...prev, newReceivedRate].slice(-MAX_HISTORY));
+        setPublishedHistory(prev => [...prev, newPublishedRate].slice(-MAX_HISTORY));
+      }
+    }
+
+    previousMetricsRef.current = currentMetrics;
+  }, [mqttFullHealth?.metrics]);
+
   // DEFENSIVE: Validate input data before calculations
   // Prevent 0% flashes when data is temporarily null/undefined
   const safeDeviceStats = useMemo(() => ({
@@ -145,49 +189,69 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {/* Main Metrics Layout: 3 Left | Overall Health Center | 3 Right */}
-      <Row gutter={[16, 16]} align="middle">
-        {/* LEFT SIDE - 3 Metrics Stacked */}
+      {/* Main Metrics Layout: 4 Left | Overall Health Center | 3 Right */}
+      <Row gutter={[16, 16]} align="stretch">
+        {/* LEFT SIDE - 4 Metrics Stacked */}
         <Col xs={24} lg={7}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px', 
+            height: '100%' 
+          }}>
+            {/* Quick Alerts Widget */}
+            <div style={{ flex: '0 0 auto' }}>
+              <QuickAlertWidget
+                criticalCount={safeAlertStats.critical}
+                offlineDevices={safeDeviceStats.offline}
+                loading={loading}
+              />
+            </div>
+            
             {/* Device Status */}
-            <MetricIndicator
-              title="Device Status"
-              percent={deviceHealth}
-              icon={<DatabaseOutlined />}
-              subtitle={`${safeDeviceStats.online} online · ${safeDeviceStats.offline} offline`}
-              tooltip={`${safeDeviceStats.online} of ${safeDeviceStats.total} devices online\n${safeDeviceStats.withReadings} devices with recent readings`}
-              loading={loading}
-            />
+            <div style={{ flex: 1 }}>
+              <MetricIndicator
+                title="Device Status"
+                percent={deviceHealth}
+                icon={<DatabaseOutlined />}
+                subtitle={`${safeDeviceStats.online} online · ${safeDeviceStats.offline} offline`}
+                tooltip={`${safeDeviceStats.online} of ${safeDeviceStats.total} devices online\n${safeDeviceStats.withReadings} devices with recent readings`}
+                loading={loading}
+              />
+            </div>
             
             {/* Alert Status */}
-            <MetricIndicator
-              title="Alert Status"
-              percent={alertHealth}
-              icon={<ThunderboltOutlined />}
-              subtitle={`${safeAlertStats.active} active · ${safeAlertStats.critical} critical`}
-              tooltip={`${safeAlertStats.active} active alerts (${safeAlertStats.critical} critical)\n${safeAlertStats.warning} warnings · ${safeAlertStats.advisory} advisories`}
-              loading={loading}
-            />
+            <div style={{ flex: 1 }}>
+              <MetricIndicator
+                title="Alert Status"
+                percent={alertHealth}
+                icon={<ThunderboltOutlined />}
+                subtitle={`${safeAlertStats.active} active · ${safeAlertStats.critical} critical`}
+                tooltip={`${safeAlertStats.active} active alerts (${safeAlertStats.critical} critical)\n${safeAlertStats.warning} warnings · ${safeAlertStats.advisory} advisories`}
+                loading={loading}
+              />
+            </div>
             
             {/* MQTT Bridge Health */}
-            <MetricIndicator
-              title="MQTT Bridge Health"
-              percent={mqttMemoryScore}
-              icon={<CloudServerOutlined />}
-              subtitle={
-                mqttMemory 
-                  ? `${formatBytes(mqttMemory.heapUsed)}/${formatBytes(mqttMemory.heapTotal)}MB heap`
-                  : mqttHealth?.connected ? 'Connected' : 'Disconnected'
-              }
-              tooltip={
-                mqttMemory && mqttHealth
-                  ? `Status: ${mqttHealth.status} (${mqttHealth.connected ? 'connected' : 'disconnected'})\nHeap: ${formatBytes(mqttMemory.heapUsed)}MB / ${formatBytes(mqttMemory.heapTotal)}MB\nRSS: ${formatBytes(mqttMemory.rss)}MB / 256MB\nHealth Score: ${mqttMemoryScore}% (based on memory efficiency)`
-                  : `MQTT Bridge: ${mqttHealth?.status || 'unknown'} - ${mqttHealth?.connected ? 'connected' : 'disconnected'}`
-              }
-              loading={loading}
-            />
-          </Space>
+            <div style={{ flex: 1 }}>
+              <MetricIndicator
+                title="MQTT Bridge Health"
+                percent={mqttMemoryScore}
+                icon={<CloudServerOutlined />}
+                subtitle={
+                  mqttMemory 
+                    ? `${formatBytes(mqttMemory.heapUsed)}/${formatBytes(mqttMemory.heapTotal)}MB heap`
+                    : mqttHealth?.connected ? 'Connected' : 'Disconnected'
+                }
+                tooltip={
+                  mqttMemory && mqttHealth
+                    ? `Status: ${mqttHealth.status} (${mqttHealth.connected ? 'connected' : 'disconnected'})\nHeap: ${formatBytes(mqttMemory.heapUsed)}MB / ${formatBytes(mqttMemory.heapTotal)}MB\nRSS: ${formatBytes(mqttMemory.rss)}MB / 256MB\nHealth Score: ${mqttMemoryScore}% (based on memory efficiency)`
+                    : `MQTT Bridge: ${mqttHealth?.status || 'unknown'} - ${mqttHealth?.connected ? 'connected' : 'disconnected'}`
+                }
+                loading={loading}
+              />
+            </div>
+          </div>
         </Col>
 
         {/* CENTER - Overall System Health (Larger) */}
@@ -199,7 +263,7 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
               borderRadius: '12px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               height: '100%',
-              minHeight: '360px',
+              minHeight: '480px',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
@@ -247,81 +311,61 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
 
         {/* RIGHT SIDE - 3 Metrics Stacked */}
         <Col xs={24} lg={7}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px', 
+            height: '100%' 
+          }}>
+            {/* Incoming Messages - Live Monitor */}
+            <div style={{ flex: 1 }}>
+              <LiveMetricIndicator
+                title="Incoming Messages"
+                currentValue={receivedRate}
+                totalValue={mqttFullHealth?.metrics?.received || 0}
+                icon={<ArrowDownOutlined />}
+                color="#52c41a"
+                dataHistory={receivedHistory}
+                tooltip={`Real-time incoming message rate\nTotal received: ${mqttFullHealth?.metrics?.received?.toLocaleString() || 0}`}
+                loading={loading}
+              />
+            </div>
+            
+            {/* Outgoing Messages - Live Monitor */}
+            <div style={{ flex: 1 }}>
+              <LiveMetricIndicator
+                title="Outgoing Messages"
+                currentValue={publishedRate}
+                totalValue={mqttFullHealth?.metrics?.published || 0}
+                icon={<ArrowUpOutlined />}
+                color="#1890ff"
+                dataHistory={publishedHistory}
+                tooltip={`Real-time outgoing message rate\nTotal published: ${mqttFullHealth?.metrics?.published?.toLocaleString() || 0}`}
+                loading={loading}
+              />
+            </div>
+            
             {/* RAM Usage */}
-            <MetricIndicator
-              title="RAM Usage"
-              percent={ramUsage?.percent || 0}
-              icon={<HddOutlined />}
-              subtitle={
-                ramUsage 
-                  ? `${formatBytes(ramUsage.used)}MB / ${formatBytes(ramUsage.total)}MB used`
-                  : 'No data'
-              }
-              tooltip={
-                ramUsage 
-                  ? `RAM: ${formatBytes(ramUsage.used)}MB / ${formatBytes(ramUsage.total)}MB (${ramUsage.percent}%)\n${formatBytes(ramUsage.total - ramUsage.used)}MB available`
-                  : 'RAM usage data not available'
-              }
-              loading={loading}
-              inverse={true}
-            />
-            
-            {/* CPU Usage - Placeholder for future metric */}
-            <MetricIndicator
-              title="Data Throughput"
-              percent={mqttHealth?.metrics ? Math.min(Math.round((mqttHealth.metrics.received / 100) * 100), 100) : 0}
-              icon={<ThunderboltOutlined />}
-              subtitle={
-                mqttHealth?.metrics 
-                  ? `${mqttHealth.metrics.received} received · ${mqttHealth.metrics.published} sent`
-                  : 'No data'
-              }
-              tooltip={
-                mqttHealth?.metrics 
-                  ? `Messages received: ${mqttHealth.metrics.received}\nMessages published: ${mqttHealth.metrics.published}\nFailed: ${mqttHealth.metrics.failed}`
-                  : 'Data throughput metrics not available'
-              }
-              loading={loading}
-            />
-            
-            {/* System Uptime - Placeholder for future metric */}
-            <MetricIndicator
-              title="Active Readings"
-              percent={safeDeviceStats.total > 0 ? Math.round((safeDeviceStats.withReadings / safeDeviceStats.total) * 100) : 0}
-              icon={<DatabaseOutlined />}
-              subtitle={`${safeDeviceStats.withReadings} of ${safeDeviceStats.total} devices`}
-              tooltip={`${safeDeviceStats.withReadings} devices have sent recent readings\nTotal devices: ${safeDeviceStats.total}`}
-              loading={loading}
-            />
-          </Space>
-        </Col>
-      </Row>
-
-      {/* Detailed Stats Grid - Full Width Cards */}
-      <Row gutter={[16, 16]}>
-        {/* Device Statistics - Using new DeviceStatusCard */}
-        <Col xs={24} md={8}>
-          <DeviceStatusCard
-            deviceStats={safeDeviceStats}
-            loading={loading}
-          />
-        </Col>
-
-        {/* Alert Statistics - Using new AlertStatusCard */}
-        <Col xs={24} md={8}>
-          <AlertStatusCard
-            alertStats={safeAlertStats}
-            loading={loading}
-          />
-        </Col>
-
-        {/* MQTT Bridge Statistics - Using new MqttBridgeStatusCard */}
-        <Col xs={24} md={8}>
-          <MqttBridgeStatusCard
-            mqttHealth={mqttHealth}
-            loading={loading}
-          />
+            <div style={{ flex: 1 }}>
+              <MetricIndicator
+                title="RAM Usage"
+                percent={ramUsage?.percent || 0}
+                icon={<HddOutlined />}
+                subtitle={
+                  ramUsage 
+                    ? `${formatBytes(ramUsage.used)}MB / ${formatBytes(ramUsage.total)}MB used`
+                    : 'No data'
+                }
+                tooltip={
+                  ramUsage 
+                    ? `RAM: ${formatBytes(ramUsage.used)}MB / ${formatBytes(ramUsage.total)}MB (${ramUsage.percent}%)\n${formatBytes(ramUsage.total - ramUsage.used)}MB available`
+                    : 'RAM usage data not available'
+                }
+                loading={loading}
+                inverse={true}
+              />
+            </div>
+          </div>
         </Col>
       </Row>
     </Space>

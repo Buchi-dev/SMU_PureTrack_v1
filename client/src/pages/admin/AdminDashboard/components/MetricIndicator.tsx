@@ -40,7 +40,8 @@ export const MetricIndicator = memo<MetricIndicatorProps>(({
       style={{ 
         backgroundColor: '#fafafa',
         borderLeft: `4px solid ${getHealthColor(percent)}`,
-        minHeight: '90px', // Changed to minHeight for flexibility
+        minHeight: '105px',
+        height: '100%',
         display: 'flex',
         alignItems: 'center'
       }}

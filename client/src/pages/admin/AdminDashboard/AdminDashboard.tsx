@@ -125,40 +125,9 @@ export const AdminDashboard = memo(() => {
               metrics: mqttBridge.health.metrics,
             } : null}
             mqttMemory={mqttBridge.status?.memory || null}
+            mqttFullHealth={mqttBridge.health}
             loading={isLoading}
           />
-
-          {/* Quick Action Insights */}
-          {realtimeAlerts.criticalAlerts.length > 0 && (
-            <Alert
-              message={`${realtimeAlerts.criticalAlerts.length} Critical Alert${realtimeAlerts.criticalAlerts.length > 1 ? 's' : ''} Require Immediate Attention`}
-              description={
-                <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                  {realtimeAlerts.criticalAlerts.slice(0, 3).map(alert => (
-                    <li key={alert.alertId}>
-                      <strong>{alert.deviceName || alert.deviceId}:</strong> {alert.message}
-                    </li>
-                  ))}
-                  {realtimeAlerts.criticalAlerts.length > 3 && (
-                    <li>... and {realtimeAlerts.criticalAlerts.length - 3} more</li>
-                  )}
-                </ul>
-              }
-              type="error"
-              showIcon
-              closable
-            />
-          )}
-
-          {realtimeDevices.stats.offline > 0 && (
-            <Alert
-              message={`${realtimeDevices.stats.offline} Device${realtimeDevices.stats.offline > 1 ? 's' : ''} Offline`}
-              description="Some devices are not reporting sensor data. Check the Devices tab for details."
-              type="warning"
-              showIcon
-              closable
-            />
-          )}
         </Space>
       ),
     },
