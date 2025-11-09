@@ -31,10 +31,12 @@ export const UserRoleSchema = z.enum(['Admin', 'Staff']);
  */
 export const UserListDataSchema = z.object({
   id: z.string(),
+  uuid: z.string(),
   email: z.string().email(),
   firstname: z.string(),
+  middlename: z.string(),
   lastname: z.string(),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z.string(),
   department: z.string(),
   role: UserRoleSchema,
   status: UserStatusSchema,

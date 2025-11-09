@@ -92,7 +92,7 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
       if (diffDays < 7) return `${diffDays}d ago`;
       
       return date.toLocaleDateString();
-    } catch (error) {
+    } catch {
       return 'Unknown time';
     }
   };

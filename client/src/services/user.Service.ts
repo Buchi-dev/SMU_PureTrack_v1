@@ -18,7 +18,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import type { Unsubscribe } from 'firebase/firestore';
-import type { UserStatus, UserRole } from '../contexts';
+import type { UserStatus, UserRole, UserListData } from '../schemas';
 import { refreshUserToken } from '../utils/authHelpers';
 import { db } from '../config/firebase';
 import { dataFlowLogger, DataSource, FlowLayer } from '../utils/dataFlowLogger';
@@ -26,22 +26,6 @@ import { dataFlowLogger, DataSource, FlowLayer } from '../utils/dataFlowLogger';
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
-
-export interface UserListData {
-  id: string;
-  uuid: string;
-  firstname: string;
-  lastname: string;
-  middlename: string;
-  department: string;
-  phoneNumber: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  createdAt: Date;
-  updatedAt?: Date;
-  lastLogin?: Date;
-}
 
 export interface UpdateUserStatusRequest {
   userId: string;

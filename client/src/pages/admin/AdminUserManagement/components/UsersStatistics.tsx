@@ -13,7 +13,7 @@ import {
   StopOutlined,
   CrownOutlined,
 } from '@ant-design/icons';
-import type { UserListData } from '../../../../services/user.Service';
+import type { UserListData } from '../../../../schemas';
 
 interface UsersStatisticsProps {
   users: UserListData[];

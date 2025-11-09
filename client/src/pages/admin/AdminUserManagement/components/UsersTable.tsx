@@ -26,8 +26,7 @@ import {
   StopOutlined,
   ClockCircleOutlined,
 } from '@ant-design/icons';
-import type { UserListData } from '../../../../services/user.Service';
-import type { UserRole, UserStatus } from '../../../../contexts';
+import type { UserListData, UserRole, UserStatus } from '../../../../schemas';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
