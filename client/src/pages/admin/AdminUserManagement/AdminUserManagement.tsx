@@ -23,6 +23,7 @@ import {
   Empty,
   Breadcrumb,
   theme,
+  message,
 } from "antd";
 import {
   UserOutlined,
@@ -30,7 +31,7 @@ import {
   PlusOutlined,
   HomeOutlined,
 } from "@ant-design/icons";
-import { useUserManagement } from "./hooks";
+import { useRealtime_Users, useCall_Users } from "../../../hooks";
 import { UsersTable } from "./components/UsersTable";
 import { UserEditModal } from "./components/UserEditModal";
 import { UsersStatistics } from "./components/UsersStatistics";
@@ -43,15 +44,24 @@ const { Content } = Layout;
 
 export const AdminUserManagement: React.FC = () => {
   const { token } = theme.useToken();
+  
+  // Global READ hook - Real-time user data
+  const { 
+    users, 
+    isLoading: loading, 
+    error: realtimeError 
+  } = useRealtime_Users();
+
+  // Global WRITE hook - User operations
   const {
-    users,
-    loading,
-    error,
     updateUser,
     updateUserStatus,
-    updateUserRole,
-    refreshing,
-  } = useUserManagement();
+    isLoading: refreshing,
+    error: writeError,
+  } = useCall_Users();
+
+  // Combine errors
+  const error = realtimeError?.message || writeError?.message || null;
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserListData | null>(null);
@@ -68,9 +78,14 @@ export const AdminUserManagement: React.FC = () => {
     status?: UserStatus,
     role?: UserRole
   ) => {
-    await updateUser(userId, status, role);
-    setEditModalVisible(false);
-    setSelectedUser(null);
+    try {
+      const result = await updateUser(userId, status, role);
+      message.success(result.message || 'User updated successfully');
+      setEditModalVisible(false);
+      setSelectedUser(null);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to update user');
+    }
   };
 
   // Handle quick status change
@@ -78,12 +93,22 @@ export const AdminUserManagement: React.FC = () => {
     userId: string,
     status: UserStatus
   ) => {
-    await updateUserStatus(userId, status);
+    try {
+      await updateUserStatus(userId, status);
+      message.success(`User status updated to ${status}`);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to update user status');
+    }
   };
 
   // Handle quick role change
   const handleQuickRoleChange = async (userId: string, role: UserRole) => {
-    await updateUserRole(userId, role);
+    try {
+      await updateUser(userId, undefined, role);
+      message.success(`User role updated to ${role}`);
+    } catch (error: any) {
+      message.error(error.message || 'Failed to update user role');
+    }
   };
 
   // Handle cancel edit
