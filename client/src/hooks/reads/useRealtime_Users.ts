@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from 'react';
 import { usersService } from '../../services/user.Service';
-import type { UserListData } from '../../services/user.Service';
+import type { UserListData } from '../../schemas';
 
 /**
  * Hook configuration options

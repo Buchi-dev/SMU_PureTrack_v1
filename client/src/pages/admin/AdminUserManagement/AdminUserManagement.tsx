@@ -35,8 +35,7 @@ import { useRealtime_Users, useCall_Users } from "../../../hooks";
 import { UsersTable } from "./components/UsersTable";
 import { UserEditModal } from "./components/UserEditModal";
 import { UsersStatistics } from "./components/UsersStatistics";
-import type { UserListData } from "../../../services/user.Service";
-import type { UserRole, UserStatus } from "../../../contexts";
+import type { UserListData, UserRole, UserStatus } from "../../../schemas";
 import { AdminLayout } from "../../../components/layouts/AdminLayout";
 
 const { Title, Text } = Typography;

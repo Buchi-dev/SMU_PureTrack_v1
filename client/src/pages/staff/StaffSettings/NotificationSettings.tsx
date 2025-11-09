@@ -27,8 +27,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../../contexts/AuthContext';
-import { usersService } from '../../../services/user.Service';
-import { devicesService } from '../../../services/devices.Service';
+import { useRealtime_Devices, useCall_Users } from '../../../hooks';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -52,13 +51,22 @@ const NotificationSettings: React.FC = () => {
   const { user } = useAuth();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
-  const [devices, setDevices] = useState<any[]>([]);
+
+  // ✅ GLOBAL HOOKS - Following Service → Hooks → UI architecture
+  const { devices: devicesWithReadings } = useRealtime_Devices();
+  const { getUserPreferences, setupPreferences, isLoading: saving } = useCall_Users();
+
+  // Transform devices for select component - metadata from DeviceWithSensorData contains full Device object
+  const devices = devicesWithReadings.map(d => ({
+    deviceId: d.deviceId,
+    name: d.deviceName,
+    status: d.status,
+    location: d.metadata?.metadata?.location // Access nested metadata.metadata.location
+  }));
 
   useEffect(() => {
     loadPreferences();
-    loadDevices();
   }, [user]);
 
   const loadPreferences = async () => {
@@ -69,8 +77,8 @@ const NotificationSettings: React.FC = () => {
       
       console.log('📥 Loading preferences for user:', user.uid);
       
-      // Get user preferences using service layer
-      const userPrefs = await usersService.getUserPreferences(user.uid);
+      // ✅ Use global hook instead of direct service call
+      const userPrefs = await getUserPreferences(user.uid);
 
       console.log('📋 Loaded preferences from database:', userPrefs);
 
@@ -114,23 +122,10 @@ const NotificationSettings: React.FC = () => {
     }
   };
 
-  const loadDevices = async () => {
-    try {
-      // Get devices using service layer
-      const devicesList = await devicesService.listDevices();
-      setDevices(devicesList);
-    } catch (error: any) {
-      console.error('Error loading devices:', error);
-      // Don't show error message as devices are optional
-    }
-  };
-
   const handleSave = async (values: any) => {
     if (!user || !user.email) return;
 
     try {
-      setSaving(true);
-
       const quietHoursStart = values.quietHoursEnabled && values.quietHours?.[0]
         ? values.quietHours[0].format('HH:mm')
         : undefined;
@@ -155,8 +150,8 @@ const NotificationSettings: React.FC = () => {
 
       console.log('💾 Saving notification preferences:', preferencesPayload);
 
-      // Save preferences using service layer
-      const savedPreferences = await usersService.setupPreferences(preferencesPayload);
+      // ✅ Use global hook instead of direct service call
+      const savedPreferences = await setupPreferences(preferencesPayload);
 
       console.log('✅ Preferences saved successfully:', savedPreferences);
       
@@ -168,8 +163,6 @@ const NotificationSettings: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Error saving preferences:', error);
       message.error(error.message || 'Failed to save notification preferences');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -577,10 +570,9 @@ const NotificationSettings: React.FC = () => {
                         padding: '4px 0'
                       }}>
                         <Text style={{ fontSize: '14px', fontWeight: 500 }}>{device.name}</Text>
-                        {device.metadata?.location?.building && (
+                        {device.location && (
                           <Text type="secondary" style={{ fontSize: '12px' }}>
-                            📍 {device.metadata.location.building}
-                            {device.metadata.location.room && ` - ${device.metadata.location.room}`}
+                            📍 {device.location.building} - Floor {device.location.floor}
                           </Text>
                         )}
                       </div>

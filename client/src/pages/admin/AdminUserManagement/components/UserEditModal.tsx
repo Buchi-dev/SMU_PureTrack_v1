@@ -6,8 +6,7 @@
 import React, { useEffect } from 'react';
 import { Modal, Form, Select, Space, Typography, Divider, Row, Col, Tag } from 'antd';
 import { UserOutlined, MailOutlined, PhoneOutlined, TeamOutlined } from '@ant-design/icons';
-import type { UserListData } from '../../../../services/user.Service';
-import type { UserRole, UserStatus } from '../../../../contexts';
+import type { UserListData, UserRole, UserStatus } from '../../../../schemas';
 
 const { Text } = Typography;
 
