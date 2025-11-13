@@ -7,14 +7,19 @@ const pino = require('pino');
 const compression = require('compression');
 const { backOff } = require('exponential-backoff');
 const CircuitBreaker = require('opossum');
+const os = require('os');
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  LOGGER CONFIGURATION (Minimal - errors only)
+//  LOGGER CONFIGURATION (Structured logging with levels)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'error', // Only critical errors logged
-  formatters: { level: (label) => ({ level: label.toUpperCase() }) }
+  level: process.env.LOG_LEVEL,
+  formatters: { 
+    level: (label) => ({ level: label.toUpperCase() }),
+    bindings: (bindings) => ({ pid: bindings.pid, hostname: bindings.hostname })
+  },
+  timestamp: pino.stdTimeFunctions.isoTime
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -27,9 +32,14 @@ const CONFIG = {
   MQTT_BROKER_URL: process.env.MQTT_BROKER_URL,
   MQTT_USERNAME: process.env.MQTT_USERNAME,
   MQTT_PASSWORD: process.env.MQTT_PASSWORD,
-  PORT: process.env.PORT || 8080,
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+  PORT: process.env.PORT,
+  NODE_ENV: process.env.NODE_ENV,
+  LOG_LEVEL: process.env.LOG_LEVEL,
+  
+  // CORS Configuration (from environment)
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
   
   // Hardcoded Pub/Sub Topics
   PUBSUB_TOPIC: 'iot-sensor-readings',
@@ -116,7 +126,8 @@ const state = {
   isShuttingDown: false,
   startTime: Date.now(),
   lastCpuUsage: null,
-  lastCpuCheck: null
+  lastCpuCheck: null,
+  flushInProgress: new Map() // Track ongoing flushes per topic
 };
 
 const metrics = {
@@ -124,6 +135,8 @@ const metrics = {
   published: 0,
   failed: 0,
   flushes: 0,
+  droppedUnmatched: 0,
+  droppedBufferFull: 0,
   circuitBreakerOpen: false
 };
 
@@ -151,17 +164,26 @@ const publishBreaker = new CircuitBreaker(
 );
 
 publishBreaker.on('open', () => {
-  // Circuit breaker opened - tracked by metrics
   metrics.circuitBreakerOpen = true;
+  logger.error({ 
+    breaker: 'pub-sub-publish',
+    state: 'open' 
+  }, 'Circuit breaker opened - Pub/Sub publishing halted');
 });
 
 publishBreaker.on('halfOpen', () => {
-  // Circuit breaker testing recovery - no action needed
+  logger.warn({ 
+    breaker: 'pub-sub-publish',
+    state: 'half-open' 
+  }, 'Circuit breaker testing recovery');
 });
 
 publishBreaker.on('close', () => {
-  // Circuit breaker closed - tracked by metrics
   metrics.circuitBreakerOpen = false;
+  logger.info({ 
+    breaker: 'pub-sub-publish',
+    state: 'closed' 
+  }, 'Circuit breaker closed - Pub/Sub publishing resumed');
 });
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -177,43 +199,76 @@ const initializeBuffers = () => {
   });
 };
 
-const addToBuffer = (topicName, message, priority = 'normal') => {
+const addToBuffer = async (topicName, message, priority = 'normal') => {
   if (!state.messageBuffer.has(topicName)) {
     state.messageBuffer.set(topicName, []);
   }
 
   const buffer = state.messageBuffer.get(topicName);
+  
+  // Check if buffer is full - drop message with metrics
+  if (buffer.length >= CONFIG.MAX_BUFFER_SIZE) {
+    metrics.droppedBufferFull++;
+    logger.error({ 
+      topic: topicName, 
+      bufferSize: buffer.length,
+      droppedTotal: metrics.droppedBufferFull 
+    }, 'Buffer full - message dropped (DATA LOSS)');
+    return;
+  }
+  
   buffer.push({ ...message, priority });
   metrics.received++;
 
-  // Adaptive flush at threshold
+  // Adaptive flush at threshold - AWAIT to prevent race conditions
   const utilization = buffer.length / CONFIG.MAX_BUFFER_SIZE;
-  if (utilization >= CONFIG.BUFFER_FLUSH_THRESHOLD) {
-    // Removed info logger - flushing is tracked by metrics
-    flushMessageBuffer(topicName);
+  if (utilization >= CONFIG.BUFFER_FLUSH_THRESHOLD && !state.flushInProgress.get(topicName)) {
+    logger.info({ 
+      topic: topicName, 
+      bufferSize: buffer.length, 
+      utilization: Math.round(utilization * 100) 
+    }, 'Buffer threshold reached - triggering flush');
+    await flushMessageBuffer(topicName);
   }
 
   // Check total across all buffers
   const totalMessages = Array.from(state.messageBuffer.values())
     .reduce((sum, buf) => sum + buf.length, 0);
   if (totalMessages >= CONFIG.MAX_BUFFER_SIZE) {
-    flushAllBuffers();
+    await flushAllBuffers();
   }
 };
 
 const flushMessageBuffer = async (topicName) => {
+  // Prevent concurrent flushes of same topic (race condition fix)
+  if (state.flushInProgress.get(topicName)) {
+    logger.debug({ topic: topicName }, 'Flush already in progress - skipping');
+    return;
+  }
+  
   const messages = state.messageBuffer.get(topicName) || [];
   if (messages.length === 0) return;
 
-  const chunkSize = 100; // Reduced from 500 to process smaller batches (less memory peaks)
-  // Removed info logger - not critical
+  state.flushInProgress.set(topicName, true);
+  const messageCount = messages.length;
+  const chunkSize = 100;
+  
+  logger.info({ 
+    topic: topicName, 
+    messageCount 
+  }, 'Starting buffer flush');
+  
   metrics.flushes++;
 
   try {
     const topic = pubSubClient.topic(topicName);
+    
+    // Take snapshot of messages and clear buffer immediately (prevents duplicates)
+    const messagesToPublish = [...messages];
+    state.messageBuffer.set(topicName, []);
 
-    for (let i = 0; i < messages.length; i += chunkSize) {
-      const chunk = messages.slice(i, i + chunkSize);
+    for (let i = 0; i < messagesToPublish.length; i += chunkSize) {
+      const chunk = messagesToPublish.slice(i, i + chunkSize);
 
       // Use circuit breaker with retry
       try {
@@ -229,31 +284,37 @@ const flushMessageBuffer = async (topicName) => {
             numOfAttempts: 3,
             jitter: 'full',
             retry: (error, attemptNumber) => {
-              // Removed warn logger - retry is expected behavior
+              logger.warn({ 
+                topic: topicName, 
+                attempt: attemptNumber, 
+                error: error.message 
+              }, 'Publish retry attempt');
               return true;
             }
           }
         );
 
         metrics.published += chunk.length;
-        
-        // Clear chunk from memory immediately after successful publish
-        chunk.length = 0;
       } catch (error) {
         metrics.failed += chunk.length;
         logger.error(
-          { topic: topicName, error: error.message },
-          'Chunk publish failed'
+          { topic: topicName, chunkSize: chunk.length, error: error.message },
+          'Chunk publish failed after retries (DATA LOSS)'
         );
-        throw error;
+        // NOTE: Messages are lost here - no DLQ implemented
+        // Consider implementing persistence layer for production
       }
     }
 
-    // Clear buffer and help GC by setting to new array
-    state.messageBuffer.set(topicName, []);
-    // Removed info logger - success is tracked by metrics
+    logger.info({ 
+      topic: topicName, 
+      published: messageCount - metrics.failed,
+      failed: metrics.failed 
+    }, 'Buffer flush completed');
   } catch (error) {
-    logger.error({ topic: topicName, error: error.message }, 'Flush failed');
+    logger.error({ topic: topicName, error: error.message, stack: error.stack }, 'Flush failed');
+  } finally {
+    state.flushInProgress.set(topicName, false);
   }
 };
 
@@ -263,12 +324,14 @@ const flushAllBuffers = async () => {
 };
 
 const startBufferFlusher = () => {
-  state.bufferIntervalId = setInterval(() => {
+  state.bufferIntervalId = setInterval(async () => {
     if (!state.isShuttingDown) {
-      flushAllBuffers();
+      await flushAllBuffers();
     }
   }, CONFIG.BUFFER_INTERVAL_MS);
-  // Removed info logger - startup is tracked by health endpoint
+  logger.info({ 
+    intervalMs: CONFIG.BUFFER_INTERVAL_MS 
+  }, 'Buffer flusher started');
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -276,7 +339,7 @@ const startBufferFlusher = () => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const startMemoryMonitoring = () => {
-  state.memoryCheckIntervalId = setInterval(() => {
+  state.memoryCheckIntervalId = setInterval(async () => {
     const memUsage = process.memoryUsage();
     
     // Calculate RSS percentage against Cloud Run 256MB limit
@@ -289,19 +352,34 @@ const startMemoryMonitoring = () => {
 
     if (rssPercent > RSS_CRITICAL_PERCENT) {
       logger.error(
-        { rssPercent: Math.round(rssPercent), rssMB: Math.round(memUsage.rss / 1024 / 1024) },
-        'Critical RSS memory usage detected'
+        { 
+          rssPercent: Math.round(rssPercent), 
+          rssMB: Math.round(memUsage.rss / 1024 / 1024),
+          heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+          bufferCount: Array.from(state.messageBuffer.values()).reduce((sum, buf) => sum + buf.length, 0)
+        },
+        'Critical RSS memory usage - flushing buffers'
       );
-      // Force garbage collection if available
-      if (global.gc) {
-        global.gc();
-      }
-      // Emergency buffer flush to free memory
-      flushAllBuffers().catch(err => logger.error({ err: err.message }, 'Emergency flush failed'));
+      
+      // Emergency buffer flush to free memory (removed manual GC call)
+      await flushAllBuffers().catch(err => 
+        logger.error({ err: err.message }, 'Emergency flush failed')
+      );
+    } else if (rssPercent > RSS_WARNING_PERCENT) {
+      logger.warn(
+        { 
+          rssPercent: Math.round(rssPercent), 
+          rssMB: Math.round(memUsage.rss / 1024 / 1024) 
+        },
+        'High RSS memory usage detected'
+      );
     }
-    // Removed warn logger for high memory - tracked by /health endpoint
   }, CONFIG.MEMORY_CHECK_INTERVAL);
-  // Removed info logger - startup is tracked by health endpoint
+  
+  logger.info({ 
+    intervalMs: CONFIG.MEMORY_CHECK_INTERVAL,
+    limitMB: 256 
+  }, 'Memory monitoring started');
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -317,10 +395,14 @@ const calculateCpuUsage = () => {
     
     // Calculate CPU percentage (user + system time / elapsed time)
     const totalCpuTime = cpuUsage.user + cpuUsage.system;
-    const cpuPercent = (totalCpuTime / timeDiff) * 100;
+    const cpuPercentPerCore = (totalCpuTime / timeDiff) * 100;
+    
+    // FIXED: Normalize by number of CPU cores for accurate system CPU usage
+    const numCores = os.cpus().length;
+    const actualCpuPercent = cpuPercentPerCore / numCores;
     
     // Update CPU metrics
-    cpuMetrics.current = Math.min(Math.round(cpuPercent * 100) / 100, 100); // Round to 2 decimals, cap at 100
+    cpuMetrics.current = Math.min(Math.round(actualCpuPercent * 100) / 100, 100); // Round to 2 decimals, cap at 100
     
     // Track samples for average (keep last 12 samples = 1 minute at 5s intervals)
     cpuMetrics.samples.push(cpuMetrics.current);
@@ -341,8 +423,20 @@ const calculateCpuUsage = () => {
     // Log critical CPU usage
     if (cpuMetrics.current > CONFIG.CPU_CRITICAL_PERCENT) {
       logger.error(
-        { cpuPercent: cpuMetrics.current, average: cpuMetrics.average },
+        { 
+          cpuPercent: cpuMetrics.current, 
+          average: cpuMetrics.average,
+          cores: numCores 
+        },
         'Critical CPU usage detected'
+      );
+    } else if (cpuMetrics.current > CONFIG.CPU_WARNING_PERCENT) {
+      logger.warn(
+        { 
+          cpuPercent: cpuMetrics.current, 
+          average: cpuMetrics.average 
+        },
+        'High CPU usage detected'
       );
     }
   }
@@ -362,6 +456,11 @@ const startCpuMonitoring = () => {
       calculateCpuUsage();
     }
   }, CONFIG.CPU_CHECK_INTERVAL);
+  
+  logger.info({ 
+    intervalMs: CONFIG.CPU_CHECK_INTERVAL,
+    cores: os.cpus().length 
+  }, 'CPU monitoring started');
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -374,7 +473,7 @@ const startCpuMonitoring = () => {
 //  MQTT HANDLERS
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-const handleMQTTMessage = (topic, message) => {
+const handleMQTTMessage = async (topic, message) => {
   try {
     let data = message.toString();
     try {
@@ -387,7 +486,11 @@ const handleMQTTMessage = (topic, message) => {
     });
 
     if (!matchedTopic) {
-      // Removed warn logger - unmatched topics are not critical errors
+      metrics.droppedUnmatched++;
+      logger.warn({ 
+        topic, 
+        droppedTotal: metrics.droppedUnmatched 
+      }, 'Unmatched MQTT topic - message dropped');
       return;
     }
 
@@ -407,9 +510,9 @@ const handleMQTTMessage = (topic, message) => {
       }
     };
 
-    addToBuffer(pubSubTopic, messageData, priority);
+    await addToBuffer(pubSubTopic, messageData, priority);
   } catch (error) {
-    logger.error({ topic, error: error.message }, 'Message handling failed');
+    logger.error({ topic, error: error.message, stack: error.stack }, 'Message handling failed');
   }
 };
 
@@ -435,11 +538,18 @@ const initializeMQTTClient = () => {
     }
   };
 
-  // Removed info logger - connection status tracked by /health endpoint
+  logger.info({ 
+    broker: CONFIG.MQTT_BROKER_URL,
+    clientId: options.clientId 
+  }, 'Connecting to MQTT broker');
+  
   state.mqttClient = mqtt.connect(CONFIG.MQTT_BROKER_URL, options);
 
   state.mqttClient.on('connect', () => {
-    // Removed info logger - connection status tracked by /health endpoint
+    logger.info({ 
+      broker: CONFIG.MQTT_BROKER_URL,
+      clientId: options.clientId 
+    }, 'MQTT connected successfully');
 
     // Publish bridge status
     state.mqttClient.publish(
@@ -463,8 +573,9 @@ const initializeMQTTClient = () => {
       state.mqttClient.subscribe(topic, { qos }, (err) => {
         if (err) {
           logger.error({ topic, error: err.message }, 'Subscription failed');
+        } else {
+          logger.info({ topic, qos }, 'Subscribed to MQTT topic');
         }
-        // Removed info logger - subscription success is not critical
       });
     });
 
@@ -474,11 +585,18 @@ const initializeMQTTClient = () => {
   });
 
   state.mqttClient.on('message', handleMQTTMessage);
-  state.mqttClient.on('error', (error) => logger.error({ error: error.message }, 'MQTT error'));
-  // Removed warn loggers for reconnect/close/offline - tracked by /health endpoint
-  state.mqttClient.on('reconnect', () => {});
-  state.mqttClient.on('close', () => {});
-  state.mqttClient.on('offline', () => {});
+  state.mqttClient.on('error', (error) => 
+    logger.error({ error: error.message }, 'MQTT error')
+  );
+  state.mqttClient.on('reconnect', () => 
+    logger.warn('MQTT reconnecting...')
+  );
+  state.mqttClient.on('close', () => 
+    logger.warn('MQTT connection closed')
+  );
+  state.mqttClient.on('offline', () => 
+    logger.warn('MQTT offline')
+  );
 };
 
 // Command subscription removed - not used in UI
@@ -490,23 +608,19 @@ const initializeMQTTClient = () => {
 const app = express();
 app.disable('x-powered-by');
 
-// CORS Configuration - Whitelist production and development origins
-const allowedOrigins = [
-  'https://my-app-da530.web.app',
-  'https://my-app-da530.firebaseapp.com', // Firebase also provides this URL
-  'http://localhost:5173',
-  'http://127.0.0.1:5173'
-];
-
+// CORS Configuration - Origins from environment variable
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin)) {
+    if (CONFIG.ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
-      // Removed warn logger - CORS blocking is not critical to log
+      logger.warn({ 
+        origin, 
+        allowedOrigins: CONFIG.ALLOWED_ORIGINS 
+      }, 'CORS blocked request from unauthorized origin');
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -567,23 +681,30 @@ app.get('/health', (req, res) => {
   const RSS_WARNING_PERCENT = 90;
   const RSS_CRITICAL_PERCENT = 95;
   
+  let httpStatusCode = 200;
+  
   if (!state.mqttClient?.connected) {
     health.status = 'unhealthy';
+    httpStatusCode = 503;
   } else if (
     rssPercent > RSS_CRITICAL_PERCENT ||
-    cpuMetrics.current > CONFIG.CPU_CRITICAL_PERCENT
+    cpuMetrics.current > CONFIG.CPU_CRITICAL_PERCENT ||
+    metrics.circuitBreakerOpen
   ) {
     health.status = 'unhealthy';
+    httpStatusCode = 503;
   } else if (
     rssPercent > RSS_WARNING_PERCENT ||
     cpuMetrics.current > CONFIG.CPU_WARNING_PERCENT ||
     Object.values(health.checks.buffers).some(b => b.utilization > 80)
   ) {
     health.status = 'degraded';
+    httpStatusCode = 200; // Degraded still returns 200 (service operational but stressed)
   }
 
-  //res status must be 200 event its degraded or unhealthy
-  res.status(200).json(health);
+  // FIXED: Return proper HTTP status codes for health checks
+  // 200 = healthy/degraded, 503 = unhealthy (triggers load balancer failover)
+  res.status(httpStatusCode).json(health);
 });
 
 app.get('/status', (req, res) => {
@@ -610,7 +731,7 @@ app.get('/status', (req, res) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const gracefulShutdown = async (signal) => {
-  // Removed info logger - shutdown is expected behavior
+  logger.info({ signal }, 'Graceful shutdown initiated');
   state.isShuttingDown = true;
 
   const shutdownTimeout = setTimeout(() => {
@@ -635,7 +756,8 @@ const gracefulShutdown = async (signal) => {
       state.cpuCheckIntervalId = null;
     }
 
-    // Flush remaining messages (no logger - expected behavior)
+    // Flush remaining messages
+    logger.info('Flushing remaining buffers before shutdown');
     await Promise.race([
       flushAllBuffers(),
       new Promise((_, reject) =>
@@ -643,7 +765,8 @@ const gracefulShutdown = async (signal) => {
       )
     ]);
 
-    // Close MQTT connection (no logger - expected behavior)
+    // Close MQTT connection
+    logger.info('Closing MQTT connection');
     if (state.mqttClient?.connected) {
       state.mqttClient.publish(
         'bridge/status',
@@ -661,7 +784,11 @@ const gracefulShutdown = async (signal) => {
     }
 
     clearTimeout(shutdownTimeout);
-    // Removed info logger - shutdown complete is expected
+    logger.info({ 
+      signal,
+      uptime: process.uptime(),
+      metrics 
+    }, 'Graceful shutdown completed');
     process.exit(0);
   } catch (error) {
     logger.error({ error: error.message, stack: error.stack }, 'Shutdown error');
@@ -688,14 +815,39 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const start = async () => {
   try {
-    // Removed startup info loggers - not critical
+    logger.info({ 
+      nodeVersion: process.version,
+      platform: process.platform,
+      env: CONFIG.NODE_ENV 
+    }, 'MQTT Bridge starting');
+    
     validateConfig();
+    
+    logger.info({ 
+      projectId: CONFIG.PROJECT_ID,
+      topics: TOPIC_MAPPINGS 
+    }, 'Configuration validated');
 
     initializeBuffers();
     initializeMQTTClient();
 
     const server = app.listen(CONFIG.PORT, '0.0.0.0', () => {
-      // Removed info loggers - server status tracked by /health endpoint
+      logger.info({ 
+        port: CONFIG.PORT,
+        allowedOrigins: CONFIG.ALLOWED_ORIGINS,
+        bufferConfig: {
+          intervalMs: CONFIG.BUFFER_INTERVAL_MS,
+          maxSize: CONFIG.MAX_BUFFER_SIZE,
+          flushThreshold: CONFIG.BUFFER_FLUSH_THRESHOLD
+        }
+      }, 'HTTP server listening - MQTT Bridge ready');
+      
+      // DATA LOSS WARNING
+      logger.warn({
+        qosSensorData: CONFIG.QOS_SENSOR_DATA,
+        bufferIntervalMs: CONFIG.BUFFER_INTERVAL_MS,
+        maxBufferSize: CONFIG.MAX_BUFFER_SIZE
+      }, 'WARNING: No message persistence layer - data loss possible on crash (up to buffer size)');
     });
 
     // Handle server errors
