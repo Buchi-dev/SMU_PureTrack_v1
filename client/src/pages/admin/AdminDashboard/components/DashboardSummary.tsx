@@ -72,13 +72,27 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
 
   // Calculate real-time throughput for live indicators
   useEffect(() => {
-    if (!mqttFullHealth?.metrics) return;
+    console.log('[DashboardSummary] mqttFullHealth received:', {
+      exists: !!mqttFullHealth,
+      hasMetrics: !!mqttFullHealth?.metrics,
+      metrics: mqttFullHealth?.metrics,
+      status: mqttFullHealth?.status,
+      connected: mqttFullHealth?.checks?.mqtt?.connected
+    });
+
+    if (!mqttFullHealth?.metrics) {
+      console.warn('[DashboardSummary] No metrics available - skipping rate calculation');
+      return;
+    }
 
     const currentMetrics = {
       received: mqttFullHealth.metrics.received,
       published: mqttFullHealth.metrics.published,
       timestamp: Date.now(),
     };
+
+    console.log('[DashboardSummary] Current metrics:', currentMetrics);
+    console.log('[DashboardSummary] Previous metrics:', previousMetricsRef.current);
 
     if (previousMetricsRef.current) {
       const timeDelta = (currentMetrics.timestamp - previousMetricsRef.current.timestamp) / 1000;
@@ -89,6 +103,14 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
 
         const newReceivedRate = Math.round(receivedDelta / timeDelta);
         const newPublishedRate = Math.round(publishedDelta / timeDelta);
+
+        console.log('[DashboardSummary] Calculated rates:', {
+          timeDelta,
+          receivedDelta,
+          publishedDelta,
+          newReceivedRate,
+          newPublishedRate
+        });
 
         setReceivedRate(newReceivedRate);
         setPublishedRate(newPublishedRate);

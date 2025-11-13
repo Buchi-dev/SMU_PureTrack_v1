@@ -27,7 +27,7 @@ interface UseCallDevicesReturn {
   registerDevice: (deviceId: string, building: string, floor: string, notes?: string) => Promise<void>;
   /** Loading state for any operation */
   isLoading: boolean;
-  /** Error from last operation */
+  /** Error from last operation (combined from all mutations) */
   error: Error | null;
   /** Success flag - true after successful operation */
   isSuccess: boolean;
@@ -35,6 +35,26 @@ interface UseCallDevicesReturn {
   addedDevice: Device | null;
   /** Reset error, success states, and added device */
   reset: () => void;
+  /** 
+   * Granular error tracking for each operation type.
+   * Useful when you need to know which specific operation failed.
+   */
+  errors: {
+    add: Error | null;
+    update: Error | null;
+    delete: Error | null;
+    register: Error | null;
+  };
+  /**
+   * Granular loading tracking for each operation type.
+   * Useful for showing operation-specific loading indicators.
+   */
+  loadingStates: {
+    isAdding: boolean;
+    isUpdating: boolean;
+    isDeleting: boolean;
+    isRegistering: boolean;
+  };
 }
 
 /**
@@ -63,8 +83,16 @@ interface UseCallDevicesReturn {
  *   sensors: ['tds', 'ph', 'turbidity']
  * });
  * 
- * // Update device
+ * // Update device with granular loading state
+ * if (loadingStates.isUpdating) {
+ *   console.log('Updating device...');
+ * }
  * await updateDevice('ESP32-001', { status: 'maintenance' });
+ * 
+ * // Check specific error
+ * if (errors.update) {
+ *   console.error('Update failed:', errors.update.message);
+ * }
  * 
  * // Register device location
  * await registerDevice('ESP32-001', 'Building A', 'Floor 2', 'Near cafeteria');
@@ -155,6 +183,20 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
     isSuccess,
     addedDevice: addMutation.data ?? null,
     reset,
+    // Granular error tracking
+    errors: {
+      add: addMutation.error,
+      update: updateMutation.error,
+      delete: deleteMutation.error,
+      register: registerMutation.error,
+    },
+    // Granular loading tracking
+    loadingStates: {
+      isAdding: addMutation.isPending,
+      isUpdating: updateMutation.isPending,
+      isDeleting: deleteMutation.isPending,
+      isRegistering: registerMutation.isPending,
+    },
   };
 };
 

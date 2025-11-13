@@ -127,7 +127,7 @@ export const useRealtime_Alerts = (
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
-  // Cleanup subscription when component unmounts or query changes
+  // Cleanup subscription when component unmounts or maxAlerts changes
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -135,7 +135,7 @@ export const useRealtime_Alerts = (
         unsubscribeRef.current = null;
       }
     };
-  }, [queryKey.join(',')]); // Reconnect if query key changes
+  }, [maxAlerts]); // Reconnect if maxAlerts changes
 
   return {
     alerts,

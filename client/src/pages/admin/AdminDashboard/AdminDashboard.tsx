@@ -3,7 +3,7 @@ import {
   DashboardOutlined, 
   CloudServerOutlined 
 } from '@ant-design/icons';
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useEffect } from 'react';
 import { AdminLayout } from "../../../components/layouts";
 import { 
   useRealtime_MQTTMetrics, 
@@ -82,6 +82,24 @@ export const AdminDashboard = memo(() => {
   // Combined loading state
   const isLoading = mqttLoading || devicesLoading || alertsLoading;
 
+  // Debug: Log loading states
+  useEffect(() => {
+    console.log('[AdminDashboard] Loading States:', {
+      mqttLoading,
+      devicesLoading,
+      alertsLoading,
+      combinedIsLoading: isLoading,
+      mqttHealth: !!mqttHealth,
+      mqttStatus: !!mqttStatus,
+      devices: devices?.length,
+      alerts: alerts?.length
+    });
+  }, [mqttLoading, devicesLoading, alertsLoading, isLoading, mqttHealth, mqttStatus, devices, alerts]);
+
+  // 🔧 FIX: Only show loading on initial load, not on background refetches
+  // If we have data, don't block the UI with loading state
+  const isInitialLoading = isLoading && !mqttHealth && !devices && !alerts;
+
   // Tab items
   const tabItems = [
     {
@@ -123,6 +141,27 @@ export const AdminDashboard = memo(() => {
           )}
 
           {/* Comprehensive Dashboard Summary */}
+          {(() => {
+            console.log('[AdminDashboard] Passing props to DashboardSummary:', {
+              mqttHealth: mqttHealth ? {
+                status: mqttHealth.status,
+                connected: mqttHealth.checks?.mqtt?.connected,
+                hasMetrics: !!mqttHealth.metrics,
+                metrics: mqttHealth.metrics
+              } : null,
+              mqttMemory: mqttStatus?.memory || null,
+              mqttFullHealth: mqttHealth ? {
+                status: mqttHealth.status,
+                hasChecks: !!mqttHealth.checks,
+                hasMetrics: !!mqttHealth.metrics,
+                metricsReceived: mqttHealth.metrics?.received,
+                metricsPublished: mqttHealth.metrics?.published
+              } : null,
+              loading: isInitialLoading,  // 🔧 FIXED: Was isLoading, now isInitialLoading
+              oldLoading: isLoading        // For comparison
+            });
+            return null;
+          })()}
           <DashboardSummary
             deviceStats={deviceStats}
             alertStats={alertStats}
@@ -134,7 +173,7 @@ export const AdminDashboard = memo(() => {
             } : null}
             mqttMemory={mqttStatus?.memory || null}
             mqttFullHealth={mqttHealth}
-            loading={isLoading}
+            loading={isInitialLoading}
           />
         </Space>
       ),

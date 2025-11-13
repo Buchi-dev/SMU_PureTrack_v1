@@ -12,6 +12,7 @@
 import { useMutation } from './useMutation';
 import { usersService } from '../../services/user.Service';
 import type { UserRole, UserStatus } from '../../schemas';
+import type { NotificationPreferences, PreferencesData } from '../../services/user.Service';
 
 /**
  * Update user response
@@ -35,9 +36,9 @@ interface UseCallUsersReturn {
   /** Update user status and/or role */
   updateUser: (userId: string, status?: UserStatus, role?: UserRole) => Promise<UpdateUserResult>;
   /** Get user notification preferences */
-  getUserPreferences: (userId: string) => Promise<any>;
+  getUserPreferences: (userId: string) => Promise<NotificationPreferences | null>;
   /** Setup/update user notification preferences */
-  setupPreferences: (preferences: any) => Promise<any>;
+  setupPreferences: (preferences: PreferencesData) => Promise<NotificationPreferences>;
   /** Loading state for any operation */
   isLoading: boolean;
   /** Error from last operation */
@@ -120,7 +121,7 @@ export const useCall_Users = (): UseCallUsersReturn => {
     },
   });
 
-  const getPreferencesMutation = useMutation<any, Error, string>({
+  const getPreferencesMutation = useMutation<NotificationPreferences | null, Error, string>({
     mutationFn: async (userId) => {
       return await usersService.getUserPreferences(userId);
     },
@@ -129,7 +130,7 @@ export const useCall_Users = (): UseCallUsersReturn => {
     },
   });
 
-  const setupPreferencesMutation = useMutation<any, Error, any>({
+  const setupPreferencesMutation = useMutation<NotificationPreferences, Error, PreferencesData>({
     mutationFn: async (preferences) => {
       return await usersService.setupPreferences(preferences);
     },

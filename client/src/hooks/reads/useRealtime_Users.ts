@@ -40,6 +40,10 @@ interface UseRealtimeUsersReturn {
   error: Error | null;
   /** Manual refetch function (reconnects listener) */
   refetch: () => void;
+  /** Whether data is being fetched (including background refetch) */
+  isFetching: boolean;
+  /** Whether data is stale and should be refetched */
+  isStale: boolean;
 }
 
 /**
@@ -79,6 +83,8 @@ export const useRealtime_Users = (
     isLoading,
     error,
     refetch,
+    isFetching,
+    isStale,
   } = useQuery<UserListData[], Error>({
     queryKey,
     queryFn: async () => {
@@ -118,7 +124,7 @@ export const useRealtime_Users = (
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
   });
 
-  // Cleanup subscription when component unmounts or query changes
+  // Cleanup subscription when component unmounts
   useEffect(() => {
     return () => {
       if (unsubscribeRef.current) {
@@ -126,7 +132,7 @@ export const useRealtime_Users = (
         unsubscribeRef.current = null;
       }
     };
-  }, [queryKey.join(',')]);
+  }, []); // Empty dependency - cleanup only on unmount
 
   return {
     users,
@@ -135,6 +141,8 @@ export const useRealtime_Users = (
     refetch: async () => {
       await refetch();
     },
+    isFetching,
+    isStale,
   };
 };
 

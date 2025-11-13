@@ -66,6 +66,8 @@ export interface MqttBridgeHealth {
     published: number;
     failed: number;
     flushes: number;
+    droppedUnmatched: number;
+    droppedBufferFull: number;
     circuitBreakerOpen: boolean;
   };
 }
@@ -90,6 +92,8 @@ export interface MqttBridgeStatus {
     published: number;
     failed: number;
     flushes: number;
+    droppedUnmatched: number;
+    droppedBufferFull: number;
     circuitBreakerOpen: boolean;
   };
   buffers: {
@@ -136,13 +140,22 @@ export class MqttService {
    */
   async getHealth(): Promise<MqttBridgeHealth> {
     try {
+      console.log('[MqttService] Fetching health from:', this.healthEndpoint);
       const response = await axios.get<MqttBridgeHealth>(this.healthEndpoint, {
         headers: { 'Accept': 'application/json' },
         timeout: this.requestTimeout,
       });
 
+      console.log('[MqttService] Health response received:', {
+        status: response.data.status,
+        metricsReceived: response.data.metrics?.received,
+        metricsPublished: response.data.metrics?.published,
+        connected: response.data.checks?.mqtt?.connected
+      });
+
       return response.data;
     } catch (error) {
+      console.error('[MqttService] Health fetch failed:', error);
       throw this.handleError(error, 'Failed to fetch MQTT Bridge health');
     }
   }
@@ -157,13 +170,22 @@ export class MqttService {
    */
   async getStatus(): Promise<MqttBridgeStatus> {
     try {
+      console.log('[MqttService] Fetching status from:', this.statusEndpoint);
       const response = await axios.get<MqttBridgeStatus>(this.statusEndpoint, {
         headers: { 'Accept': 'application/json' },
         timeout: this.requestTimeout,
       });
 
+      console.log('[MqttService] Status response received:', {
+        uptime: response.data.uptime,
+        metricsReceived: response.data.metrics?.received,
+        metricsPublished: response.data.metrics?.published,
+        mqttConnected: response.data.mqtt?.connected
+      });
+
       return response.data;
     } catch (error) {
+      console.error('[MqttService] Status fetch failed:', error);
       throw this.handleError(error, 'Failed to fetch MQTT Bridge status');
     }
   }
@@ -186,6 +208,21 @@ export class MqttService {
 
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError;
+      
+      // Check for CORS errors
+      if (axiosError.message?.includes('Network Error') && !axiosError.response) {
+        console.error('[MqttService] Possible CORS error - check browser console for details');
+        console.error('[MqttService] Current origin:', window.location.origin);
+        console.error('[MqttService] Target URL:', this.healthEndpoint);
+        return {
+          code: 'cors_error',
+          message: 'CORS error: Cannot connect to MQTT Bridge. Check if your origin is allowed.',
+          details: { 
+            origin: window.location.origin,
+            error: error.message 
+          },
+        };
+      }
       
       if (axiosError.code === 'ECONNABORTED') {
         return {

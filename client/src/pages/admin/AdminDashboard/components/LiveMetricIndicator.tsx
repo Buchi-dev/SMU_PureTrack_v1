@@ -43,6 +43,16 @@ export const LiveMetricIndicator = memo<LiveMetricIndicatorProps>(({
   const [isActive, setIsActive] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Debug logging to see what props are received
+  useEffect(() => {
+    console.log(`[LiveMetricIndicator ${title}] Props:`, {
+      currentValue,
+      totalValue,
+      loading,
+      dataHistoryLength: dataHistory.length
+    });
+  }, [title, currentValue, totalValue, loading, dataHistory]);
+
   // Detect if metric is active
   useEffect(() => {
     setIsActive(currentValue > 0);
@@ -168,6 +178,12 @@ export const LiveMetricIndicator = memo<LiveMetricIndicatorProps>(({
               {unit}
             </Text>
           </Space>
+          {/* Debug: Show we're receiving data even if it's 0 */}
+          {process.env.NODE_ENV === 'development' && (
+            <Text type="secondary" style={{ fontSize: '10px', display: 'block' }}>
+              Debug: cv={currentValue}, tv={totalValue}
+            </Text>
+          )}
         </div>
 
         {/* Mini Graph */}

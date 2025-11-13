@@ -1,10 +1,27 @@
 /**
- * useMutation - Generic Mutation Hook
+ * useMutation - Enhanced Mutation Hook
  * 
- * Re-export of React Query's useMutation with application-specific defaults.
- * Provides consistent loading, error, and success state management for all write operations.
+ * Application-specific wrapper around React Query's useMutation with automatic cache invalidation.
+ * This wrapper is NOT deprecated - it provides valuable automatic cache management that simplifies
+ * mutation handling across the application.
  * 
- * Now powered by @tanstack/react-query for:
+ * **Why use this instead of React Query's useMutation directly?**
+ * - ✅ Automatic cache invalidation via `invalidateQueries` option (no manual queryClient calls)
+ * - ✅ Consistent mutation pattern across all write hooks
+ * - ✅ Simplified API - less boilerplate in consuming code
+ * - ✅ Centralized mutation logic for easier maintenance
+ * 
+ * **When to use:**
+ * - ALL write operations in custom hooks (useCall_* hooks)
+ * - Any mutation that needs to invalidate related queries
+ * - Standard CRUD operations with automatic cache refresh
+ * 
+ * **When to use React Query's useMutation directly:**
+ * - Complex optimistic updates requiring full control
+ * - Advanced mutation orchestration with manual cache management
+ * - One-off mutations outside the standard hook pattern
+ * 
+ * Powered by @tanstack/react-query for:
  * - Automatic cache invalidation
  * - Optimistic updates
  * - Request deduplication
@@ -12,7 +29,6 @@
  * - DevTools integration
  * 
  * @module hooks/writes
- * @deprecated Use useMutation from @tanstack/react-query directly
  */
 
 import { useMutation as useReactQueryMutation, useQueryClient } from '@tanstack/react-query';

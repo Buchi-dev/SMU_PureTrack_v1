@@ -25,6 +25,35 @@ import { devicesService } from '../../services/devices.Service';
 import type { Device, SensorReading } from '../../schemas';
 
 /**
+ * Simple throttle utility for RTDB updates
+ * Ensures cache updates don't happen more frequently than specified interval
+ */
+function throttle<T extends (...args: any[]) => void>(
+  func: T,
+  delay: number
+): T {
+  let timeoutId: NodeJS.Timeout | null = null;
+  let lastArgs: Parameters<T> | null = null;
+
+  const throttled = (...args: Parameters<T>) => {
+    lastArgs = args;
+
+    if (!timeoutId) {
+      func(...args);
+      timeoutId = setTimeout(() => {
+        if (lastArgs) {
+          func(...lastArgs);
+        }
+        timeoutId = null;
+        lastArgs = null;
+      }, delay);
+    }
+  };
+
+  return throttled as T;
+}
+
+/**
  * Device with sensor data
  */
 export interface DeviceWithSensorData {
@@ -64,6 +93,10 @@ interface UseRealtimeDevicesReturn {
   error: Error | null;
   /** Manual refetch function (reconnects listeners) */
   refetch: () => void;
+  /** Whether data is being fetched (including background refetch) */
+  isFetching: boolean;
+  /** Whether data is stale and should be refetched */
+  isStale: boolean;
 }
 
 /**
@@ -98,11 +131,28 @@ export const useRealtime_Devices = (
   // React Query configuration
   const queryKey = ['devices', 'realtime', { includeMetadata }];
 
+  // Create throttled cache update function (max once per 500ms)
+  // Prevents excessive re-renders from rapid sensor updates
+  const throttledCacheUpdate = useRef(
+    throttle((deviceId: string, reading: SensorReading) => {
+      queryClient.setQueryData<DeviceWithSensorData[]>(queryKey, (oldData) => {
+        if (!oldData) return oldData;
+        return oldData.map((device) =>
+          device.deviceId === deviceId
+            ? { ...device, latestReading: reading }
+            : device
+        );
+      });
+    }, 500) // Update cache max once per 500ms per device
+  );
+
   const {
     data: devices = [],
     isLoading,
     error,
     refetch,
+    isFetching,
+    isStale,
   } = useQuery<DeviceWithSensorData[], Error>({
     queryKey,
     queryFn: async () => {
@@ -134,15 +184,9 @@ export const useRealtime_Devices = (
           deviceIds,
           (deviceId, reading) => {
             if (reading) {
-              // ✅ Update sensor reading in cache, keep Firestore status as source of truth
-              queryClient.setQueryData<DeviceWithSensorData[]>(queryKey, (oldData) => {
-                if (!oldData) return oldData;
-                return oldData.map((device) =>
-                  device.deviceId === deviceId
-                    ? { ...device, latestReading: reading }
-                    : device
-                );
-              });
+              // ✅ Throttled update: prevents excessive re-renders from rapid sensor updates
+              // Cache updates max once per 500ms per device
+              throttledCacheUpdate.current(deviceId, reading);
             }
           },
           (deviceId, err) => {
@@ -163,7 +207,7 @@ export const useRealtime_Devices = (
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
-  // Cleanup subscription when component unmounts or query key changes
+  // Cleanup subscription when component unmounts or includeMetadata changes
   useEffect(() => {
     return () => {
       if (unsubscribeAllRef.current) {
@@ -171,7 +215,7 @@ export const useRealtime_Devices = (
         unsubscribeAllRef.current = null;
       }
     };
-  }, [queryKey.join(',')]);
+  }, [includeMetadata]); // Reconnect if includeMetadata changes
 
   return {
     devices,
@@ -180,6 +224,8 @@ export const useRealtime_Devices = (
     refetch: async () => {
       await refetch();
     },
+    isFetching,
+    isStale,
   };
 };
 

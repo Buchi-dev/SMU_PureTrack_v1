@@ -6,6 +6,11 @@
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
+ * Architecture:
+ * - Uses separate queries for health and status to allow partial failures
+ * - Each endpoint can fail independently without blocking the other
+ * - Better resilience for network issues or service degradation
+ * 
  * Powered by React Query for:
  * - Automatic polling with refetchInterval
  * - Smart error recovery and exponential backoff
@@ -83,13 +88,13 @@ export const useRealtime_MQTTMetrics = (
 ): UseRealtimeMQTTMetricsReturn => {
   const { 
     pollInterval = 2000, 
-    enabled = true,
-    retryDelay = 5000
+    enabled = true
   } = options;
 
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // React Query configuration for health
+  // Separate queries for better error isolation
+  // Each can fail independently without blocking the other
   const healthQuery = useQuery<MqttBridgeHealth, Error>({
     queryKey: ['mqtt', 'health'],
     queryFn: async () => {
@@ -100,36 +105,68 @@ export const useRealtime_MQTTMetrics = (
     enabled,
     refetchInterval: pollInterval,
     refetchIntervalInBackground: true,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(retryDelay * Math.pow(2, attemptIndex), 30000),
-    staleTime: 0, // Always consider data stale to enable continuous polling
-    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+    retry: 1, // Only retry once for faster failure
+    retryDelay: 1000, // Quick retry
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+    // Don't throw on error - return undefined and let UI handle it
+    throwOnError: false,
   });
 
-  // React Query configuration for status
   const statusQuery = useQuery<MqttBridgeStatus, Error>({
     queryKey: ['mqtt', 'status'],
     queryFn: async () => {
-      const data = await mqttService.getStatus();
-      return data;
+      return await mqttService.getStatus();
     },
     enabled,
     refetchInterval: pollInterval,
     refetchIntervalInBackground: true,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(retryDelay * Math.pow(2, attemptIndex), 30000),
-    staleTime: 0, // Always consider data stale to enable continuous polling
-    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+    retry: 1, // Only retry once for faster failure
+    retryDelay: 1000, // Quick retry
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000,
+    // Don't throw on error - return undefined and let UI handle it
+    throwOnError: false,
   });
 
-  // Combined loading state - only true if both are loading for the first time
-  const isLoading = healthQuery.isLoading || statusQuery.isLoading;
+  // Combined loading state - only true if BOTH are loading for the first time AND have no data yet
+  // This prevents infinite loading if one query succeeds
+  const isLoading = (healthQuery.isLoading || statusQuery.isLoading) && 
+                    !healthQuery.data && 
+                    !statusQuery.data;
   
-  // Combined error state - show error if either fails
-  const error = healthQuery.error || statusQuery.error;
+  // Combined error state - show error only if BOTH fail
+  // This allows partial success (e.g., health works but status fails)
+  const error = (healthQuery.error && statusQuery.error) 
+    ? (healthQuery.error || statusQuery.error) 
+    : null;
 
   // Determine if actively polling
   const isPolling = enabled && (healthQuery.isFetching || statusQuery.isFetching);
+
+  // Debug logging in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[useRealtime_MQTTMetrics] State:', {
+      isLoading,
+      isPolling,
+      healthData: !!healthQuery.data,
+      statusData: !!statusQuery.data,
+      healthLoading: healthQuery.isLoading,
+      statusLoading: statusQuery.isLoading,
+      healthError: healthQuery.error?.message,
+      statusError: statusQuery.error?.message,
+      healthMetrics: healthQuery.data?.metrics,
+      statusMetrics: statusQuery.data?.metrics,
+    });
+    
+    // Deep log the full health object to see structure
+    if (healthQuery.data) {
+      console.log('[useRealtime_MQTTMetrics] Full Health Data:', JSON.stringify(healthQuery.data, null, 2));
+    }
+    if (statusQuery.data) {
+      console.log('[useRealtime_MQTTMetrics] Full Status Data:', JSON.stringify(statusQuery.data, null, 2));
+    }
+  }
 
   return {
     health: healthQuery.data ?? null,

@@ -54,7 +54,26 @@ interface UseCallReportsReturn {
   error: Error | null;
   /** Success flag - true after successful operation */
   isSuccess: boolean;
-  /** Data from last successful report generation */
+  /** 
+   * Data from last successful report generation.
+   * ⚠️ NOTE: Returns the most recent report data from ANY mutation (water quality, 
+   * device status, data summary, compliance, or custom). If you need to track specific 
+   * report types separately, capture the returned promise value directly from the 
+   * generation function instead of using this shared state.
+   * 
+   * @example
+   * ```tsx
+   * // Using shared reportData (returns last report of any type)
+   * const { generateWaterQualityReport, reportData } = useCall_Reports();
+   * await generateWaterQualityReport(['device1']);
+   * console.log(reportData); // Water quality report data
+   * 
+   * // Tracking specific report types separately
+   * const waterQualityReport = await generateWaterQualityReport(['device1']);
+   * const statusReport = await generateDeviceStatusReport(['device2']);
+   * // Now you have both reports stored separately
+   * ```
+   */
   reportData: any | null;
   /** Reset error, success states, and report data */
   reset: () => void;
