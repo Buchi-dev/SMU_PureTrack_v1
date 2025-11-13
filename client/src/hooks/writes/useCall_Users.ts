@@ -98,6 +98,7 @@ export const useCall_Users = (): UseCallUsersReturn => {
     mutationFn: async ({ userId, status }) => {
       await usersService.updateUserStatus(userId, status);
     },
+    invalidateQueries: [['users', 'realtime']], // Auto-refresh users list
     onError: (error) => {
       console.error('[useCall_Users] Update status error:', error);
     },
@@ -113,6 +114,7 @@ export const useCall_Users = (): UseCallUsersReturn => {
         updates: response.updates,
       };
     },
+    invalidateQueries: [['users', 'realtime']], // Auto-refresh users list
     onError: (error) => {
       console.error('[useCall_Users] Update user error:', error);
     },
@@ -136,12 +138,12 @@ export const useCall_Users = (): UseCallUsersReturn => {
     },
   });
 
-  // Determine combined loading/error/success state
+  // Determine combined loading/error/success state (React Query uses 'isPending')
   const isLoading = 
-    updateStatusMutation.isLoading || 
-    updateUserMutation.isLoading || 
-    getPreferencesMutation.isLoading || 
-    setupPreferencesMutation.isLoading;
+    updateStatusMutation.isPending || 
+    updateUserMutation.isPending || 
+    getPreferencesMutation.isPending || 
+    setupPreferencesMutation.isPending;
   
   const error = 
     updateStatusMutation.error || 
@@ -164,15 +166,15 @@ export const useCall_Users = (): UseCallUsersReturn => {
 
   return {
     updateUserStatus: (userId: string, status: UserStatus) => 
-      updateStatusMutation.mutate({ userId, status }),
+      updateStatusMutation.mutateAsync({ userId, status }),
     updateUser: (userId: string, status?: UserStatus, role?: UserRole) => 
-      updateUserMutation.mutate({ userId, status, role }),
-    getUserPreferences: getPreferencesMutation.mutate,
-    setupPreferences: setupPreferencesMutation.mutate,
+      updateUserMutation.mutateAsync({ userId, status, role }),
+    getUserPreferences: getPreferencesMutation.mutateAsync,
+    setupPreferences: setupPreferencesMutation.mutateAsync,
     isLoading,
     error,
     isSuccess,
-    updateResult: updateUserMutation.data,
+    updateResult: updateUserMutation.data ?? null,
     reset,
   };
 };

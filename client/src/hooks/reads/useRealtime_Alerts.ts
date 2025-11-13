@@ -6,10 +6,17 @@
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
+ * Powered by React Query for:
+ * - Automatic caching and request deduplication
+ * - Background refetching and smart invalidation
+ * - Built-in error retry with exponential backoff
+ * - DevTools integration for debugging
+ * 
  * @module hooks/reads
  */
 
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { alertsService } from '../../services/alerts.Service';
 import type { WaterQualityAlert } from '../../schemas';
 
@@ -35,14 +42,29 @@ interface UseRealtimeAlertsReturn {
   error: Error | null;
   /** Manual refetch function (reconnects listener) */
   refetch: () => void;
+  /** Whether data is being fetched (including background refetch) */
+  isFetching: boolean;
+  /** Whether data is stale and should be refetched */
+  isStale: boolean;
 }
 
 /**
  * Subscribe to real-time water quality alerts from Firestore
  * 
+ * Uses React Query for smart caching and automatic refetching.
+ * Maintains real-time Firestore subscription and updates cache on changes.
+ * 
  * @example
  * ```tsx
- * const { alerts, isLoading, error } = useRealtime_Alerts({ maxAlerts: 50 });
+ * const { alerts, isLoading, error, refetch } = useRealtime_Alerts({ maxAlerts: 50 });
+ * 
+ * // Check if data is stale
+ * if (isStale) {
+ *   console.log('Data might be outdated');
+ * }
+ * 
+ * // Manual refetch
+ * await refetch();
  * ```
  * 
  * @param options - Configuration options
@@ -52,50 +74,78 @@ export const useRealtime_Alerts = (
   options: UseRealtimeAlertsOptions = {}
 ): UseRealtimeAlertsReturn => {
   const { maxAlerts = 20, enabled = true } = options;
+  const queryClient = useQueryClient();
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // React Query configuration
+  const queryKey = ['alerts', 'realtime', maxAlerts];
 
+  const {
+    data: alerts = [],
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+    isStale,
+  } = useQuery<WaterQualityAlert[], Error>({
+    queryKey,
+    queryFn: async () => {
+      // Initial fetch - returns a promise that resolves with initial data
+      return new Promise<WaterQualityAlert[]>((resolve, reject) => {
+        let initialDataReceived = false;
+
+        const unsubscribe = alertsService.subscribeToAlerts(
+          (alertsData) => {
+            if (!initialDataReceived) {
+              // First data received - resolve the promise
+              initialDataReceived = true;
+              resolve(alertsData);
+            } else {
+              // Subsequent updates - update cache directly
+              queryClient.setQueryData<WaterQualityAlert[]>(queryKey, alertsData);
+            }
+          },
+          (err) => {
+            console.error('[useRealtime_Alerts] Subscription error:', err);
+            if (!initialDataReceived) {
+              reject(err instanceof Error ? err : new Error('Failed to fetch alerts'));
+            }
+          },
+          maxAlerts
+        );
+
+        // Store unsubscribe function
+        unsubscribeRef.current = unsubscribe;
+      });
+    },
+    enabled,
+    staleTime: 0, // Always consider data fresh (real-time subscription)
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+    refetchOnWindowFocus: false, // Don't refetch on focus (we have real-time updates)
+    refetchOnMount: true, // Refetch on mount to establish subscription
+    retry: 3, // Retry failed subscriptions
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+  });
+
+  // Cleanup subscription when component unmounts or query changes
   useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    // Subscribe to real-time alerts via service layer
-    const unsubscribe = alertsService.subscribeToAlerts(
-      (alertsData) => {
-        setAlerts(alertsData);
-        setError(null);
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('[useRealtime_Alerts] Subscription error:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch alerts'));
-        setIsLoading(false);
-      },
-      maxAlerts
-    );
-
     return () => {
-      unsubscribe();
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
     };
-  }, [maxAlerts, enabled, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger((prev) => prev + 1);
-  };
+  }, [queryKey.join(',')]); // Reconnect if query key changes
 
   return {
     alerts,
     isLoading,
     error,
-    refetch,
+    refetch: async () => {
+      await refetch();
+    },
+    isFetching,
+    isStale,
   };
 };
 

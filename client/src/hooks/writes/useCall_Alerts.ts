@@ -58,6 +58,7 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
     mutationFn: async (alertId: string) => {
       await alertsService.acknowledgeAlert(alertId);
     },
+    invalidateQueries: [['alerts', 'realtime']], // Auto-refresh alerts list
     onError: (error) => {
       console.error('[useCall_Alerts] Acknowledge error:', error);
     },
@@ -67,13 +68,14 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
     mutationFn: async ({ alertId, notes }) => {
       await alertsService.resolveAlert(alertId, notes);
     },
+    invalidateQueries: [['alerts', 'realtime']], // Auto-refresh alerts list
     onError: (error) => {
       console.error('[useCall_Alerts] Resolve error:', error);
     },
   });
 
-  // Determine combined loading/error/success state
-  const isLoading = acknowledgeMutation.isLoading || resolveMutation.isLoading;
+  // Determine combined loading/error/success state (React Query uses 'isPending' instead of 'isLoading')
+  const isLoading = acknowledgeMutation.isPending || resolveMutation.isPending;
   const error = acknowledgeMutation.error || resolveMutation.error;
   const isSuccess = acknowledgeMutation.isSuccess || resolveMutation.isSuccess;
 
@@ -83,8 +85,8 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
   };
 
   return {
-    acknowledgeAlert: acknowledgeMutation.mutate,
-    resolveAlert: (alertId: string, notes?: string) => resolveMutation.mutate({ alertId, notes }),
+    acknowledgeAlert: acknowledgeMutation.mutateAsync,
+    resolveAlert: (alertId: string, notes?: string) => resolveMutation.mutateAsync({ alertId, notes }),
     isLoading,
     error,
     isSuccess,

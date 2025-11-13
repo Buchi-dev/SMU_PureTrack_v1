@@ -140,13 +140,13 @@ export const useCall_Reports = (): UseCallReportsReturn => {
     },
   });
 
-  // Determine combined loading/error/success state
+  // Determine combined loading/error/success state (React Query uses 'isPending')
   const isLoading = 
-    waterQualityMutation.isLoading || 
-    deviceStatusMutation.isLoading || 
-    dataSummaryMutation.isLoading || 
-    complianceMutation.isLoading || 
-    customReportMutation.isLoading;
+    waterQualityMutation.isPending || 
+    deviceStatusMutation.isPending || 
+    dataSummaryMutation.isPending || 
+    complianceMutation.isPending || 
+    customReportMutation.isPending;
   
   const error = 
     waterQualityMutation.error || 
@@ -164,11 +164,12 @@ export const useCall_Reports = (): UseCallReportsReturn => {
 
   // Get the most recent report data from any mutation
   const reportData = 
-    waterQualityMutation.data || 
-    deviceStatusMutation.data || 
-    dataSummaryMutation.data || 
-    complianceMutation.data || 
-    customReportMutation.data;
+    waterQualityMutation.data ?? 
+    deviceStatusMutation.data ?? 
+    dataSummaryMutation.data ?? 
+    complianceMutation.data ?? 
+    customReportMutation.data ?? 
+    null;
 
   const reset = () => {
     waterQualityMutation.reset();
@@ -180,14 +181,14 @@ export const useCall_Reports = (): UseCallReportsReturn => {
 
   return {
     generateWaterQualityReport: (deviceIds?: string[], startDate?: number, endDate?: number) =>
-      waterQualityMutation.mutate({ deviceIds, startDate, endDate }),
+      waterQualityMutation.mutateAsync({ deviceIds, startDate, endDate }),
     generateDeviceStatusReport: (deviceIds?: string[]) =>
-      deviceStatusMutation.mutate({ deviceIds }),
+      deviceStatusMutation.mutateAsync({ deviceIds }),
     generateDataSummaryReport: (deviceIds?: string[], startDate?: number, endDate?: number) =>
-      dataSummaryMutation.mutate({ deviceIds, startDate, endDate }),
+      dataSummaryMutation.mutateAsync({ deviceIds, startDate, endDate }),
     generateComplianceReport: (deviceIds?: string[], startDate?: number, endDate?: number) =>
-      complianceMutation.mutate({ deviceIds, startDate, endDate }),
-    generateReport: customReportMutation.mutate,
+      complianceMutation.mutateAsync({ deviceIds, startDate, endDate }),
+    generateReport: customReportMutation.mutateAsync,
     isLoading,
     error,
     isSuccess,

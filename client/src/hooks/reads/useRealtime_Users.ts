@@ -6,10 +6,17 @@
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
+ * Powered by React Query for:
+ * - Automatic caching and request deduplication
+ * - Background refetching and smart invalidation
+ * - Built-in error retry with exponential backoff
+ * - DevTools integration for debugging
+ * 
  * @module hooks/reads
  */
 
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { usersService } from '../../services/user.Service';
 import type { UserListData } from '../../schemas';
 
@@ -38,12 +45,20 @@ interface UseRealtimeUsersReturn {
 /**
  * Subscribe to real-time user updates from Firestore
  * 
+ * Uses React Query for smart caching and automatic refetching.
+ * Maintains real-time Firestore subscription and updates cache on changes.
+ * 
  * @example
  * ```tsx
- * const { users, isLoading, error } = useRealtime_Users();
+ * const { users, isLoading, error, refetch } = useRealtime_Users();
  * 
  * // Conditional subscription
  * const { users } = useRealtime_Users({ enabled: isAdmin });
+ * 
+ * // Check if data is stale
+ * if (isStale) {
+ *   console.log('User data might be outdated');
+ * }
  * ```
  * 
  * @param options - Configuration options
@@ -53,49 +68,73 @@ export const useRealtime_Users = (
   options: UseRealtimeUsersOptions = {}
 ): UseRealtimeUsersReturn => {
   const { enabled = true } = options;
+  const queryClient = useQueryClient();
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  const [users, setUsers] = useState<UserListData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // React Query configuration
+  const queryKey = ['users', 'realtime'];
 
+  const {
+    data: users = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<UserListData[], Error>({
+    queryKey,
+    queryFn: async () => {
+      // Initial fetch - returns a promise that resolves with initial data
+      return new Promise<UserListData[]>((resolve, reject) => {
+        let initialDataReceived = false;
+
+        const unsubscribe = usersService.subscribeToUsers(
+          (usersData) => {
+            if (!initialDataReceived) {
+              // First data received - resolve the promise
+              initialDataReceived = true;
+              resolve(usersData);
+            } else {
+              // Subsequent updates - update cache directly
+              queryClient.setQueryData<UserListData[]>(queryKey, usersData);
+            }
+          },
+          (err) => {
+            console.error('[useRealtime_Users] Subscription error:', err);
+            if (!initialDataReceived) {
+              reject(err instanceof Error ? err : new Error('Failed to fetch users'));
+            }
+          }
+        );
+
+        // Store unsubscribe function
+        unsubscribeRef.current = unsubscribe;
+      });
+    },
+    enabled,
+    staleTime: 0, // Always consider data fresh (real-time subscription)
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+    refetchOnWindowFocus: false, // Don't refetch on focus (we have real-time updates)
+    refetchOnMount: true, // Refetch on mount to establish subscription
+    retry: 3, // Retry failed subscriptions
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+  });
+
+  // Cleanup subscription when component unmounts or query changes
   useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    // Subscribe to real-time users via service layer
-    const unsubscribe = usersService.subscribeToUsers(
-      (usersData) => {
-        setUsers(usersData);
-        setError(null);
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('[useRealtime_Users] Subscription error:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch users'));
-        setIsLoading(false);
-      }
-    );
-
     return () => {
-      unsubscribe();
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
     };
-  }, [enabled, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger((prev) => prev + 1);
-  };
+  }, [queryKey.join(',')]);
 
   return {
     users,
     isLoading,
     error,
-    refetch,
+    refetch: async () => {
+      await refetch();
+    },
   };
 };
 

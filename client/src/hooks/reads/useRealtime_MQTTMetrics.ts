@@ -6,10 +6,17 @@
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
+ * Powered by React Query for:
+ * - Automatic polling with refetchInterval
+ * - Smart error recovery and exponential backoff
+ * - Background refetching and caching
+ * - Automatic request deduplication
+ * 
  * @module hooks/reads
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { mqttService } from '../../services/mqtt.service';
 import type { MqttBridgeHealth, MqttBridgeStatus } from '../../services/mqtt.service';
 
@@ -80,119 +87,59 @@ export const useRealtime_MQTTMetrics = (
     retryDelay = 5000
   } = options;
 
-  const [health, setHealth] = useState<MqttBridgeHealth | null>(null);
-  const [status, setStatus] = useState<MqttBridgeStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
 
-  // Refs for optimization and cleanup
-  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
-  const errorCountRef = useRef(0);
-  const lastValidHealthRef = useRef<MqttBridgeHealth | null>(null);
-  const lastValidStatusRef = useRef<MqttBridgeStatus | null>(null);
-  const prevHealthStrRef = useRef<string | null>(null);
-  const prevStatusStrRef = useRef<string | null>(null);
-
-  /**
-   * Fetch both health and status data
-   */
-  const fetchMetrics = useCallback(async () => {
-    try {
-      // Fetch both endpoints in parallel
-      const [healthData, statusData] = await Promise.all([
-        mqttService.getHealth(),
-        mqttService.getStatus(),
-      ]);
-
-      // Deduplicate health data
-      const healthStr = JSON.stringify(healthData);
-      if (prevHealthStrRef.current !== healthStr) {
-        setHealth(healthData);
-        lastValidHealthRef.current = healthData;
-        prevHealthStrRef.current = healthStr;
-      }
-
-      // Deduplicate status data
-      const statusStr = JSON.stringify(statusData);
-      if (prevStatusStrRef.current !== statusStr) {
-        setStatus(statusData);
-        lastValidStatusRef.current = statusData;
-        prevStatusStrRef.current = statusStr;
-      }
-
-      setError(null);
+  // React Query configuration for health
+  const healthQuery = useQuery<MqttBridgeHealth, Error>({
+    queryKey: ['mqtt', 'health'],
+    queryFn: async () => {
+      const data = await mqttService.getHealth();
       setLastUpdate(new Date());
-      setIsLoading(false);
-      errorCountRef.current = 0; // Reset error count on success
+      return data;
+    },
+    enabled,
+    refetchInterval: pollInterval,
+    refetchIntervalInBackground: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(retryDelay * Math.pow(2, attemptIndex), 30000),
+    staleTime: 0, // Always consider data stale to enable continuous polling
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+  });
 
-    } catch (err) {
-      errorCountRef.current++;
-      const error = err instanceof Error ? err : new Error('Failed to fetch MQTT metrics');
-      
-      console.error('[useRealtime_MQTTMetrics] Fetch error:', error);
-      
-      // Keep last valid data on error
-      if (lastValidHealthRef.current) {
-        console.warn('[useRealtime_MQTTMetrics] Using cached health data due to error');
-      }
-      if (lastValidStatusRef.current) {
-        console.warn('[useRealtime_MQTTMetrics] Using cached status data due to error');
-      }
+  // React Query configuration for status
+  const statusQuery = useQuery<MqttBridgeStatus, Error>({
+    queryKey: ['mqtt', 'status'],
+    queryFn: async () => {
+      const data = await mqttService.getStatus();
+      return data;
+    },
+    enabled,
+    refetchInterval: pollInterval,
+    refetchIntervalInBackground: true,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(retryDelay * Math.pow(2, attemptIndex), 30000),
+    staleTime: 0, // Always consider data stale to enable continuous polling
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+  });
 
-      setError(error);
-      setIsLoading(false);
-    }
-  }, []);
+  // Combined loading state - only true if both are loading for the first time
+  const isLoading = healthQuery.isLoading || statusQuery.isLoading;
+  
+  // Combined error state - show error if either fails
+  const error = healthQuery.error || statusQuery.error;
 
-  /**
-   * Manual refetch
-   */
-  const refetch = useCallback(async () => {
-    await fetchMetrics();
-  }, [fetchMetrics]);
-
-  /**
-   * Polling effect
-   */
-  useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      setIsPolling(false);
-      return;
-    }
-
-    setIsPolling(true);
-
-    const poll = async () => {
-      await fetchMetrics();
-
-      // Schedule next poll with adaptive delay
-      const delay = errorCountRef.current > 0 ? retryDelay : pollInterval;
-      
-      timeoutIdRef.current = setTimeout(poll, delay);
-    };
-
-    // Start polling
-    poll();
-
-    return () => {
-      setIsPolling(false);
-      if (timeoutIdRef.current) {
-        clearTimeout(timeoutIdRef.current);
-        timeoutIdRef.current = null;
-      }
-    };
-  }, [enabled, pollInterval, retryDelay, fetchMetrics]);
+  // Determine if actively polling
+  const isPolling = enabled && (healthQuery.isFetching || statusQuery.isFetching);
 
   return {
-    health,
-    status,
+    health: healthQuery.data ?? null,
+    status: statusQuery.data ?? null,
     isLoading,
     error,
     lastUpdate,
-    refetch,
+    refetch: async () => {
+      await Promise.all([healthQuery.refetch(), statusQuery.refetch()]);
+    },
     isPolling,
   };
 };

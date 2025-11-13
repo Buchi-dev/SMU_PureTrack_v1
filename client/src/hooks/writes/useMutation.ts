@@ -1,37 +1,24 @@
 /**
  * useMutation - Generic Mutation Hook
  * 
- * A reusable hook for handling async operations with consistent
- * loading, error, and success state management.
+ * Re-export of React Query's useMutation with application-specific defaults.
+ * Provides consistent loading, error, and success state management for all write operations.
  * 
- * Inspired by React Query's useMutation pattern, but simplified
- * for this application's needs without external dependencies.
+ * Now powered by @tanstack/react-query for:
+ * - Automatic cache invalidation
+ * - Optimistic updates
+ * - Request deduplication
+ * - Built-in retry logic
+ * - DevTools integration
  * 
  * @module hooks/writes
+ * @deprecated Use useMutation from @tanstack/react-query directly
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useMutation as useReactQueryMutation, useQueryClient } from '@tanstack/react-query';
 
 /**
- * Mutation state
- */
-export interface MutationState<TData = unknown, TError = Error> {
-  /** Current data from successful mutation */
-  data: TData | null;
-  /** Current error from failed mutation */
-  error: TError | null;
-  /** Whether mutation is currently executing */
-  isLoading: boolean;
-  /** Whether mutation has completed successfully */
-  isSuccess: boolean;
-  /** Whether mutation has failed */
-  isError: boolean;
-  /** Whether mutation is idle (not started) */
-  isIdle: boolean;
-}
-
-/**
- * Mutation options
+ * Mutation options (compatible with React Query)
  */
 export interface MutationOptions<TData = unknown, TError = Error, TVariables = void> {
   /** Function to execute - receives variables and returns a promise */
@@ -41,26 +28,18 @@ export interface MutationOptions<TData = unknown, TError = Error, TVariables = v
   /** Called on failed mutation */
   onError?: (error: TError, variables: TVariables) => void;
   /** Called when mutation settles (success or error) */
-  onSettled?: (data: TData | null, error: TError | null, variables: TVariables) => void;
+  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables) => void;
+  /** Query keys to invalidate on success */
+  invalidateQueries?: string[][];
+  /** Enable optimistic updates */
+  onMutate?: (variables: TVariables) => Promise<any> | any;
 }
 
 /**
- * Mutation result
- */
-export interface MutationResult<TData = unknown, TError = Error, TVariables = void> extends MutationState<TData, TError> {
-  /** Execute the mutation */
-  mutate: (variables: TVariables) => Promise<TData>;
-  /** Execute the mutation asynchronously (same as mutate) */
-  mutateAsync: (variables: TVariables) => Promise<TData>;
-  /** Reset mutation state */
-  reset: () => void;
-}
-
-/**
- * Generic mutation hook for handling async operations
+ * Enhanced mutation hook powered by React Query
  * 
- * Provides a consistent API for write operations with built-in
- * loading, error, and success state management.
+ * Wrapper around @tanstack/react-query's useMutation with application-specific
+ * enhancements like automatic cache invalidation and optimistic updates.
  * 
  * @example
  * ```tsx
@@ -69,6 +48,7 @@ export interface MutationResult<TData = unknown, TError = Error, TVariables = vo
  *   mutationFn: async (userId: string) => {
  *     return await userService.deleteUser(userId);
  *   },
+ *   invalidateQueries: [['users', 'realtime']], // Auto-invalidate users list
  *   onSuccess: () => {
  *     message.success('User deleted');
  *   },
@@ -78,26 +58,29 @@ export interface MutationResult<TData = unknown, TError = Error, TVariables = vo
  * });
  * 
  * // Execute mutation
- * await mutation.mutate('user-123');
+ * await mutation.mutateAsync('user-123');
  * 
  * // Check state
- * if (mutation.isLoading) return <Spin />;
+ * if (mutation.isPending) return <Spin />;
  * if (mutation.isError) return <Error message={mutation.error.message} />;
  * if (mutation.isSuccess) return <Success data={mutation.data} />;
  * ```
  * 
  * @example
  * ```tsx
- * // With complex variables
+ * // With complex variables and optimistic updates
  * const addDeviceMutation = useMutation({
  *   mutationFn: async ({ id, data }: { id: string; data: DeviceData }) => {
  *     return await deviceService.addDevice(id, data);
- *   }
- * });
- * 
- * await addDeviceMutation.mutate({
- *   id: 'ESP32-001',
- *   data: { name: 'Sensor 1', type: 'ESP32' }
+ *   },
+ *   onMutate: async (newDevice) => {
+ *     // Optimistically update UI before server responds
+ *     await queryClient.cancelQueries({ queryKey: ['devices'] });
+ *     const previousDevices = queryClient.getQueryData(['devices']);
+ *     queryClient.setQueryData(['devices'], (old) => [...old, newDevice]);
+ *     return { previousDevices };
+ *   },
+ *   invalidateQueries: [['devices', 'realtime']],
  * });
  * ```
  * 
@@ -106,99 +89,36 @@ export interface MutationResult<TData = unknown, TError = Error, TVariables = vo
  * @template TVariables - Type of variables passed to mutation (defaults to void)
  * 
  * @param options - Mutation configuration options
- * @returns Mutation state and functions
+ * @returns Mutation state and functions (compatible with React Query)
  */
 export function useMutation<TData = unknown, TError = Error, TVariables = void>(
   options: MutationOptions<TData, TError, TVariables>
-): MutationResult<TData, TError, TVariables> {
-  const { mutationFn, onSuccess, onError, onSettled } = options;
+) {
+  const queryClient = useQueryClient();
+  const { invalidateQueries, onSuccess, onError, onSettled, ...reactQueryOptions } = options;
 
-  // Use refs for callbacks to avoid dependency issues
-  const onSuccessRef = useRef(onSuccess);
-  const onErrorRef = useRef(onError);
-  const onSettledRef = useRef(onSettled);
-
-  // Update refs when callbacks change
-  onSuccessRef.current = onSuccess;
-  onErrorRef.current = onError;
-  onSettledRef.current = onSettled;
-
-  const [state, setState] = useState<MutationState<TData, TError>>({
-    data: null,
-    error: null,
-    isLoading: false,
-    isSuccess: false,
-    isError: false,
-    isIdle: true,
-  });
-
-  const reset = useCallback(() => {
-    setState({
-      data: null,
-      error: null,
-      isLoading: false,
-      isSuccess: false,
-      isError: false,
-      isIdle: true,
-    });
-  }, []);
-
-  const mutate = useCallback(
-    async (variables: TVariables): Promise<TData> => {
-      setState({
-        data: null,
-        error: null,
-        isLoading: true,
-        isSuccess: false,
-        isError: false,
-        isIdle: false,
-      });
-
-      try {
-        const data = await mutationFn(variables);
-
-        setState({
-          data,
-          error: null,
-          isLoading: false,
-          isSuccess: true,
-          isError: false,
-          isIdle: false,
+  return useReactQueryMutation<TData, TError, TVariables>({
+    ...reactQueryOptions,
+    onSuccess: (data, variables) => {
+      // Invalidate specified queries to refetch fresh data
+      if (invalidateQueries) {
+        invalidateQueries.forEach((queryKey) => {
+          queryClient.invalidateQueries({ queryKey });
         });
-
-        // Call success callback
-        onSuccessRef.current?.(data, variables);
-        onSettledRef.current?.(data, null, variables);
-
-        return data;
-      } catch (err) {
-        const error = err as TError;
-
-        setState({
-          data: null,
-          error,
-          isLoading: false,
-          isSuccess: false,
-          isError: true,
-          isIdle: false,
-        });
-
-        // Call error callback
-        onErrorRef.current?.(error, variables);
-        onSettledRef.current?.(null, error, variables);
-
-        throw error; // Re-throw for caller handling
       }
+      
+      // Call user's onSuccess callback
+      onSuccess?.(data, variables);
     },
-    [mutationFn]
-  );
-
-  return {
-    ...state,
-    mutate,
-    mutateAsync: mutate, // Alias for consistency with React Query
-    reset,
-  };
+    onError: (error, variables) => {
+      // Call user's onError callback
+      onError?.(error, variables);
+    },
+    onSettled: (data, error, variables) => {
+      // Call user's onSettled callback
+      onSettled?.(data, error, variables);
+    },
+  });
 }
 
 export default useMutation;

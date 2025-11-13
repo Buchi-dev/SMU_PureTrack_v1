@@ -80,6 +80,7 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
     mutationFn: async ({ deviceId, deviceData }) => {
       return await devicesService.addDevice(deviceId, deviceData);
     },
+    invalidateQueries: [['devices', 'realtime']], // Auto-refresh devices list
     onError: (error) => {
       console.error('[useCall_Devices] Add error:', error);
     },
@@ -89,6 +90,7 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
     mutationFn: async ({ deviceId, deviceData }) => {
       await devicesService.updateDevice(deviceId, deviceData);
     },
+    invalidateQueries: [['devices', 'realtime']], // Auto-refresh devices list
     onError: (error) => {
       console.error('[useCall_Devices] Update error:', error);
     },
@@ -98,6 +100,7 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
     mutationFn: async (deviceId) => {
       await devicesService.deleteDevice(deviceId);
     },
+    invalidateQueries: [['devices', 'realtime']], // Auto-refresh devices list
     onError: (error) => {
       console.error('[useCall_Devices] Delete error:', error);
     },
@@ -107,17 +110,18 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
     mutationFn: async ({ deviceId, building, floor, notes }) => {
       await devicesService.registerDevice(deviceId, building, floor, notes);
     },
+    invalidateQueries: [['devices', 'realtime']], // Auto-refresh devices list
     onError: (error) => {
       console.error('[useCall_Devices] Register error:', error);
     },
   });
 
-  // Determine combined loading/error/success state
+  // Determine combined loading/error/success state (React Query uses 'isPending')
   const isLoading = 
-    addMutation.isLoading || 
-    updateMutation.isLoading || 
-    deleteMutation.isLoading || 
-    registerMutation.isLoading;
+    addMutation.isPending || 
+    updateMutation.isPending || 
+    deleteMutation.isPending || 
+    registerMutation.isPending;
   
   const error = 
     addMutation.error || 
@@ -140,16 +144,16 @@ export const useCall_Devices = (): UseCallDevicesReturn => {
 
   return {
     addDevice: (deviceId: string, deviceData: DeviceData) => 
-      addMutation.mutate({ deviceId, deviceData }),
+      addMutation.mutateAsync({ deviceId, deviceData }),
     updateDevice: (deviceId: string, deviceData: DeviceData) => 
-      updateMutation.mutate({ deviceId, deviceData }),
-    deleteDevice: deleteMutation.mutate,
+      updateMutation.mutateAsync({ deviceId, deviceData }),
+    deleteDevice: deleteMutation.mutateAsync,
     registerDevice: (deviceId: string, building: string, floor: string, notes?: string) => 
-      registerMutation.mutate({ deviceId, building, floor, notes }),
+      registerMutation.mutateAsync({ deviceId, building, floor, notes }),
     isLoading,
     error,
     isSuccess,
-    addedDevice: addMutation.data,
+    addedDevice: addMutation.data ?? null,
     reset,
   };
 };

@@ -10,10 +10,17 @@
  * - Device status comes from Firestore ONLY
  * - RTDB subscriptions update latestReading but NOT device status
  * 
+ * Powered by React Query for:
+ * - Automatic caching and request deduplication
+ * - Background refetching and smart invalidation
+ * - Built-in error retry with exponential backoff
+ * - DevTools integration for debugging
+ * 
  * @module hooks/reads
  */
 
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { devicesService } from '../../services/devices.Service';
 import type { Device, SensorReading } from '../../schemas';
 
@@ -67,10 +74,15 @@ interface UseRealtimeDevicesReturn {
  * 
  * @example
  * ```tsx
- * const { devices, isLoading, error } = useRealtime_Devices();
+ * const { devices, isLoading, error, refetch } = useRealtime_Devices();
  * 
  * // With metadata
  * const { devices } = useRealtime_Devices({ includeMetadata: true });
+ * 
+ * // Check fetching state
+ * if (isFetching) {
+ *   console.log('Updating data in background...');
+ * }
  * ```
  * 
  * @param options - Configuration options
@@ -80,92 +92,94 @@ export const useRealtime_Devices = (
   options: UseRealtimeDevicesOptions = {}
 ): UseRealtimeDevicesReturn => {
   const { enabled = true, includeMetadata = false } = options;
+  const queryClient = useQueryClient();
+  const unsubscribeAllRef = useRef<(() => void) | null>(null);
 
-  const [devices, setDevices] = useState<DeviceWithSensorData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // React Query configuration
+  const queryKey = ['devices', 'realtime', { includeMetadata }];
 
-  useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
-    }
+  const {
+    data: devices = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<DeviceWithSensorData[], Error>({
+    queryKey,
+    queryFn: async () => {
+      // Cleanup previous subscriptions if any
+      if (unsubscribeAllRef.current) {
+        unsubscribeAllRef.current();
+        unsubscribeAllRef.current = null;
+      }
 
-    let unsubscribeAll: (() => void) | null = null;
+      // READ: Fetch device list from Firestore
+      const devicesData = await devicesService.listDevices();
 
-    const initDevices = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
+      const formattedDevices: DeviceWithSensorData[] = devicesData.map((device) => ({
+        deviceId: device.deviceId,
+        deviceName: device.name || device.deviceId,
+        latestReading: null,
+        status: device.status || 'offline',
+        location: device.metadata?.location
+          ? `${device.metadata.location.building || ''}, ${device.metadata.location.floor || ''}`
+          : undefined,
+        ...(includeMetadata && { metadata: device }),
+      }));
 
-        // READ: Fetch device list from Firestore
-        const devicesData = await devicesService.listDevices();
-
-        const formattedDevices: DeviceWithSensorData[] = devicesData.map((device) => ({
-          deviceId: device.deviceId,
-          deviceName: device.name || device.deviceId,
-          latestReading: null,
-          status: device.status || 'offline',
-          location: device.metadata?.location
-            ? `${device.metadata.location.building || ''}, ${device.metadata.location.floor || ''}`
-            : undefined,
-          ...(includeMetadata && { metadata: device }),
-        }));
-
-        setDevices(formattedDevices);
-
-        // READ: Subscribe to real-time sensor readings from RTDB
-        if (formattedDevices.length > 0) {
-          const deviceIds = formattedDevices.map((d) => d.deviceId);
-          
-          unsubscribeAll = devicesService.subscribeToMultipleDevices(
-            deviceIds,
-            (deviceId, reading) => {
-              if (reading) {
-                // ✅ Update sensor reading, keep Firestore status as source of truth
-                setDevices((prevDevices) =>
-                  prevDevices.map((device) =>
-                    device.deviceId === deviceId
-                      ? { ...device, latestReading: reading }
-                      : device
-                  )
+      // READ: Subscribe to real-time sensor readings from RTDB
+      if (formattedDevices.length > 0) {
+        const deviceIds = formattedDevices.map((d) => d.deviceId);
+        
+        unsubscribeAllRef.current = devicesService.subscribeToMultipleDevices(
+          deviceIds,
+          (deviceId, reading) => {
+            if (reading) {
+              // ✅ Update sensor reading in cache, keep Firestore status as source of truth
+              queryClient.setQueryData<DeviceWithSensorData[]>(queryKey, (oldData) => {
+                if (!oldData) return oldData;
+                return oldData.map((device) =>
+                  device.deviceId === deviceId
+                    ? { ...device, latestReading: reading }
+                    : device
                 );
-              }
-            },
-            (deviceId, err) => {
-              console.error(`[useRealtime_Devices] Error with device ${deviceId}:`, err);
-              // Don't set global error for individual device failures
+              });
             }
-          );
-        }
-
-        setIsLoading(false);
-      } catch (err) {
-        console.error('[useRealtime_Devices] Error fetching devices:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch devices'));
-        setIsLoading(false);
+          },
+          (deviceId, err) => {
+            console.error(`[useRealtime_Devices] Error with device ${deviceId}:`, err);
+            // Don't set global error for individual device failures
+          }
+        );
       }
-    };
 
-    initDevices();
+      return formattedDevices;
+    },
+    enabled,
+    staleTime: 30 * 1000, // Consider data fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes after unmount
+    refetchOnWindowFocus: true, // Refetch on window focus to get latest device list
+    refetchOnMount: true, // Refetch on mount
+    retry: 2, // Retry failed fetches
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+  });
 
+  // Cleanup subscription when component unmounts or query key changes
+  useEffect(() => {
     return () => {
-      if (unsubscribeAll) {
-        unsubscribeAll();
+      if (unsubscribeAllRef.current) {
+        unsubscribeAllRef.current();
+        unsubscribeAllRef.current = null;
       }
     };
-  }, [enabled, includeMetadata, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger((prev) => prev + 1);
-  };
+  }, [queryKey.join(',')]);
 
   return {
     devices,
     isLoading,
     error,
-    refetch,
+    refetch: async () => {
+      await refetch();
+    },
   };
 };
 
