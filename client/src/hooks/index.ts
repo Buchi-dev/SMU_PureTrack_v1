@@ -26,11 +26,7 @@ export { useRealtime_Users } from './reads/useRealtime_Users';
 // Export types from read hooks
 export type { DeviceWithSensorData } from './reads/useRealtime_Devices';
 
-// ============================================================================
-// QUERY HOOKS - React Query (TanStack Query) for cached/non-realtime data
-// ============================================================================
 
-export * from './queries';
 
 // ============================================================================
 // WRITE HOOKS - CRUD operations and mutations
