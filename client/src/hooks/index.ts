@@ -27,9 +27,24 @@ export { useRealtime_Users } from './reads/useRealtime_Users';
 export type { DeviceWithSensorData } from './reads/useRealtime_Devices';
 
 // ============================================================================
+// QUERY HOOKS - React Query (TanStack Query) for cached/non-realtime data
+// ============================================================================
+
+export * from './queries';
+
+// ============================================================================
 // WRITE HOOKS - CRUD operations and mutations
 // ============================================================================
 
+// Generic mutation hook
+export { useMutation } from './writes/useMutation';
+export type { 
+  MutationState, 
+  MutationOptions, 
+  MutationResult 
+} from './writes/useMutation';
+
+// Specific write hooks
 export { useCall_Alerts } from './writes/useCall_Alerts';
 export { useCall_Devices } from './writes/useCall_Devices';
 export { useCall_Users } from './writes/useCall_Users';

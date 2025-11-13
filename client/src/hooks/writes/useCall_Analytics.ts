@@ -12,6 +12,8 @@
  * @see useCall_Reports
  */
 
+import { useMutation } from './useMutation';
+
 /**
  * Placeholder for future analytics operations
  * 
@@ -25,16 +27,22 @@
  * ```
  */
 export const useCall_Analytics = () => {
-  console.warn(
-    '[useCall_Analytics] This hook is currently a placeholder. ' +
-    'Use useCall_Reports for generating analytics data.'
-  );
+  // Placeholder mutation that logs a warning
+  const placeholderMutation = useMutation({
+    mutationFn: async () => {
+      console.warn(
+        '[useCall_Analytics] This hook is currently a placeholder. ' +
+        'Use useCall_Reports for generating analytics data.'
+      );
+    },
+  });
 
   return {
     // Reserved for future analytics mutations
-    isLoading: false,
-    error: null,
-    isSuccess: false,
+    isLoading: placeholderMutation.isLoading,
+    error: placeholderMutation.error,
+    isSuccess: placeholderMutation.isSuccess,
+    reset: placeholderMutation.reset,
   };
 };
 

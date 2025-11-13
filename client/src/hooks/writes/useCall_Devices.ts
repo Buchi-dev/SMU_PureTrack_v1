@@ -9,14 +9,9 @@
  * @module hooks/writes
  */
 
-import { useState, useCallback } from 'react';
+import { useMutation } from './useMutation';
 import { devicesService } from '../../services/devices.Service';
 import type { Device, DeviceData } from '../../schemas';
-
-/**
- * Device operation types
- */
-type DeviceOperation = 'add' | 'update' | 'delete' | 'register';
 
 /**
  * Hook return value
@@ -36,8 +31,6 @@ interface UseCallDevicesReturn {
   error: Error | null;
   /** Success flag - true after successful operation */
   isSuccess: boolean;
-  /** Currently executing operation type */
-  operationType: DeviceOperation | null;
   /** Result from last add operation */
   addedDevice: Device | null;
   /** Reset error, success states, and added device */
@@ -83,127 +76,80 @@ interface UseCallDevicesReturn {
  * @returns Device operation functions and state
  */
 export const useCall_Devices = (): UseCallDevicesReturn => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [operationType, setOperationType] = useState<DeviceOperation | null>(null);
-  const [addedDevice, setAddedDevice] = useState<Device | null>(null);
-
-  const reset = useCallback(() => {
-    setError(null);
-    setIsSuccess(false);
-    setOperationType(null);
-    setAddedDevice(null);
-  }, []);
-
-  const addDevice = useCallback(async (
-    deviceId: string, 
-    deviceData: DeviceData
-  ): Promise<Device> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('add');
-      setAddedDevice(null);
-
-      const device = await devicesService.addDevice(deviceId, deviceData);
-
-      setIsSuccess(true);
-      setAddedDevice(device);
-      return device;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to add device');
+  const addMutation = useMutation<Device, Error, { deviceId: string; deviceData: DeviceData }>({
+    mutationFn: async ({ deviceId, deviceData }) => {
+      return await devicesService.addDevice(deviceId, deviceData);
+    },
+    onError: (error) => {
       console.error('[useCall_Devices] Add error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const updateDevice = useCallback(async (
-    deviceId: string, 
-    deviceData: DeviceData
-  ): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('update');
-
+  const updateMutation = useMutation<void, Error, { deviceId: string; deviceData: DeviceData }>({
+    mutationFn: async ({ deviceId, deviceData }) => {
       await devicesService.updateDevice(deviceId, deviceData);
-
-      setIsSuccess(true);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to update device');
+    },
+    onError: (error) => {
       console.error('[useCall_Devices] Update error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const deleteDevice = useCallback(async (deviceId: string): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('delete');
-
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: async (deviceId) => {
       await devicesService.deleteDevice(deviceId);
-
-      setIsSuccess(true);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to delete device');
+    },
+    onError: (error) => {
       console.error('[useCall_Devices] Delete error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const registerDevice = useCallback(async (
-    deviceId: string,
-    building: string,
-    floor: string,
-    notes?: string
-  ): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('register');
-
+  const registerMutation = useMutation<void, Error, { deviceId: string; building: string; floor: string; notes?: string }>({
+    mutationFn: async ({ deviceId, building, floor, notes }) => {
       await devicesService.registerDevice(deviceId, building, floor, notes);
-
-      setIsSuccess(true);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to register device');
+    },
+    onError: (error) => {
       console.error('[useCall_Devices] Register error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
+
+  // Determine combined loading/error/success state
+  const isLoading = 
+    addMutation.isLoading || 
+    updateMutation.isLoading || 
+    deleteMutation.isLoading || 
+    registerMutation.isLoading;
+  
+  const error = 
+    addMutation.error || 
+    updateMutation.error || 
+    deleteMutation.error || 
+    registerMutation.error;
+  
+  const isSuccess = 
+    addMutation.isSuccess || 
+    updateMutation.isSuccess || 
+    deleteMutation.isSuccess || 
+    registerMutation.isSuccess;
+
+  const reset = () => {
+    addMutation.reset();
+    updateMutation.reset();
+    deleteMutation.reset();
+    registerMutation.reset();
+  };
 
   return {
-    addDevice,
-    updateDevice,
-    deleteDevice,
-    registerDevice,
+    addDevice: (deviceId: string, deviceData: DeviceData) => 
+      addMutation.mutate({ deviceId, deviceData }),
+    updateDevice: (deviceId: string, deviceData: DeviceData) => 
+      updateMutation.mutate({ deviceId, deviceData }),
+    deleteDevice: deleteMutation.mutate,
+    registerDevice: (deviceId: string, building: string, floor: string, notes?: string) => 
+      registerMutation.mutate({ deviceId, building, floor, notes }),
     isLoading,
     error,
     isSuccess,
-    operationType,
-    addedDevice,
+    addedDevice: addMutation.data,
     reset,
   };
 };

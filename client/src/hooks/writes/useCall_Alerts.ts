@@ -9,13 +9,8 @@
  * @module hooks/writes
  */
 
-import { useState, useCallback } from 'react';
+import { useMutation } from './useMutation';
 import { alertsService } from '../../services/alerts.Service';
-
-/**
- * Alert operation types
- */
-type AlertOperation = 'acknowledge' | 'resolve';
 
 /**
  * Hook return value
@@ -31,8 +26,6 @@ interface UseCallAlertsReturn {
   error: Error | null;
   /** Success flag - true after successful operation */
   isSuccess: boolean;
-  /** Currently executing operation type */
-  operationType: AlertOperation | null;
   /** Reset error and success states */
   reset: () => void;
 }
@@ -61,66 +54,40 @@ interface UseCallAlertsReturn {
  * @returns Alert operation functions and state
  */
 export const useCall_Alerts = (): UseCallAlertsReturn => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [operationType, setOperationType] = useState<AlertOperation | null>(null);
-
-  const reset = useCallback(() => {
-    setError(null);
-    setIsSuccess(false);
-    setOperationType(null);
-  }, []);
-
-  const acknowledgeAlert = useCallback(async (alertId: string): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('acknowledge');
-
+  const acknowledgeMutation = useMutation({
+    mutationFn: async (alertId: string) => {
       await alertsService.acknowledgeAlert(alertId);
-
-      setIsSuccess(true);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to acknowledge alert');
+    },
+    onError: (error) => {
       console.error('[useCall_Alerts] Acknowledge error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error; // Re-throw for caller handling
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const resolveAlert = useCallback(async (alertId: string, notes?: string): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('resolve');
-
+  const resolveMutation = useMutation<void, Error, { alertId: string; notes?: string }>({
+    mutationFn: async ({ alertId, notes }) => {
       await alertsService.resolveAlert(alertId, notes);
-
-      setIsSuccess(true);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to resolve alert');
+    },
+    onError: (error) => {
       console.error('[useCall_Alerts] Resolve error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error; // Re-throw for caller handling
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
+
+  // Determine combined loading/error/success state
+  const isLoading = acknowledgeMutation.isLoading || resolveMutation.isLoading;
+  const error = acknowledgeMutation.error || resolveMutation.error;
+  const isSuccess = acknowledgeMutation.isSuccess || resolveMutation.isSuccess;
+
+  const reset = () => {
+    acknowledgeMutation.reset();
+    resolveMutation.reset();
+  };
 
   return {
-    acknowledgeAlert,
-    resolveAlert,
+    acknowledgeAlert: acknowledgeMutation.mutate,
+    resolveAlert: (alertId: string, notes?: string) => resolveMutation.mutate({ alertId, notes }),
     isLoading,
     error,
     isSuccess,
-    operationType,
     reset,
   };
 };

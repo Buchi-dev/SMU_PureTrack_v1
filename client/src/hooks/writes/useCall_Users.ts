@@ -9,14 +9,9 @@
  * @module hooks/writes
  */
 
-import { useState, useCallback } from 'react';
+import { useMutation } from './useMutation';
 import { usersService } from '../../services/user.Service';
 import type { UserRole, UserStatus } from '../../schemas';
-
-/**
- * User operation types
- */
-type UserOperation = 'updateStatus' | 'updateUser' | 'getUserPreferences' | 'setupPreferences';
 
 /**
  * Update user response
@@ -49,8 +44,6 @@ interface UseCallUsersReturn {
   error: Error | null;
   /** Success flag - true after successful operation */
   isSuccess: boolean;
-  /** Currently executing operation type */
-  operationType: UserOperation | null;
   /** Result from last update operation */
   updateResult: UpdateUserResult | null;
   /** Reset error, success states, and update result */
@@ -101,139 +94,85 @@ interface UseCallUsersReturn {
  * @returns User operation functions and state
  */
 export const useCall_Users = (): UseCallUsersReturn => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [operationType, setOperationType] = useState<UserOperation | null>(null);
-  const [updateResult, setUpdateResult] = useState<UpdateUserResult | null>(null);
-
-  const reset = useCallback(() => {
-    setError(null);
-    setIsSuccess(false);
-    setOperationType(null);
-    setUpdateResult(null);
-  }, []);
-
-  const updateUserStatus = useCallback(async (
-    userId: string, 
-    status: UserStatus
-  ): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('updateStatus');
-      setUpdateResult(null);
-
-      const response = await usersService.updateUserStatus(userId, status);
-
-      setIsSuccess(true);
-      setUpdateResult({
-        success: response.success,
-        message: response.message,
-        userId: response.userId,
-        updates: { status: response.status },
-      });
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to update user status');
+  const updateStatusMutation = useMutation<void, Error, { userId: string; status: UserStatus }>({
+    mutationFn: async ({ userId, status }) => {
+      await usersService.updateUserStatus(userId, status);
+    },
+    onError: (error) => {
       console.error('[useCall_Users] Update status error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const updateUser = useCallback(async (
-    userId: string,
-    status?: UserStatus,
-    role?: UserRole
-  ): Promise<UpdateUserResult> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('updateUser');
-      setUpdateResult(null);
-
+  const updateUserMutation = useMutation<UpdateUserResult, Error, { userId: string; status?: UserStatus; role?: UserRole }>({
+    mutationFn: async ({ userId, status, role }) => {
       const response = await usersService.updateUser(userId, status, role);
-
-      const result: UpdateUserResult = {
+      return {
         success: response.success,
         message: response.message,
         userId: response.userId,
         updates: response.updates,
       };
-
-      setIsSuccess(true);
-      setUpdateResult(result);
-      return result;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to update user');
+    },
+    onError: (error) => {
       console.error('[useCall_Users] Update user error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const getUserPreferences = useCallback(async (userId: string): Promise<any> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('getUserPreferences');
-
-      const preferences = await usersService.getUserPreferences(userId);
-
-      setIsSuccess(true);
-      return preferences;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to get user preferences');
+  const getPreferencesMutation = useMutation<any, Error, string>({
+    mutationFn: async (userId) => {
+      return await usersService.getUserPreferences(userId);
+    },
+    onError: (error) => {
       console.error('[useCall_Users] Get preferences error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
 
-  const setupPreferences = useCallback(async (preferences: any): Promise<any> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      setIsSuccess(false);
-      setOperationType('setupPreferences');
-
-      const savedPreferences = await usersService.setupPreferences(preferences);
-
-      setIsSuccess(true);
-      return savedPreferences;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to setup preferences');
+  const setupPreferencesMutation = useMutation<any, Error, any>({
+    mutationFn: async (preferences) => {
+      return await usersService.setupPreferences(preferences);
+    },
+    onError: (error) => {
       console.error('[useCall_Users] Setup preferences error:', error);
-      setError(error);
-      setIsSuccess(false);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+  });
+
+  // Determine combined loading/error/success state
+  const isLoading = 
+    updateStatusMutation.isLoading || 
+    updateUserMutation.isLoading || 
+    getPreferencesMutation.isLoading || 
+    setupPreferencesMutation.isLoading;
+  
+  const error = 
+    updateStatusMutation.error || 
+    updateUserMutation.error || 
+    getPreferencesMutation.error || 
+    setupPreferencesMutation.error;
+  
+  const isSuccess = 
+    updateStatusMutation.isSuccess || 
+    updateUserMutation.isSuccess || 
+    getPreferencesMutation.isSuccess || 
+    setupPreferencesMutation.isSuccess;
+
+  const reset = () => {
+    updateStatusMutation.reset();
+    updateUserMutation.reset();
+    getPreferencesMutation.reset();
+    setupPreferencesMutation.reset();
+  };
 
   return {
-    updateUserStatus,
-    updateUser,
-    getUserPreferences,
-    setupPreferences,
+    updateUserStatus: (userId: string, status: UserStatus) => 
+      updateStatusMutation.mutate({ userId, status }),
+    updateUser: (userId: string, status?: UserStatus, role?: UserRole) => 
+      updateUserMutation.mutate({ userId, status, role }),
+    getUserPreferences: getPreferencesMutation.mutate,
+    setupPreferences: setupPreferencesMutation.mutate,
     isLoading,
     error,
     isSuccess,
-    operationType,
-    updateResult,
+    updateResult: updateUserMutation.data,
     reset,
   };
 };
