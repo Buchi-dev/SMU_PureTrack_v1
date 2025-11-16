@@ -1,6 +1,6 @@
 {
-  "name": "Water Quality Monitoring",
-  "short_name": "WQM",
+  "name": "PureTrack",
+  "short_name": "PureTrack",
   "description": "Realtime water quality monitoring and alerts",
   "start_url": "/",
   "scope": "/",

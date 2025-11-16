@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['/favicon.ico', '/robots.txt', '/icons/*.svg'],
       manifest: {
-        name: 'Water Quality Monitoring',
-        short_name: 'WQM',
+        name: 'PureTrack',
+        short_name: 'PureTrack',
         description: 'Realtime water quality monitoring and alerts',
         theme_color: '#0f172a',
         background_color: '#ffffff',
