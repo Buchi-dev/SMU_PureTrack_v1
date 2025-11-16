@@ -320,7 +320,7 @@ export const generateDataSummaryReport = async (
     } else {
       doc.setFontSize(FONTS.body.size);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(COLORS.textSecondary.r, COLORS.textSecondary.g, COLORS.textSecondary.b);
+      doc.setTextColor(COLORS.gray.r, COLORS.gray.g, COLORS.gray.b);
       doc.text('No sensor data available for statistical analysis.', SPACING.page.left, yPos);
       yPos += 10;
     }
@@ -338,7 +338,7 @@ export const generateDataSummaryReport = async (
     
     // Page numbers (centered)
     doc.setFontSize(FONTS.small.size);
-    doc.setTextColor(COLORS.textSecondary.r, COLORS.textSecondary.g, COLORS.textSecondary.b);
+    doc.setTextColor(COLORS.gray.r, COLORS.gray.g, COLORS.gray.b);
     doc.text(`Page ${i} of ${pageCount}`, 105, 285, { align: 'center' });
     
     // Copyright and Report ID (centered)

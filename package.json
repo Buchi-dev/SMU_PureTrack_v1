@@ -1,0 +1,25 @@
+{
+  "name": "water-quality-monitoring-system",
+  "version": "1.0.0",
+  "description": "Water Quality Monitoring System - Full Stack Deployment",
+  "scripts": {
+    "deploy": "node deploy.js",
+    "deploy:client": "cd client && npm install && npm run build",
+    "deploy:functions": "cd functions && npm install && npm run build",
+    "deploy:firebase": "npm run deploy:client && npm run deploy:functions && firebase deploy",
+    "deploy:mqtt-bridge": "cd mqtt-bridge && gcloud builds submit --tag gcr.io/my-app-da530/mqtt-bridge:latest && gcloud run deploy mqtt-bridge --image gcr.io/my-app-da530/mqtt-bridge:latest --region us-central1"
+  },
+  "keywords": [
+    "iot",
+    "water-quality",
+    "monitoring",
+    "firebase",
+    "cloud-run",
+    "mqtt"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
