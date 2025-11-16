@@ -14,8 +14,8 @@ import {logger} from "firebase-functions/v2";
  * Circuit breaker states
  */
 export enum CircuitState {
-  CLOSED = "CLOSED",     // Normal operation
-  OPEN = "OPEN",         // Failing fast, not attempting calls
+  CLOSED = "CLOSED", // Normal operation
+  OPEN = "OPEN", // Failing fast, not attempting calls
   HALF_OPEN = "HALF_OPEN", // Testing if service recovered
 }
 
@@ -68,6 +68,13 @@ export class CircuitBreaker<TArgs extends unknown[], TResult> {
   };
   private halfOpenTestCount = 0;
 
+  /**
+   * Create a circuit breaker
+   *
+   * @param {Function} fn - Function to protect with circuit breaker
+   * @param {CircuitBreakerConfig} config - Circuit breaker configuration
+   * @param {string} name - Name for logging
+   */
   constructor(
     private readonly fn: (...args: TArgs) => Promise<TResult>,
     private readonly config: CircuitBreakerConfig,
@@ -264,7 +271,15 @@ export class CircuitBreaker<TArgs extends unknown[], TResult> {
    *
    * @return {object} Statistics object
    */
-  getStats() {
+  getStats(): {
+    state: CircuitState;
+    successCount: number;
+    failureCount: number;
+    failureRate: number;
+    lastFailureTime: number | null;
+    stateChangedAt: number;
+    halfOpenTestCount: number;
+    } {
     return {
       state: this.state,
       successCount: this.stats.successCount,
@@ -303,10 +318,10 @@ export function createCircuitBreaker<TArgs extends unknown[], TResult>(
   name: string = "Default"
 ): CircuitBreaker<TArgs, TResult> {
   return new CircuitBreaker(fn, {
-    timeout: 5000,              // 5 second timeout
-    failureThreshold: 50,       // Open at 50% failure rate
-    minimumCalls: 5,            // Need 5 calls before opening
-    resetTimeout: 30000,        // Try recovery after 30 seconds
-    halfOpenCalls: 3,           // 3 successful test calls to close
+    timeout: 5000, // 5 second timeout
+    failureThreshold: 50, // Open at 50% failure rate
+    minimumCalls: 5, // Need 5 calls before opening
+    resetTimeout: 30000, // Try recovery after 30 seconds
+    halfOpenCalls: 3, // 3 successful test calls to close
   }, name);
 }

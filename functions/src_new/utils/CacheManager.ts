@@ -173,7 +173,7 @@ export class CacheManager<T> {
     ttlMs: number;
     oldestEntry: number | null;
     newestEntry: number | null;
-  } {
+    } {
     let oldestTimestamp = Infinity;
     let newestTimestamp = 0;
 

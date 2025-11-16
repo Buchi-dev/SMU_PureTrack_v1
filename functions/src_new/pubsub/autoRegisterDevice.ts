@@ -22,13 +22,12 @@
  * - Disabled auto-registration to enforce manual registration workflow
  */
 
-import * as admin from "firebase-admin";
 import type {CloudEvent} from "firebase-functions/v2";
 import {logger} from "firebase-functions/v2";
 import type {MessagePublishedData} from "firebase-functions/v2/pubsub";
 import {onMessagePublished} from "firebase-functions/v2/pubsub";
 
-import {db, rtdb} from "../config/firebase";
+import {db} from "../config/firebase";
 import {COLLECTIONS} from "../constants/database.constants";
 import {PUBSUB_TOPICS} from "../constants/PubSub.Constants";
 import {isValidDeviceId} from "../utils/validators";

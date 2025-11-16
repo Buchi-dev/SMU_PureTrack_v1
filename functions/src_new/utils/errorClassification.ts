@@ -62,9 +62,9 @@ export function classifyError(error: unknown, context: string = "Unknown"): Erro
   }
 
   // Extract error information
-  const errorObj = error as any;
-  const code = errorObj.code?.toLowerCase() || "";
-  const message = errorObj.message || String(error);
+  const errorObj = error as Record<string, unknown>;
+  const code = (typeof errorObj.code === "string" ? errorObj.code.toLowerCase() : "") || "";
+  const message = (typeof errorObj.message === "string" ? errorObj.message : String(error)) || "";
 
   // Check for retriable Firestore errors
   if (RETRIABLE_FIRESTORE_CODES.includes(code)) {
@@ -128,19 +128,19 @@ export function handleClassifiedError(error: unknown, context: string): void {
   const action = classifyError(error, context);
 
   switch (action) {
-    case ErrorAction.RETRY:
-      // Re-throw to trigger Pub/Sub retry
-      throw error;
+  case ErrorAction.RETRY:
+    // Re-throw to trigger Pub/Sub retry
+    throw error;
 
-    case ErrorAction.SKIP:
-      // Log and return (don't retry)
-      logger.warn(`Skipping due to permanent error in ${context}`, {error});
-      return;
+  case ErrorAction.SKIP:
+    // Log and return (don't retry)
+    logger.warn(`Skipping due to permanent error in ${context}`, {error});
+    return;
 
-    case ErrorAction.CONTINUE:
-      // Log and continue (non-critical)
-      logger.warn(`Continuing despite error in ${context}`, {error});
-      return;
+  case ErrorAction.CONTINUE:
+    // Log and continue (non-critical)
+    logger.warn(`Continuing despite error in ${context}`, {error});
+    return;
   }
 }
 

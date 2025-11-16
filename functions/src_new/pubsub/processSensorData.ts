@@ -36,7 +36,6 @@ import {EMAIL_USER_SECRET_REF, EMAIL_PASSWORD_SECRET_REF} from "../config/email"
 import {db, rtdb} from "../config/firebase";
 import {COLLECTIONS} from "../constants/database.constants";
 import {
-  ALERT_COOLDOWN_MS,
   HISTORY_STORAGE_INTERVAL,
   LASTSEEN_UPDATE_THRESHOLD_MS,
   SENSOR_DATA_ERRORS,
@@ -47,12 +46,12 @@ import {
 } from "../constants/Sensor.Constants";
 import type {WaterParameter, TrendDirection} from "../types/Alert.Types";
 import type {SensorData, SensorReading, BatchSensorData} from "../types/Sensor.Types";
-import {createAlert, getNotificationRecipients} from "../utils/alertHelpers";
+import {getNotificationRecipients} from "../utils/alertHelpers";
 import {CacheManager} from "../utils/CacheManager";
 import {createCircuitBreaker} from "../utils/CircuitBreaker";
 import {sendEmailNotification} from "../utils/emailNotifications";
 import {classifyError, ErrorAction, executeWithErrorHandling} from "../utils/errorClassification";
-import {getThresholdConfig, checkThreshold, analyzeTrend} from "../utils/thresholdHelpers";
+import {getThresholdConfig, checkThreshold, analyzeTrend, type AlertThresholds} from "../utils/thresholdHelpers";
 import {isValidDeviceId, isValidSensorReading} from "../utils/validators";
 
 /**
@@ -540,7 +539,7 @@ async function processSensorReadingForAlerts(reading: SensorReading): Promise<vo
 async function processParameterAlert(
   reading: SensorReading,
   parameter: WaterParameter,
-  thresholds: any
+  thresholds: AlertThresholds
 ): Promise<void> {
   const value = reading[parameter];
 
@@ -741,7 +740,7 @@ async function processNotifications(
           logger.warn("Email notification failed", {
             alertId,
             userId: result.value.userId,
-            error: (result.value as any).error,
+            error: (result.value as {userId: string; success: boolean; error: unknown}).error,
           });
         }
       } else {
