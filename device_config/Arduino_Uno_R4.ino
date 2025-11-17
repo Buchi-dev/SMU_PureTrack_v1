@@ -42,8 +42,9 @@
 
 // Sensor Pin Configuration
 #define TDS_PIN A0          // TDS Sensor
-#define PH_PIN A1           // pH Sensor
-#define TURBIDITY_PIN A2    // Turbidity Sensor
+#define TURBIDITY_PIN A1    // Turbidity Sensor
+#define PH_PIN A2           // pH Sensor
+
 
 // Timing Configuration - Phase 3 Optimization
 #define SENSOR_READ_INTERVAL 30000   // Read sensors every 30 seconds
