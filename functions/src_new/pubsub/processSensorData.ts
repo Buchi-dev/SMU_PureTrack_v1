@@ -297,12 +297,17 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
   const hasLocation = deviceData?.metadata?.location?.building &&
                      deviceData?.metadata?.location?.floor;
 
+  // CRITICAL: Update device status FIRST (before checking registration)
+  // This ensures unregistered devices show as "online" when sending data
+  await updateDeviceStatus(deviceId, deviceDoc);
+
   if (!hasLocation) {
     logger.info("Device UNREGISTERED (no location) - sensor data NOT stored", {
       deviceId,
       hasMetadata: !!deviceData?.metadata,
       reason: "Waiting for admin to assign building and floor location",
       action: "Data will be stored after registration via admin UI",
+      statusUpdated: "Device marked as online despite being unregistered",
     });
     return; // Skip unregistered devices - don't store data yet
   }
@@ -339,10 +344,8 @@ async function processSingleReading(deviceId: string, sensorData: SensorData): P
     }
   }
 
-  // OPTIMIZATION: Update device status in Firestore (throttled)
-  // Only update if lastSeen is older than 2 minutes to reduce writes by ~70%
-  // Pass the device document to avoid redundant Firestore read
-  await updateDeviceStatus(deviceId, deviceDoc);
+  // NOTE: Device status already updated earlier (before location check)
+  // This ensures both registered and unregistered devices show correct status
 
   // Process alerts for this reading
   await processSensorReadingForAlerts(readingData);

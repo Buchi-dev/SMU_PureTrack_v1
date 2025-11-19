@@ -133,18 +133,24 @@ export const autoRegisterDevice = onMessagePublished(
       const doc = await deviceRef.get();
 
       if (doc.exists) {
-        // Device already exists - just acknowledge connection
+        // Device already exists - update status and lastSeen
         const deviceData = doc.data();
         const hasLocation = deviceData?.metadata?.location?.building &&
                            deviceData?.metadata?.location?.floor;
 
+        // Update device status to online when it reconnects
+        await deviceRef.update({
+          status: "online",
+          lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
         if (hasLocation) {
           logger.info(
-            `✅ Device ${deviceId} is properly registered with location - connection acknowledged`
+            `✅ Device ${deviceId} is properly registered with location - connection acknowledged, status updated to online`
           );
         } else {
           logger.info(
-            `📝 Device ${deviceId} exists but UNREGISTERED (no location) - awaiting admin assignment`
+            `📝 Device ${deviceId} exists but UNREGISTERED (no location) - awaiting admin assignment, status updated to online`
           );
         }
         return; // Don't recreate existing device
@@ -161,7 +167,7 @@ export const autoRegisterDevice = onMessagePublished(
         macAddress: deviceInfo?.macAddress || "",
         ipAddress: deviceInfo?.ipAddress || "",
         sensors: deviceInfo?.sensors || [],
-        status: "offline", // Will be updated by processSensorData when data arrives
+        status: "online", // Device is connecting now, mark as online
         registeredAt: admin.firestore.FieldValue.serverTimestamp(),
         lastSeen: admin.firestore.FieldValue.serverTimestamp(),
         metadata: {}, // NO LOCATION - intentionally unregistered

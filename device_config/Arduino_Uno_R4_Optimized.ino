@@ -4,22 +4,28 @@
  * Sensors: TDS, pH, Turbidity
  * 
  * ARCHITECTURE:
- * - Arduino UNO R4: Pure sensor data collector (no logic processing)
- * - Sends RAW sensor values to MQTT bridge
- * - Backend/UI handles ALL conversions and thresholds
+ * - Arduino UNO R4: Sensor data collector with on-device computation
+ * - Converts raw sensor readings to calibrated values
+ * - Sends computed values (ppm, pH, NTU) to MQTT bridge
+ * - Backend handles thresholds, alerts, and analytics
  * 
  * DATA SENT:
- * - tdsVoltage: Raw voltage from TDS sensor
- * - phVoltage: Raw voltage from pH sensor
- * - turbidityADC: Raw ADC value from turbidity sensor
+ * - tds: TDS measurement in ppm (parts per million)
+ * - ph: pH level (0-14 scale)
+ * - turbidity: Turbidity in NTU (Nephelometric Turbidity Units)
  * - timestamp: Device uptime in milliseconds
+ * 
+ * SENSOR CALIBRATION:
+ * - TDS: (Voltage * 133) * TempCoefficient (1.0 at 25°C)
+ * - pH: 7 + ((2.5 - Voltage) / 0.18) [2.5V = pH 7.0]
+ * - Turbidity: Polynomial curve -1120.4*(V/5)^2 + 5742.3*(V/5) - 4352.9
  * 
  * PERFORMANCE OPTIMIZATIONS:
  * - Real-time monitoring: 2-second intervals
  * - Reduced memory footprint (50% less RAM usage)
  * - Faster sensor sampling (microsecond delays)
  * - Lightweight JSON payloads (128 bytes)
- * - No computation overhead (only raw data collection)
+ * - On-device computation reduces backend processing
  * 
  * LED MATRIX VISUALIZATION (12x8 Built-in LED Matrix):
  * ┌─────────────────────────────────────────────────┐
@@ -422,14 +428,29 @@ void readSensors() {
 
 float readTDS() {
   float voltage = readAnalogAverage(TDS_PIN);
-  // Return raw voltage - backend will handle TDS calculation
-  return voltage;
+  
+  // Convert voltage to TDS (ppm)
+  // Formula: TDS (ppm) = (Voltage * 133) * CompensationCoefficient
+  // CompensationCoefficient = 1.0 at 25°C
+  float compensationCoefficient = 1.0;
+  float tdsPpm = (voltage * 133.0) * compensationCoefficient;
+  
+  return tdsPpm;
 }
 
 float readPH() {
   float voltage = readAnalogAverage(PH_PIN);
-  // Return raw voltage - backend will handle pH calculation
-  return voltage;
+  
+  // Convert voltage to pH (0-14 scale)
+  // Formula: pH = 7 + ((2.5 - Voltage) / 0.18)
+  // Calibrated for 2.5V = pH 7.0
+  float phValue = 7.0 + ((2.5 - voltage) / 0.18);
+  
+  // Clamp pH to valid range (0-14)
+  if (phValue < 0.0) phValue = 0.0;
+  if (phValue > 14.0) phValue = 14.0;
+  
+  return phValue;
 }
 
 float readTurbidity() {
@@ -444,8 +465,16 @@ float readTurbidity() {
   turbidityReadIndex = (turbidityReadIndex + 1) % TURBIDITY_NUM_READINGS;
   turbidityAverage = turbidityTotal / TURBIDITY_NUM_READINGS;
   
-  // Return raw ADC average - backend will handle NTU conversion
-  return turbidityAverage;
+  // Convert ADC to NTU (Nephelometric Turbidity Units)
+  // Formula: NTU = -1120.4*(V/5)^2 + 5742.3*(V/5) - 4352.9
+  float voltage = (turbidityAverage / 1024.0) * 5.0;
+  float voltageRatio = voltage / 5.0;
+  float ntu = -1120.4 * pow(voltageRatio, 2) + 5742.3 * voltageRatio - 4352.9;
+  
+  // Ensure non-negative NTU
+  if (ntu < 0.0) ntu = 0.0;
+  
+  return ntu;
 }
 
 // ===========================
@@ -457,9 +486,9 @@ void publishSensorData() {
   if (!mqttConnected) return;
   
   StaticJsonDocument<128> doc;
-  doc["tdsVoltage"] = tds;           // Raw TDS voltage
-  doc["phVoltage"] = ph;             // Raw pH voltage
-  doc["turbidityADC"] = turbidity;   // Raw turbidity ADC value
+  doc["tds"] = tds;                  // TDS in ppm
+  doc["ph"] = ph;                    // pH value (0-14)
+  doc["turbidity"] = turbidity;      // Turbidity in NTU
   doc["timestamp"] = millis();
   
   char payload[128];
