@@ -206,9 +206,9 @@ export default function AlertNotificationCenter() {
                           display: 'block',
                           marginBottom: 4,
                         }}
-                        ellipsis={{ tooltip: alert.message }}
+                        ellipsis={{ tooltip: alert.message || `${alert.parameter.toUpperCase()} alert` }}
                       >
-                        {alert.message}
+                        {alert.message || `${alert.parameter.toUpperCase()} alert detected`}
                       </Text>
                       <Space size={8} wrap>
                         <Text type="secondary" style={{ fontSize: 11 }}>

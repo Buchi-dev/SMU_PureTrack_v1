@@ -178,7 +178,9 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
                       <Text type="secondary" style={{ fontSize: 12, fontWeight: 600 }}>
                         ALERT MESSAGE
                       </Text>
-                      <Text style={{ fontSize: 14 }}>{alert.message}</Text>
+                      <Text style={{ fontSize: 14 }}>
+                        {alert.message || `${getParameterName(alert.parameter)} alert detected`}
+                      </Text>
                     </Space>
                   </Card>
 
@@ -245,7 +247,7 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
                           Recommended Action
                         </Text>
                         <Text style={{ fontSize: 13 }}>
-                          {alert.recommendedAction}
+                          {alert.recommendedAction || 'Please monitor the water quality parameters and take appropriate action based on the severity level.'}
                         </Text>
                       </div>
                     </Space>

@@ -46,7 +46,7 @@ export const ActiveAlerts = memo<ActiveAlertsProps>(({ alerts }) => {
                 {alert.severity.toUpperCase()}
               </Tag>
               <Text strong>{alert.parameter.toUpperCase()}: </Text>
-              <Text>{alert.message}</Text>
+              <Text>{alert.message || 'Alert detected'}</Text>
               {alert.currentValue && (
                 <Text type="secondary"> (Value: {alert.currentValue.toFixed(2)})</Text>
               )}

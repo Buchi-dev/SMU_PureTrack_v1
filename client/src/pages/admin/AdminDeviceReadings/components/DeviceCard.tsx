@@ -299,7 +299,7 @@ export const DeviceCard = memo(({ device }: DeviceCardProps) => {
                       <Tag color={alert.severity === 'Critical' ? 'red' : 'orange'} style={{ marginBottom: 4 }}>
                         {alert.severity}
                       </Tag>
-                      <Text style={{ fontSize: '12px' }}>{alert.message}</Text>
+                      <Text style={{ fontSize: '12px' }}>{alert.message || 'Alert detected'}</Text>
                     </div>
                   ))}
                   {activeAlerts.length > 2 && (

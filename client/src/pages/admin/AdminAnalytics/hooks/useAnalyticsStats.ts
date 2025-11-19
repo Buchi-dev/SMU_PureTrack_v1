@@ -330,74 +330,6 @@ const calculateDevicePerformance = (devices: DeviceWithSensorData[], alerts: Wat
 };
 
 /**
- * Calculate location-based analytics
- */
-const calculateLocationAnalytics = (devices: DeviceWithSensorData[], alerts: WaterQualityAlert[]) => {
-  // Group devices by building/floor
-  const locationMap = new Map<string, DeviceWithSensorData[]>();
-  
-  devices.forEach(device => {
-    const metadata = device.metadata as any;
-    const building = metadata?.location?.building || 'Unknown Building';
-    const floor = metadata?.location?.floor || 'Unknown Floor';
-    const key = `${building}|${floor}`;
-    
-    if (!locationMap.has(key)) {
-      locationMap.set(key, []);
-    }
-    locationMap.get(key)!.push(device);
-  });
-
-  return Array.from(locationMap.entries()).map(([key, locationDevices]) => {
-    const [building, floor] = key.split('|');
-    
-    const deviceIds = locationDevices.map(d => d.deviceId);
-    const locationAlerts = alerts.filter(a => deviceIds.includes(a.deviceId) && a.status === 'Active');
-    
-    // Calculate average readings
-    const phValues = locationDevices
-      .map(d => d.latestReading?.ph)
-      .filter((v): v is number => v !== undefined && v > 0);
-    const tdsValues = locationDevices
-      .map(d => d.latestReading?.tds)
-      .filter((v): v is number => v !== undefined && v > 0);
-    const turbidityValues = locationDevices
-      .map(d => d.latestReading?.turbidity)
-      .filter((v): v is number => v !== undefined && v >= 0);
-
-    const avgPh = phValues.length > 0 
-      ? phValues.reduce((sum, v) => sum + v, 0) / phValues.length 
-      : 0;
-    const avgTds = tdsValues.length > 0 
-      ? tdsValues.reduce((sum, v) => sum + v, 0) / tdsValues.length 
-      : 0;
-    const avgTurbidity = turbidityValues.length > 0 
-      ? turbidityValues.reduce((sum, v) => sum + v, 0) / turbidityValues.length 
-      : 0;
-
-    // Calculate quality score
-    let qualityScore = 100;
-    if (avgPh < 6.5 || avgPh > 8.5) qualityScore -= 30;
-    if (avgTds > 500) qualityScore -= 30;
-    if (avgTurbidity > 5) qualityScore -= 30;
-    if (locationAlerts.length > 0) qualityScore -= Math.min(locationAlerts.length * 10, 30);
-
-    return {
-      building,
-      floor,
-      deviceCount: locationDevices.length,
-      avgWaterQualityScore: Math.max(0, qualityScore),
-      activeAlertCount: locationAlerts.length,
-      readings: {
-        avgPh,
-        avgTds,
-        avgTurbidity,
-      },
-    };
-  });
-};
-
-/**
  * Calculate aggregated metrics for historical trends
  */
 const calculateAggregatedMetrics = (devices: DeviceWithSensorData[]) => {
@@ -444,7 +376,6 @@ const calculateAggregatedMetrics = (devices: DeviceWithSensorData[]) => {
  *   systemHealth,
  *   complianceStatus,
  *   devicePerformance,
- *   locationAnalytics,
  *   aggregatedMetrics,
  * } = useAnalyticsStats(devices, alerts, mqttHealth, mqttStatus);
  * ```
@@ -464,7 +395,6 @@ export const useAnalyticsStats = (
   );
   const complianceStatus = useMemo(() => calculateComplianceStatus(waterQualityMetrics), [waterQualityMetrics]);
   const devicePerformance = useMemo(() => calculateDevicePerformance(devices, alerts), [devices, alerts]);
-  const locationAnalytics = useMemo(() => calculateLocationAnalytics(devices, alerts), [devices, alerts]);
   const aggregatedMetrics = useMemo(() => calculateAggregatedMetrics(devices), [devices]);
 
   return {
@@ -474,7 +404,6 @@ export const useAnalyticsStats = (
     systemHealth,
     complianceStatus,
     devicePerformance,
-    locationAnalytics,
     aggregatedMetrics,
   };
 };

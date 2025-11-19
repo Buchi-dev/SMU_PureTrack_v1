@@ -187,7 +187,7 @@ export const DeviceListItem = memo(({ device }: DeviceListItemProps) => {
                       color={alert.severity === 'Critical' ? 'red' : 'orange'}
                       style={{ fontSize: '11px', margin: 0 }}
                     >
-                      {alert.parameter.toUpperCase()}: {alert.message}
+                      {alert.parameter.toUpperCase()}: {alert.message || 'Alert'}
                     </Tag>
                   ))}
                   {activeAlerts.length > 3 && (

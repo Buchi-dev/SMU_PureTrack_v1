@@ -46,7 +46,7 @@ import {
 } from "../constants/Sensor.Constants";
 import type {WaterParameter, TrendDirection} from "../types/Alert.Types";
 import type {SensorData, SensorReading, BatchSensorData} from "../types/Sensor.Types";
-import {getNotificationRecipients} from "../utils/alertHelpers";
+import {getNotificationRecipients, generateAlertContent} from "../utils/alertHelpers";
 import {CacheManager} from "../utils/CacheManager";
 import {createCircuitBreaker} from "../utils/CircuitBreaker";
 import {sendEmailNotification} from "../utils/emailNotifications";
@@ -446,6 +446,38 @@ async function createAlertWithDuplicationCheck(
   alertData: Record<string, unknown>
 ): Promise<string | null> {
   try {
+    // Fetch device information for alert content generation
+    let deviceName = "Unknown Device";
+    const deviceLocation: {building?: string; floor?: string} = {};
+
+    try {
+      const deviceDoc = await db.collection(COLLECTIONS.DEVICES).doc(deviceId).get();
+
+      if (deviceDoc.exists) {
+        const deviceData = deviceDoc.data();
+        deviceName = deviceData?.name || deviceId;
+
+        // Extract location information if available
+        if (deviceData?.metadata?.location) {
+          const location = deviceData.metadata.location;
+          if (location.building) deviceLocation.building = location.building;
+          if (location.floor) deviceLocation.floor = location.floor;
+        }
+      }
+    } catch (error) {
+      logger.warn("Failed to fetch device information for alert:", error);
+    }
+
+    // Generate alert message and recommended action
+    const {message, recommendedAction} = generateAlertContent(
+      parameter,
+      (alertData.value as number) || 0,
+      severity as "Advisory" | "Warning" | "Critical",
+      alertType as "threshold" | "trend",
+      alertData.trendDirection as TrendDirection | undefined,
+      deviceLocation
+    );
+
     // Use transaction to atomically check and create
     const result = await db.runTransaction(async (transaction) => {
       // Check for existing active alert within transaction
@@ -474,9 +506,15 @@ async function createAlertWithDuplicationCheck(
       const newAlertRef = db.collection(COLLECTIONS.ALERTS).doc();
       transaction.set(newAlertRef, {
         ...alertData,
+        deviceName,
+        ...(deviceLocation.building && {deviceBuilding: deviceLocation.building}),
+        ...(deviceLocation.floor && {deviceFloor: deviceLocation.floor}),
+        message,
+        recommendedAction,
         alertId: newAlertRef.id,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        notificationsSent: [],
       });
 
       return newAlertRef.id;
