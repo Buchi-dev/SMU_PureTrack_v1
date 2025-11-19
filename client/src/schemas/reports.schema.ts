@@ -42,6 +42,8 @@ export const AlertDataSchema = z.object({
   parameter: z.string(),
   message: z.string(),
   value: z.string(),
+  timestamp: z.number(),
+  location: z.string().optional(),
 });
 
 // ============================================================================
@@ -118,12 +120,10 @@ export const DeviceStatusSummarySchema = z.object({
  */
 export const DeviceStatusInfoSchema = z.object({
   deviceId: z.string(),
-  name: z.string(),
-  type: z.string(),
+  deviceName: z.string(),
   status: z.string(),
-  lastSeen: z.number(),
-  firmwareVersion: z.string(),
-  location: z.string().optional(),
+  lastSeen: z.string(),
+  uptime: z.string().optional(),
 });
 
 /**

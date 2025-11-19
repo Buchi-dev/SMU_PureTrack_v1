@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Modal, message } from 'antd';
+import { Layout, Modal, message, Space, Input } from 'antd';
+import { ApiOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
+import { PageHeader } from '../../../components/PageHeader';
 import {
-  DeviceHeader,
   DeviceStats,
   DeviceTable,
   ViewDeviceModal,
@@ -12,6 +13,9 @@ import { useDeviceFilter } from './hooks';
 import { useRealtime_Devices, useCall_Devices } from '../../../hooks';
 import type { Device } from '../../../schemas';
 import './DeviceManagement.css';
+
+const { Content } = Layout;
+const { Search } = Input;
 
 /**
  * AdminDeviceManagement - Device Management Page
@@ -118,32 +122,49 @@ export const AdminDeviceManagement = () => {
 
   return (
     <AdminLayout>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px',
-          height: '100%',
-          padding: '4px',
-        }}
-      >
-        <DeviceHeader 
-          onRefresh={refetch} 
-          onSearchChange={setSearchText}
-        />
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Device Management"
+          icon={<ApiOutlined />}
+          description="Manage IoT devices, monitor status, and register new devices"
+          breadcrumbItems={[
+            { title: 'Devices', icon: <ApiOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={isLoading} />,
+              onClick: refetch,
+              disabled: isLoading,
+            }
+          ]}
+        >
+          {/* Search Bar */}
+          <Search
+            placeholder="Search devices by name, MAC address, or IP..."
+            allowClear
+            enterButton={<SearchOutlined />}
+            size="large"
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ maxWidth: 500 }}
+          />
+        </PageHeader>
 
-        <DeviceStats stats={stats} />
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
+          <DeviceStats stats={stats} />
 
-        <DeviceTable
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          filteredDevices={filteredDevices}
-          loading={isLoading}
-          stats={stats}
-          onView={handleView}
-          onDelete={handleDelete}
-          onRegister={handleRegister}
-        />
+          <DeviceTable
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            filteredDevices={filteredDevices}
+            loading={isLoading}
+            stats={stats}
+            onView={handleView}
+            onDelete={handleDelete}
+            onRegister={handleRegister}
+          />
+        </Space>
 
         <ViewDeviceModal
           visible={isViewModalVisible}
@@ -157,7 +178,7 @@ export const AdminDeviceManagement = () => {
           onRegister={handleRegisterWithTabSwitch}
           onCancel={handleModalClose}
         />
-      </div>
+      </Content>
     </AdminLayout>
   );
 };

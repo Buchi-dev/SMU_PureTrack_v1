@@ -11,15 +11,18 @@
  * 
  * Architecture: Uses GLOBAL read hooks for real-time data
  */
-import { Space, Spin, Tabs } from 'antd';
+import { Layout, Space, Spin, Tabs } from 'antd';
 import { memo } from 'react';
 import { 
   DashboardOutlined, 
   LineChartOutlined, 
   CheckCircleOutlined,
   FundOutlined,
+  BarChartOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
+import { PageHeader } from '../../../components/PageHeader';
 import { 
   useRealtime_Devices, 
   useRealtime_Alerts,
@@ -27,7 +30,6 @@ import {
 } from '../../../hooks';
 import { useAnalyticsProcessing, useAnalyticsStats } from './hooks';
 import {
-  AnalyticsHeader,
   KeyMetrics,
   WaterQualityStandards,
   ActiveAlerts,
@@ -39,6 +41,8 @@ import {
   ComplianceTracker,
   DevicePerformance,
 } from './components';
+
+const { Content } = Layout;
 
 export const AdminAnalytics = memo(() => {
   // ✅ GLOBAL READ HOOKS - Real-time data from service layer
@@ -192,16 +196,33 @@ export const AdminAnalytics = memo(() => {
 
   return (
     <AdminLayout>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <AnalyticsHeader />
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Analytics"
+          icon={<BarChartOutlined />}
+          description="Comprehensive water quality analytics, trends, and WHO compliance monitoring"
+          breadcrumbItems={[
+            { title: 'Analytics', icon: <BarChartOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={loading} />,
+              onClick: () => window.location.reload(),
+              disabled: loading,
+            }
+          ]}
+        />
         
         <Tabs 
           defaultActiveKey="overview" 
           items={tabItems}
           size="large"
           type="card"
+          style={{ marginTop: 24 }}
         />
-      </Space>
+      </Content>
     </AdminLayout>
   );
 });

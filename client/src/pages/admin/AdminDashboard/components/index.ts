@@ -4,7 +4,6 @@ export { MemoryMonitor } from './MemoryMonitor';
 export { CpuMonitor } from './CpuMonitor';
 export { BufferMonitor } from './BufferMonitor';
 export { SystemInfo } from './SystemInfo';
-export { RefreshControl } from './RefreshControl';
 export { DashboardSummary } from './DashboardSummary';
 export { LiveMetricIndicator } from './LiveMetricIndicator';
 export { RecentAlertsList } from './RecentAlertsList';

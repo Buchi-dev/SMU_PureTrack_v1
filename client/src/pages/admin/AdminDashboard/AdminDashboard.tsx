@@ -1,10 +1,12 @@
-import { Space, Typography, Alert, Divider, Tabs, Row, Col } from 'antd';
+import { Space, Alert, Tabs, Row, Col, Layout, Typography } from 'antd';
 import { 
   DashboardOutlined, 
-  CloudServerOutlined 
+  CloudServerOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
-import { memo, useMemo, useState } from 'react';
+import { memo, useState } from 'react';
 import { AdminLayout } from "../../../components/layouts";
+import { PageHeader } from "../../../components/PageHeader";
 import { 
   useRealtime_MQTTMetrics, 
   useRealtime_Devices, 
@@ -18,10 +20,10 @@ import {
   CpuMonitor,
   BufferMonitor,
   SystemInfo,
-  RefreshControl,
   DashboardSummary,
 } from './components';
 
+const { Content } = Layout;
 const { Title } = Typography;
 
 /**
@@ -44,7 +46,6 @@ export const AdminDashboard = memo(() => {
     status: mqttStatus,
     isLoading: mqttLoading,
     error: mqttError,
-    lastUpdate: mqttLastUpdate,
     refetch: mqttRefetch,
   } = useRealtime_MQTTMetrics({ pollInterval: 2000 });
 
@@ -71,13 +72,6 @@ export const AdminDashboard = memo(() => {
     devicesRefetch();
     alertsRefetch();
   };
-
-  // Calculate most recent update time across all sources
-  const lastUpdate = useMemo(() => {
-    const times = [mqttLastUpdate].filter(Boolean) as Date[];
-    if (times.length === 0) return null;
-    return new Date(Math.max(...times.map((t) => t.getTime())));
-  }, [mqttLastUpdate]);
 
   // Combined loading state
   const isLoading = mqttLoading || devicesLoading || alertsLoading;
@@ -205,27 +199,24 @@ export const AdminDashboard = memo(() => {
 
   return (
     <AdminLayout>
-      <Space direction="vertical" size="large" style={{ width: '100%', padding: '24px' }}>
-        {/* Header Section */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
-          marginBottom: '16px'
-        }}>
-          <Title level={2} style={{ margin: 0 }}>
-            Admin Dashboard
-          </Title>
-          <RefreshControl 
-            onRefresh={handleRefreshAll} 
-            loading={isLoading} 
-            lastUpdate={lastUpdate} 
-          />
-        </div>
-
-        <Divider style={{ margin: '8px 0' }} />
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Dashboard"
+          icon={<DashboardOutlined />}
+          description="Monitor system health, device status, and water quality metrics in real-time"
+          breadcrumbItems={[
+            { title: 'Dashboard', icon: <DashboardOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={isLoading} />,
+              onClick: handleRefreshAll,
+              disabled: isLoading,
+            }
+          ]}
+        />
 
         {/* Tabbed Interface */}
         <Tabs
@@ -233,8 +224,9 @@ export const AdminDashboard = memo(() => {
           onChange={setActiveTab}
           items={tabItems}
           size="large"
+          style={{ marginTop: 24 }}
         />
-      </Space>
+      </Content>
     </AdminLayout>
   );
 });

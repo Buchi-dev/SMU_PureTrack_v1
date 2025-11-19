@@ -8,12 +8,13 @@
  * 
  * @module pages/admin/AdminSettings
  */
+import { Layout } from 'antd';
+import { SettingOutlined, ReloadOutlined } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
-import { Typography } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
+import { PageHeader } from '../../../components/PageHeader';
 import NotificationSettings from './NotificationSettings';
 
-const { Title, Paragraph } = Typography;
+const { Content } = Layout;
 
 /**
  * Admin settings page with notification preferences
@@ -21,19 +22,28 @@ const { Title, Paragraph } = Typography;
 export const AdminSettings = () => {
   return (
     <AdminLayout>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px' }}>
-        <div style={{ marginBottom: '32px' }}>
-          <Title level={2} style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <BellOutlined style={{ color: '#1890ff' }} />
-            Notification Settings
-          </Title>
-          <Paragraph type="secondary" style={{ fontSize: '16px', marginBottom: 0 }}>
-            Manage your notification preferences and alerts for water quality monitoring
-          </Paragraph>
-        </div>
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Settings"
+          icon={<SettingOutlined />}
+          description="Manage notification preferences and system settings"
+          breadcrumbItems={[
+            { title: 'Settings', icon: <SettingOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined />,
+              onClick: () => window.location.reload(),
+            }
+          ]}
+        />
 
-        <NotificationSettings />
-      </div>
+        <div style={{ marginTop: 24 }}>
+          <NotificationSettings />
+        </div>
+      </Content>
     </AdminLayout>
   );
 };

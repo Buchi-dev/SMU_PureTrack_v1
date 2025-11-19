@@ -12,6 +12,7 @@
  */
 import { useState, useMemo } from 'react';
 import { 
+  Layout,
   Row, 
   Col, 
   Typography, 
@@ -41,11 +42,13 @@ import {
   DatabaseOutlined,
   CheckCircleOutlined,
   ExperimentOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 
 dayjs.extend(relativeTime);
 import { AdminLayout } from '../../../components/layouts';
+import { PageHeader } from '../../../components/PageHeader';
 import type { Device } from '../../../schemas';
 import { useThemeToken } from '../../../theme';
 
@@ -58,7 +61,8 @@ import { useReportHistory } from './hooks';
 // PDF Templates
 import { generateWaterQualityReport } from './templates';
 
-const { Title, Paragraph, Text } = Typography;
+const { Content } = Layout;
+const { Text } = Typography;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
 
@@ -167,41 +171,35 @@ export const AdminReports = () => {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
-        {/* Header */}
-        <Card 
-          style={{ 
-            marginBottom: 24,
-            background: '#ffffff',
-            borderTop: `4px solid ${token.colorPrimary}`,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)'
-          }}
-          bordered={false}
-        >
-          <Row justify="space-between" align="middle">
-            <Col>
-              <Space direction="vertical" size={4}>
-                <Title level={2} style={{ margin: 0 }}>
-                  <FileTextOutlined /> Water Quality Reports
-                </Title>
-                <Paragraph style={{ margin: 0, fontSize: 16 }} type="secondary">
-                  Generate comprehensive water quality analysis reports with compliance assessment
-                </Paragraph>
-              </Space>
-            </Col>
-            <Col>
-              <Button 
-                icon={<HistoryOutlined />} 
-                onClick={() => setShowHistory(!showHistory)}
-                type={showHistory ? 'primary' : 'default'}
-              >
-                History ({reportHistory.length})
-              </Button>
-            </Col>
-          </Row>
-        </Card>
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Reports"
+          icon={<FileTextOutlined />}
+          description="Generate comprehensive water quality analysis reports with WHO compliance assessment"
+          breadcrumbItems={[
+            { title: 'Reports', icon: <FileTextOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'history',
+              label: `History (${reportHistory.length})`,
+              icon: <HistoryOutlined />,
+              onClick: () => setShowHistory(!showHistory),
+              type: showHistory ? 'primary' : 'default',
+            },
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={devicesLoading} />,
+              onClick: () => window.location.reload(),
+              disabled: devicesLoading,
+            }
+          ]}
+        />
 
-        <Row gutter={24}>
+        <div style={{ marginTop: 24 }}>
+
+        <Row gutter={16}>
           {/* Main Form Section */}
           <Col xs={24} lg={showHistory ? 16 : 24}>
             <Card
@@ -216,13 +214,14 @@ export const AdminReports = () => {
                   Includes Compliance Assessment
                 </Tag>
               }
+              bodyStyle={{ padding: '20px' }}
             >
               <Alert
                 message="Water Quality & Compliance Report"
                 description="This report includes comprehensive water quality analysis (pH, TDS, Turbidity) and WHO standards compliance assessment for the selected devices and time period."
                 type="info"
                 showIcon
-                style={{ marginBottom: 24 }}
+                style={{ marginBottom: 20 }}
               />
 
               <Form
@@ -234,6 +233,7 @@ export const AdminReports = () => {
                   includeStatistics: true,
                   includeCharts: true,
                 }}
+                size="middle"
               >
                 <Row gutter={16}>
                   <Col xs={24} md={12}>
@@ -281,111 +281,106 @@ export const AdminReports = () => {
                   </Col>
                 </Row>
 
-                <Form.Item
-                  label="Report Title (Optional)"
-                  name="title"
-                >
-                  <Input 
-                    placeholder="e.g., Weekly Water Quality Report"
-                    disabled={generating}
-                  />
-                </Form.Item>
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item
+                      label="Report Title (Optional)"
+                      name="title"
+                    >
+                      <Input 
+                        placeholder="e.g., Weekly Water Quality Report"
+                        disabled={generating}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} md={12}>
+                    <Form.Item label="Options">
+                      <Space size="large">
+                        <Form.Item
+                          name="includeStatistics"
+                          valuePropName="checked"
+                          noStyle
+                        >
+                          <Switch 
+                            checkedChildren="Statistics" 
+                            unCheckedChildren="Statistics"
+                            disabled={generating}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          name="includeCharts"
+                          valuePropName="checked"
+                          noStyle
+                        >
+                          <Switch 
+                            checkedChildren="Charts" 
+                            unCheckedChildren="Charts"
+                            disabled={generating}
+                          />
+                        </Form.Item>
+                      </Space>
+                    </Form.Item>
+                  </Col>
+                </Row>
 
                 <Form.Item
                   label="Notes (Optional)"
                   name="notes"
                 >
                   <TextArea 
-                    rows={3}
+                    rows={2}
                     placeholder="Add any notes or observations to include in the report..."
                     disabled={generating}
                   />
                 </Form.Item>
 
-                <Row gutter={16}>
+                <Divider style={{ margin: '16px 0' }} />
+
+                <Row gutter={16} align="middle">
                   <Col xs={24} sm={12}>
-                    <Form.Item
-                      label="Include Statistics"
-                      name="includeStatistics"
-                      valuePropName="checked"
-                    >
-                      <Switch 
-                        checkedChildren="Yes" 
-                        unCheckedChildren="No"
-                        disabled={generating}
-                      />
+                    <Form.Item style={{ marginBottom: 0 }}>
+                      <Button
+                        type="primary"
+                        htmlType="submit"
+                        size="large"
+                        icon={<DownloadOutlined />}
+                        loading={generating}
+                        disabled={devicesLoading}
+                        block
+                      >
+                        {generating ? 'Generating Report...' : 'Generate & Download Report'}
+                      </Button>
                     </Form.Item>
                   </Col>
-
                   <Col xs={24} sm={12}>
-                    <Form.Item
-                      label="Include Charts"
-                      name="includeCharts"
-                      valuePropName="checked"
-                    >
-                      <Switch 
-                        checkedChildren="Yes" 
-                        unCheckedChildren="No"
-                        disabled={generating}
-                      />
-                    </Form.Item>
+                    <Row gutter={8}>
+                      <Col span={8}>
+                        <Statistic
+                          title="Devices"
+                          value={devices.filter(d => d.status === 'online').length}
+                          suffix={`/${devices.length}`}
+                          valueStyle={{ color: token.colorSuccess, fontSize: 18 }}
+                        />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic
+                          title="Reports"
+                          value={reportHistory.length}
+                          valueStyle={{ color: token.colorPrimary, fontSize: 18 }}
+                        />
+                      </Col>
+                      <Col span={8}>
+                        <Statistic
+                          title="Sensors"
+                          value={devices.reduce((acc, d) => acc + (d.sensors?.length || 0), 0)}
+                          valueStyle={{ color: token.colorInfo, fontSize: 18 }}
+                        />
+                      </Col>
+                    </Row>
                   </Col>
                 </Row>
-
-                <Divider />
-
-                <Form.Item style={{ marginBottom: 0 }}>
-                  <Space style={{ width: '100%', justifyContent: 'center' }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      size="large"
-                      icon={<DownloadOutlined />}
-                      loading={generating}
-                      disabled={devicesLoading}
-                      style={{ minWidth: 200 }}
-                    >
-                      {generating ? 'Generating Report...' : 'Generate & Download Report'}
-                    </Button>
-                  </Space>
-                </Form.Item>
               </Form>
-
-              {/* Quick Stats */}
-              <Divider />
-              <Row gutter={16} style={{ marginTop: 24 }}>
-                <Col xs={12} sm={6}>
-                  <Statistic
-                    title="Active Devices"
-                    value={devices.filter(d => d.status === 'online').length}
-                    suffix={`/ ${devices.length}`}
-                    valueStyle={{ color: token.colorSuccess }}
-                  />
-                </Col>
-                <Col xs={12} sm={6}>
-                  <Statistic
-                    title="Total Reports"
-                    value={reportHistory.length}
-                    prefix={<FileTextOutlined />}
-                    valueStyle={{ color: token.colorPrimary }}
-                  />
-                </Col>
-                <Col xs={12} sm={6}>
-                  <Statistic
-                    title="Last Generated"
-                    value={reportHistory.length > 0 ? dayjs(reportHistory[0].generatedAt).fromNow() : 'Never'}
-                    prefix={<ClockCircleOutlined />}
-                    valueStyle={{ fontSize: 14 }}
-                  />
-                </Col>
-                <Col xs={12} sm={6}>
-                  <Statistic
-                    title="Available Sensors"
-                    value={devices.reduce((acc, d) => acc + (d.sensors?.length || 0), 0)}
-                    valueStyle={{ color: token.colorInfo }}
-                  />
-                </Col>
-              </Row>
             </Card>
           </Col>
 
@@ -399,7 +394,7 @@ export const AdminReports = () => {
                     <span>Report History</span>
                   </Space>
                 }
-                bodyStyle={{ padding: '12px' }}
+                bodyStyle={{ padding: '16px', maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
               >
                 {reportHistory.length === 0 ? (
                   <Empty
@@ -445,7 +440,8 @@ export const AdminReports = () => {
             </Col>
           )}
         </Row>
-      </div>
+        </div>
+      </Content>
     </AdminLayout>
   );
 };

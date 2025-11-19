@@ -54,6 +54,8 @@ export interface AlertData {
   parameter: string;
   message: string;
   value: string;
+  timestamp: number;
+  location?: string;
 }
 
 /**
@@ -76,6 +78,8 @@ export interface DeviceStatusSummary {
   statusBreakdown: {
     online: number;
     offline: number;
+    error: number;
+    maintenance: number;
   };
   healthScore: string;
 }

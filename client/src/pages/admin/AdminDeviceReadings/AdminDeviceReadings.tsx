@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
+  Layout,
   Space,
-  Typography,
   Alert,
   Row,
   Col,
@@ -12,19 +12,23 @@ import {
   Segmented,
   Tooltip,
   List,
+  Typography,
 } from 'antd';
 import {
-  DashboardOutlined,
+  LineChartOutlined,
   InfoCircleOutlined,
   BarChartOutlined,
   AppstoreOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
+import { PageHeader } from '../../../components/PageHeader';
 import { useRealtime_Devices, useRealtime_Alerts } from '../../../hooks';
 import { useDeviceSeverityCalculator } from './hooks/useDeviceSeverityCalculator';
-import { StatsOverview, DeviceCard, DeviceListItem, RefreshControl, FilterControls } from './components';
+import { StatsOverview, DeviceCard, DeviceListItem, FilterControls } from './components';
 
-const { Title, Text, Paragraph } = Typography;
+const { Content } = Layout;
+const { Text, Title } = Typography;
 
 export const AdminDeviceReadings = () => {
   // ✅ GLOBAL HOOKS: Real-time data from Firestore/RTDB
@@ -39,7 +43,6 @@ export const AdminDeviceReadings = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid');
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // Combine loading and error states
   const loading = devicesLoading || alertsLoading;
@@ -67,7 +70,6 @@ export const AdminDeviceReadings = () => {
   const handleRefresh = () => {
     refetchDevices();
     refetchAlerts();
-    setLastUpdate(new Date());
   };
 
   // Apply filters to enriched devices
@@ -109,21 +111,26 @@ export const AdminDeviceReadings = () => {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px', maxWidth: '1800px', margin: '0 auto' }}>
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
-            <div>
-              <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <DashboardOutlined style={{ color: '#1890ff' }} />
-                Device Readings Monitor
-              </Title>
-              <Paragraph type="secondary" style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
-                Real-time water quality monitoring • Auto-sorted by severity
-              </Paragraph>
-            </div>
-            <RefreshControl onRefresh={handleRefresh} loading={loading} lastUpdate={lastUpdate} />
-          </div>
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Sensor Readings"
+          icon={<LineChartOutlined />}
+          description="Real-time water quality monitoring with automatic severity sorting"
+          breadcrumbItems={[
+            { title: 'Sensor Readings', icon: <LineChartOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={loading} />,
+              onClick: handleRefresh,
+              disabled: loading,
+            }
+          ]}
+        />
+
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24, maxWidth: '1800px', margin: '24px auto 0' }}>
 
           {/* Info Alert */}
           <Alert
@@ -353,7 +360,7 @@ export const AdminDeviceReadings = () => {
             </>
           )}
         </Space>
-      </div>
+      </Content>
     </AdminLayout>
   );
 };

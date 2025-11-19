@@ -15,10 +15,11 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Typography, message } from 'antd';
-import { BellOutlined } from '@ant-design/icons';
+import { Layout, Space, message } from 'antd';
+import { BellOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { WaterQualityAlert } from '../../../schemas';
 import { AdminLayout } from '../../../components/layouts/AdminLayout';
+import { PageHeader } from '../../../components/PageHeader';
 import { useRealtime_Alerts, useCall_Alerts } from '../../../hooks';
 import { useAlertStats, useAlertFilters } from './hooks';
 import {
@@ -28,7 +29,7 @@ import {
   AlertDetailsDrawer,
 } from './components';
 
-const { Title, Text } = Typography;
+const { Content } = Layout;
 
 export const AdminAlerts = () => {
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
@@ -108,35 +109,48 @@ export const AdminAlerts = () => {
 
   return (
     <AdminLayout>
-      <div>
-        <Title level={2}>
-          <BellOutlined /> Water Quality Alerts
-        </Title>
-        <Text type="secondary">
-          Monitor and manage real-time water quality alerts
-        </Text>
-
-        {/* Statistics */}
-        <AlertStatistics stats={stats} />
-
-        {/* Filters and Actions */}
-        <AlertFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-          onClearFilters={handleClearFilters}
-          totalAlerts={alerts.length}
-          filteredCount={filteredAlerts.length}
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="Water Quality Alerts"
+          icon={<BellOutlined />}
+          description="Monitor and manage real-time water quality alerts"
+          breadcrumbItems={[
+            { title: 'Alerts', icon: <BellOutlined /> }
+          ]}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={loading} />,
+              onClick: () => window.location.reload(),
+              disabled: loading,
+            }
+          ]}
         />
 
-        {/* Alerts Table */}
-        <AlertsTable
-          alerts={filteredAlerts}
-          loading={loading}
-          onViewDetails={viewAlertDetails}
-          onAcknowledge={acknowledgeAlert}
-          onBatchAcknowledge={handleBatchAcknowledge}
-          isAcknowledging={isOperating}
-        />
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
+          {/* Statistics */}
+          <AlertStatistics stats={stats} />
+
+          {/* Filters and Actions */}
+          <AlertFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClearFilters={handleClearFilters}
+            totalAlerts={alerts.length}
+            filteredCount={filteredAlerts.length}
+          />
+
+          {/* Alerts Table */}
+          <AlertsTable
+            alerts={filteredAlerts}
+            loading={loading}
+            onViewDetails={viewAlertDetails}
+            onAcknowledge={acknowledgeAlert}
+            onBatchAcknowledge={handleBatchAcknowledge}
+            isAcknowledging={isOperating}
+          />
+        </Space>
 
         {/* Alert Details Drawer */}
         <AlertDetailsDrawer
@@ -148,7 +162,7 @@ export const AdminAlerts = () => {
           isAcknowledging={isOperating}
           isResolving={isOperating}
         />
-      </div>
+      </Content>
     </AdminLayout>
   );
 

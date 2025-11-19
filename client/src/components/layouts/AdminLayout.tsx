@@ -235,18 +235,19 @@ export const AdminLayout = ({ children }: AdminLayoutProps) => {
         {/* Content */}
         <Content
           style={{
-            margin: '24px 16px',
-            padding: 24,
-            minHeight: 280,
+            margin: '16px 12px',
+            padding: 0,
+            minHeight: 'calc(100vh - 140px)',
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
+            overflow: 'auto',
           }}
         >
           {children}
         </Content>
 
         {/* Footer */}
-        <Footer style={{ textAlign: 'center' }}>
+        <Footer style={{ textAlign: 'center', padding: '12px 16px', fontSize: '12px' }}>
           Admin Panel ©{new Date().getFullYear()} • Capstone System
         </Footer>
       </Layout>

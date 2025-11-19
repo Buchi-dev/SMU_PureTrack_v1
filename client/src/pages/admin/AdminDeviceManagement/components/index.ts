@@ -1,4 +1,3 @@
-export { DeviceHeader } from './DeviceHeader';
 export { DeviceStats } from './DeviceStats';
 export { DeviceTable } from './DeviceTable';
 export { ViewDeviceModal } from './ViewDeviceModal';

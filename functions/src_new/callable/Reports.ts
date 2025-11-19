@@ -118,7 +118,7 @@ async function handleGenerateWaterQualityReport(
           receivedAt: new Date(readings[0].receivedAt).toISOString(),
         });
       } else {
-        console.warn(`⚠️ No readings found for device ${deviceId} in RTDB`);
+        console.warn(`WARNING: No readings found for device ${deviceId} in RTDB`);
         console.warn(`Check if path exists: sensorReadings/${deviceId}/history`);
       }
 
@@ -142,15 +142,20 @@ async function handleGenerateWaterQualityReport(
           parameter: data.parameter || "unknown",
           message: data.message || "",
           value: String(data.currentValue || ""),
+          timestamp: data.createdAt || Date.now(),
+          location: data.location,
         };
       });
 
       // Extract location from device metadata
-      const location = deviceData.metadata?.location ?
-        `${deviceData.metadata.location.building || ""}, ${deviceData.metadata.location.floor || ""}`
-          .trim()
-          .replace(/^,\s*|,\s*$/g, "") || "Unknown Location" :
-        "Unknown Location";
+      let location = "Unknown Location";
+      if (deviceData.metadata?.location) {
+        const loc = deviceData.metadata.location;
+        const parts = [loc.building, loc.floor, loc.room].filter(Boolean);
+        if (parts.length > 0) {
+          location = parts.join(", ");
+        }
+      }
 
       devices.push({
         deviceId,
@@ -233,6 +238,8 @@ async function handleGenerateDeviceStatusReport(
     const statusCounts = {
       online: 0,
       offline: 0,
+      error: 0,
+      maintenance: 0,
     };
 
     // Process each device
@@ -243,6 +250,9 @@ async function handleGenerateDeviceStatusReport(
       // Count status
       if (status in statusCounts) {
         statusCounts[status as keyof typeof statusCounts]++;
+      } else {
+        // Default unknown statuses to offline
+        statusCounts.offline++;
       }
 
       // Calculate uptime if device is online
