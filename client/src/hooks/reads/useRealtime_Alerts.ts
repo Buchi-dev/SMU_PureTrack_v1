@@ -1,25 +1,33 @@
 /**
  * useRealtime_Alerts - Read Hook
  * 
- * Real-time listener for water quality alerts via Firestore.
- * Subscribes to alert updates and maintains live data sync.
+ * Real-time polling for water quality alerts via Express REST API with SWR.
+ * Polls for updates every 5 seconds to maintain live data sync.
  * 
  * ⚠️ READ ONLY - No write operations allowed
+ * Use useCall_Alerts hook for write operations (acknowledge, resolve)
  * 
  * @module hooks/reads
  */
 
-import { useState, useEffect } from 'react';
-import { alertsService } from '../../services/alerts.Service';
+import useSWR from 'swr';
+import { buildAlertsUrl } from '../../config/endpoints';
+import { fetcher, swrRealtimeConfig } from '../../config/swr.config';
 import type { WaterQualityAlert } from '../../schemas';
 
 /**
  * Hook configuration options
  */
 interface UseRealtimeAlertsOptions {
-  /** Maximum number of alerts to fetch (default: 20) */
-  maxAlerts?: number;
-  /** Enable/disable auto-subscription (default: true) */
+  /** Filter by alert status */
+  status?: 'Unacknowledged' | 'Acknowledged' | 'Resolved';
+  /** Filter by severity */
+  severity?: 'Critical' | 'Warning' | 'Advisory';
+  /** Filter by device ID */
+  deviceId?: string;
+  /** Maximum number of alerts to fetch (default: all) */
+  limit?: number;
+  /** Enable/disable polling (default: true) */
   enabled?: boolean;
 }
 
@@ -29,73 +37,62 @@ interface UseRealtimeAlertsOptions {
 interface UseRealtimeAlertsReturn {
   /** Array of real-time alerts */
   alerts: WaterQualityAlert[];
-  /** Loading state - true on initial load only */
+  /** Loading state */
   isLoading: boolean;
   /** Error state */
-  error: Error | null;
-  /** Manual refetch function (reconnects listener) */
+  error: Error | undefined;
+  /** Manual refetch function */
   refetch: () => void;
+  /** Is currently revalidating */
+  isValidating: boolean;
 }
 
 /**
- * Subscribe to real-time water quality alerts from Firestore
+ * Poll for real-time water quality alerts with SWR
+ * Polls every 5 seconds for live updates
  * 
  * @example
  * ```tsx
- * const { alerts, isLoading, error } = useRealtime_Alerts({ maxAlerts: 50 });
+ * // Get all alerts with real-time polling
+ * const { alerts, isLoading, error } = useRealtime_Alerts();
+ * 
+ * // Get only unacknowledged critical alerts
+ * const { alerts } = useRealtime_Alerts({ 
+ *   status: 'Unacknowledged',
+ *   severity: 'Critical'
+ * });
  * ```
  * 
- * @param options - Configuration options
+ * @param options - Filter and configuration options
  * @returns Real-time alerts data, loading state, and error state
  */
 export const useRealtime_Alerts = (
   options: UseRealtimeAlertsOptions = {}
 ): UseRealtimeAlertsReturn => {
-  const { maxAlerts = 20, enabled = true } = options;
+  const { status, severity, deviceId, limit, enabled = true } = options;
 
-  const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // Build URL with filters
+  const url = enabled
+    ? buildAlertsUrl({ status, severity, deviceId, limit })
+    : null;
 
-  useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
+  // Use SWR with real-time polling (5 seconds)
+  const { data, error, isLoading, mutate, isValidating } = useSWR(
+    url,
+    fetcher,
+    {
+      ...swrRealtimeConfig,
+      // Only poll if enabled
+      refreshInterval: enabled ? swrRealtimeConfig.refreshInterval : 0,
     }
-
-    setIsLoading(true);
-    setError(null);
-
-    // Subscribe to real-time alerts via service layer
-    const unsubscribe = alertsService.subscribeToAlerts(
-      (alertsData) => {
-        setAlerts(alertsData);
-        setError(null);
-        setIsLoading(false);
-      },
-      (err) => {
-        console.error('[useRealtime_Alerts] Subscription error:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch alerts'));
-        setIsLoading(false);
-      },
-      maxAlerts
-    );
-
-    return () => {
-      unsubscribe();
-    };
-  }, [maxAlerts, enabled, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger((prev) => prev + 1);
-  };
+  );
 
   return {
-    alerts,
+    alerts: data || [],
     isLoading,
     error,
-    refetch,
+    refetch: mutate,
+    isValidating,
   };
 };
 

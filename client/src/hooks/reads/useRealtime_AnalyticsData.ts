@@ -1,251 +1,102 @@
 /**
  * useRealtime_AnalyticsData - Global Read Hook
  * 
- * Fetches historical sensor data and analytics for date range.
- * Combines device history, alerts, and aggregated metrics.
+ * Real-time polling for analytics dashboard data via SWR and Express REST API.
+ * Polls analytics summary at regular intervals using SWR's built-in polling.
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
- * Architecture:
- * - Fetches historical data from RTDB (sensorReadings/{deviceId}/history)
- * - Fetches alerts from Firestore
- * - Enriches data with device metadata
- * - Provides aggregated metrics and time-series data
+ * ⚠️ MIGRATION NOTE:
+ * This hook has been simplified to use server-side analytics.
+ * For detailed historical data, use the analytics service directly:
+ * - analyticsService.getTrends() for time-series data
+ * - analyticsService.getParameterAnalytics() for parameter details
+ * - devicesService.getDeviceReadings() for device history
+ * - alertsService.getAlerts() for historical alerts
  * 
  * @module hooks/reads
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { analyticsService } from '../../services/analytics.service';
-import { devicesService } from '../../services/devices.Service';
-import type {
-  DateRangeFilter,
-  HistoricalSensorData,
-  AggregatedMetrics,
-  TimeSeriesDataPoint,
-  AlertStatistics,
-  DevicePerformanceMetrics,
-  AnalyticsComplianceStatus,
-  LocationAnalytics,
-} from '../../schemas/analytics.schema';
-import type { Device, WaterQualityAlert } from '../../schemas';
+import useSWR from 'swr';
+import { fetcher, swrAnalyticsConfig } from '../../config/swr.config';
+import { ANALYTICS_ENDPOINTS } from '../../config/endpoints';
+import type { AnalyticsSummary } from '../../services/analytics.service';
 
 /**
  * Hook configuration options
  */
 interface UseRealtimeAnalyticsDataOptions {
-  /** Date range for analytics (required) */
-  dateRange: DateRangeFilter;
-  /** Device IDs to include (optional, defaults to all devices) */
-  deviceIds?: string[];
   /** Enable/disable auto-fetch (default: true) */
   enabled?: boolean;
-  /** Aggregation interval for metrics (default: 'day') */
-  aggregationInterval?: 'hour' | 'day' | 'week';
 }
 
 /**
  * Hook return value
  */
 interface UseRealtimeAnalyticsDataReturn {
-  /** Historical sensor data with device context */
-  historicalData: HistoricalSensorData[];
-  /** Time-series data points for charts */
-  timeSeriesData: TimeSeriesDataPoint[];
-  /** Aggregated metrics by time period */
-  aggregatedMetrics: AggregatedMetrics[];
-  /** Alert statistics by time period */
-  alertStatistics: AlertStatistics[];
-  /** Device performance metrics */
-  devicePerformance: DevicePerformanceMetrics[];
-  /** Compliance status for water quality parameters */
-  complianceStatus: AnalyticsComplianceStatus[];
-  /** Location-based analytics */
-  locationAnalytics: LocationAnalytics[];
-  /** Historical alerts */
-  historicalAlerts: WaterQualityAlert[];
-  /** Device metadata */
-  devices: Device[];
+  /** Analytics summary data (devices, alerts, readings statistics) */
+  summary: AnalyticsSummary | null;
   /** Loading state */
   isLoading: boolean;
   /** Error state */
   error: Error | null;
   /** Manual refetch function */
   refetch: () => void;
+  /** Whether a revalidation is in progress */
+  isValidating: boolean;
 }
 
 /**
- * Fetch and process historical analytics data
+ * Fetch real-time analytics summary via SWR
  * 
- * Provides comprehensive analytics including:
- * - Historical sensor readings
- * - Time-series data for charts
- * - Aggregated metrics (hourly/daily/weekly)
- * - Alert statistics
- * - Device performance metrics
- * - Compliance tracking
- * - Location-based insights
+ * Provides dashboard summary statistics including:
+ * - Device counts and status
+ * - Alert counts by severity
+ * - Reading counts and compliance rates
+ * 
+ * For more detailed analytics, use the analytics service directly:
+ * - analyticsService.getTrends() for time-series data
+ * - analyticsService.getParameterAnalytics() for parameter-specific insights
  * 
  * @example
  * ```tsx
  * const { 
- *   historicalData, 
- *   timeSeriesData, 
- *   aggregatedMetrics,
- *   isLoading 
- * } = useRealtime_AnalyticsData({
- *   dateRange: {
- *     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
- *     endDate: new Date()
- *   },
- *   aggregationInterval: 'day'
- * });
+ *   summary, 
+ *   isLoading,
+ *   error
+ * } = useRealtime_AnalyticsData();
+ * 
+ * if (summary) {
+ *   console.log('Total devices:', summary.devices.total);
+ *   console.log('Active alerts:', summary.alerts.active);
+ * }
  * ```
  * 
  * @param options - Configuration options
- * @returns Historical analytics data, metrics, and loading state
+ * @returns Analytics summary data, loading state, and error state
  */
 export const useRealtime_AnalyticsData = (
-  options: UseRealtimeAnalyticsDataOptions
+  options: UseRealtimeAnalyticsDataOptions = {}
 ): UseRealtimeAnalyticsDataReturn => {
-  const {
-    dateRange,
-    deviceIds,
-    enabled = true,
-    aggregationInterval = 'day',
-  } = options;
+  const { enabled = true } = options;
 
-  const [historicalData, setHistoricalData] = useState<HistoricalSensorData[]>([]);
-  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesDataPoint[]>([]);
-  const [aggregatedMetrics, setAggregatedMetrics] = useState<AggregatedMetrics[]>([]);
-  const [alertStatistics, setAlertStatistics] = useState<AlertStatistics[]>([]);
-  const [devicePerformance, setDevicePerformance] = useState<DevicePerformanceMetrics[]>([]);
-  const [complianceStatus, setComplianceStatus] = useState<AnalyticsComplianceStatus[]>([]);
-  const [locationAnalytics, setLocationAnalytics] = useState<LocationAnalytics[]>([]);
-  const [historicalAlerts, setHistoricalAlerts] = useState<WaterQualityAlert[]>([]);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  const url = enabled ? ANALYTICS_ENDPOINTS.SUMMARY : null;
 
-  const fetchAnalyticsData = useCallback(async () => {
-    if (!enabled || !dateRange) {
-      setIsLoading(false);
-      return;
+  // Use SWR with analytics config (30s polling - less frequent than critical data)
+  const { data, error, isLoading, mutate, isValidating } = useSWR(
+    url,
+    fetcher,
+    {
+      ...swrAnalyticsConfig,
+      refreshInterval: enabled ? 30000 : 0, // 30 seconds
     }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // STEP 1: Fetch device list from Firestore
-      const allDevices = await devicesService.listDevices();
-      setDevices(allDevices);
-
-      // Filter devices if deviceIds provided
-      const targetDevices = deviceIds
-        ? allDevices.filter(d => deviceIds.includes(d.deviceId))
-        : allDevices;
-
-      if (targetDevices.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
-      const targetDeviceIds = targetDevices.map(d => d.deviceId);
-
-      // STEP 2: Fetch historical sensor data from RTDB
-      const rawHistoricalData = await analyticsService.getMultiDeviceHistory(
-        targetDeviceIds,
-        dateRange,
-        1000 // Limit per device
-      );
-
-      // Enrich with device metadata
-      const enrichedData = analyticsService.enrichHistoricalData(
-        rawHistoricalData,
-        targetDevices
-      );
-      setHistoricalData(enrichedData);
-
-      // STEP 3: Process time-series data
-      const timeSeries = analyticsService.aggregateToTimeSeries(
-        enrichedData,
-        aggregationInterval === 'hour' ? 60 : aggregationInterval === 'day' ? 1440 : 10080
-      );
-      setTimeSeriesData(timeSeries);
-
-      // STEP 4: Calculate aggregated metrics
-      const allReadings = enrichedData.flatMap(d => d.readings);
-      const metrics = analyticsService.calculateAggregatedMetrics(
-        allReadings,
-        aggregationInterval
-      );
-      setAggregatedMetrics(metrics);
-
-      // STEP 5: Calculate compliance status
-      const compliance = analyticsService.calculateComplianceStatus(allReadings);
-      setComplianceStatus(compliance);
-
-      // STEP 6: Fetch and process historical alerts
-      const alerts = await analyticsService.getHistoricalAlerts(dateRange);
-      setHistoricalAlerts(alerts);
-
-      // Calculate alert statistics
-      const alertStats = analyticsService.calculateAlertStatistics(
-        alerts,
-        aggregationInterval
-      );
-      setAlertStatistics(alertStats);
-
-      // STEP 7: Calculate device performance metrics
-      const historicalDataMap = new Map(
-        enrichedData.map(d => [d.deviceId, d.readings])
-      );
-      const performance = analyticsService.calculateDevicePerformance(
-        targetDevices,
-        historicalDataMap,
-        alerts,
-        dateRange
-      );
-      setDevicePerformance(performance);
-
-      // STEP 8: Calculate location-based analytics
-      const locationData = analyticsService.calculateLocationAnalytics(
-        targetDevices,
-        historicalDataMap,
-        alerts.filter(a => a.status === 'Active')
-      );
-      setLocationAnalytics(locationData);
-
-      setIsLoading(false);
-    } catch (err) {
-      console.error('[useRealtime_AnalyticsData] Error fetching analytics:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch analytics data'));
-      setIsLoading(false);
-    }
-  }, [dateRange, deviceIds, enabled, aggregationInterval]);
-
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, [fetchAnalyticsData, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger(prev => prev + 1);
-  };
+  );
 
   return {
-    historicalData,
-    timeSeriesData,
-    aggregatedMetrics,
-    alertStatistics,
-    devicePerformance,
-    complianceStatus,
-    locationAnalytics,
-    historicalAlerts,
-    devices,
+    summary: data?.data || null,
     isLoading,
-    error,
-    refetch,
+    error: error || null,
+    refetch: mutate,
+    isValidating,
   };
 };

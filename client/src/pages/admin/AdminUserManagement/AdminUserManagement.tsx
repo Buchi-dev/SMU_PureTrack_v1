@@ -34,8 +34,7 @@ import {
   LogoutOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { signOut } from "firebase/auth";
-import { auth } from "../../../config/firebase";
+import { authService } from "../../../services/auth.Service";
 import { useRealtime_Users, useCall_Users } from "../../../hooks";
 import { UsersTable } from "./components/UsersTable";
 import { UserActionsDrawer } from "./components/UserActionsDrawer";
@@ -49,7 +48,7 @@ const { Content } = Layout;
 
 export const AdminUserManagement: React.FC = () => {
   const { token } = theme.useToken();
-  const { userProfile } = useAuth();
+  const { user: userProfile } = useAuth();
   const navigate = useNavigate();
   
   // Global READ hook - Real-time user data
@@ -102,7 +101,7 @@ export const AdminUserManagement: React.FC = () => {
         okText: 'Logout Now',
         onOk: async () => {
           try {
-            await signOut(auth);
+            await authService.logout();
             message.info('Logged out successfully. Please log in again.');
             navigate('/auth/login');
           } catch (error) {
@@ -115,7 +114,7 @@ export const AdminUserManagement: React.FC = () => {
       // Auto-logout after 3 seconds
       const timer = setTimeout(async () => {
         try {
-          await signOut(auth);
+          await authService.logout();
           message.info('Logged out successfully. Please log in again.');
           navigate('/auth/login');
         } catch (error) {
@@ -320,7 +319,7 @@ export const AdminUserManagement: React.FC = () => {
           <UserActionsDrawer
             open={drawerVisible}
             user={selectedUser}
-            currentUserId={userProfile?.uuid || ''}
+            currentUserId={userProfile?.id || ''}
             onClose={handleCloseDrawer}
             onSaveProfile={handleSaveUser}
             onQuickStatusChange={handleQuickStatusChange}

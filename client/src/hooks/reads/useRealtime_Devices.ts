@@ -1,171 +1,96 @@
 /**
  * useRealtime_Devices - Read Hook
  * 
- * Real-time listener for device sensor data via RTDB and Firestore.
- * Combines device metadata (Firestore) with live sensor readings (RTDB).
+ * Real-time polling for device data via Express REST API with SWR.
+ * Polls for device list and sensor readings every 5-15 seconds.
  * 
  * ⚠️ READ ONLY - No write operations allowed
- * 
- * Architecture:
- * - Device status comes from Firestore ONLY
- * - RTDB subscriptions update latestReading but NOT device status
+ * Use useCall_Devices hook for write operations (update, delete)
  * 
  * @module hooks/reads
  */
 
-import { useState, useEffect } from 'react';
-import { devicesService } from '../../services/devices.Service';
-import type { Device, SensorReading } from '../../schemas';
-
-/**
- * Device with sensor data
- */
-export interface DeviceWithSensorData {
-  /** Unique device identifier */
-  deviceId: string;
-  /** Human-readable device name */
-  deviceName: string;
-  /** Latest sensor reading from RTDB */
-  latestReading: SensorReading | null;
-  /** Device status from Firestore (source of truth) */
-  status: 'online' | 'offline' | 'error' | 'maintenance';
-  /** Location string (building, floor) */
-  location?: string;
-  /** Full device metadata */
-  metadata?: Device;
-}
+import useSWR from 'swr';
+import { buildDevicesUrl } from '../../config/endpoints';
+import { fetcher, swrRealtimeConfig } from '../../config/swr.config';
+import type { Device } from '../../schemas';
 
 /**
  * Hook configuration options
  */
 interface UseRealtimeDevicesOptions {
-  /** Enable/disable auto-subscription (default: true) */
+  /** Filter by device status */
+  status?: 'online' | 'offline';
+  /** Filter by registration status */
+  registrationStatus?: 'registered' | 'pending';
+  /** Enable/disable polling (default: true) */
   enabled?: boolean;
-  /** Include full device metadata in response (default: false) */
-  includeMetadata?: boolean;
 }
 
 /**
  * Hook return value
  */
 interface UseRealtimeDevicesReturn {
-  /** Array of devices with real-time sensor data */
-  devices: DeviceWithSensorData[];
-  /** Loading state - true on initial load only */
+  /** Array of devices from Express API */
+  devices: Device[];
+  /** Loading state */
   isLoading: boolean;
   /** Error state */
-  error: Error | null;
-  /** Manual refetch function (reconnects listeners) */
+  error: Error | undefined;
+  /** Manual refetch function */
   refetch: () => void;
+  /** Is currently revalidating */
+  isValidating: boolean;
 }
 
 /**
- * Subscribe to real-time device sensor data
+ * Poll for real-time device data with SWR
+ * Polls every 15 seconds for device list updates
  * 
- * Fetches device list from Firestore, then subscribes to RTDB for live readings.
- * Device status remains synced with Firestore (source of truth).
+ * For sensor readings, use a separate hook or call devicesService.getDeviceReadings()
  * 
  * @example
  * ```tsx
+ * // Get all devices with real-time polling
  * const { devices, isLoading, error } = useRealtime_Devices();
  * 
- * // With metadata
- * const { devices } = useRealtime_Devices({ includeMetadata: true });
+ * // Get only registered online devices
+ * const { devices } = useRealtime_Devices({ 
+ *   status: 'online',
+ *   registrationStatus: 'registered'
+ * });
  * ```
  * 
- * @param options - Configuration options
+ * @param options - Filter and configuration options
  * @returns Real-time device data, loading state, and error state
  */
 export const useRealtime_Devices = (
   options: UseRealtimeDevicesOptions = {}
 ): UseRealtimeDevicesReturn => {
-  const { enabled = true, includeMetadata = false } = options;
+  const { status, registrationStatus, enabled = true } = options;
 
-  const [devices, setDevices] = useState<DeviceWithSensorData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // Build URL with filters
+  const url = enabled
+    ? buildDevicesUrl({ status, registrationStatus })
+    : null;
 
-  useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
+  // Use SWR with polling (15 seconds for device list)
+  const { data, error, isLoading, mutate, isValidating } = useSWR(
+    url,
+    fetcher,
+    {
+      ...swrRealtimeConfig,
+      // Poll every 15 seconds (less frequent than alerts)
+      refreshInterval: enabled ? 15000 : 0,
     }
-
-    let unsubscribeAll: (() => void) | null = null;
-
-    const initDevices = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // READ: Fetch device list from Firestore
-        const devicesData = await devicesService.listDevices();
-
-        const formattedDevices: DeviceWithSensorData[] = devicesData.map((device) => ({
-          deviceId: device.deviceId,
-          deviceName: device.name || device.deviceId,
-          latestReading: null,
-          status: device.status || 'offline',
-          location: device.metadata?.location
-            ? `${device.metadata.location.building || ''}, ${device.metadata.location.floor || ''}`
-            : undefined,
-          ...(includeMetadata && { metadata: device }),
-        }));
-
-        setDevices(formattedDevices);
-
-        // READ: Subscribe to real-time sensor readings from RTDB
-        if (formattedDevices.length > 0) {
-          const deviceIds = formattedDevices.map((d) => d.deviceId);
-          
-          unsubscribeAll = devicesService.subscribeToMultipleDevices(
-            deviceIds,
-            (deviceId, reading) => {
-              if (reading) {
-                // ✅ Update sensor reading, keep Firestore status as source of truth
-                setDevices((prevDevices) =>
-                  prevDevices.map((device) =>
-                    device.deviceId === deviceId
-                      ? { ...device, latestReading: reading }
-                      : device
-                  )
-                );
-              }
-            },
-            (deviceId, err) => {
-              console.error(`[useRealtime_Devices] Error with device ${deviceId}:`, err);
-              // Don't set global error for individual device failures
-            }
-          );
-        }
-
-        setIsLoading(false);
-      } catch (err) {
-        console.error('[useRealtime_Devices] Error fetching devices:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch devices'));
-        setIsLoading(false);
-      }
-    };
-
-    initDevices();
-
-    return () => {
-      if (unsubscribeAll) {
-        unsubscribeAll();
-      }
-    };
-  }, [enabled, includeMetadata, refetchTrigger]);
-
-  const refetch = () => {
-    setRefetchTrigger((prev) => prev + 1);
-  };
+  );
 
   return {
-    devices,
+    devices: data || [],
     isLoading,
     error,
-    refetch,
+    refetch: mutate,
+    isValidating,
   };
 };
 

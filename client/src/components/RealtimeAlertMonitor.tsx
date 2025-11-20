@@ -20,8 +20,7 @@ import {
   RiseOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { useRealtime_Alerts } from '../hooks/reads/useRealtime_Alerts';
 import { useThemeToken } from '../theme';
 
 const { Text } = Typography;
@@ -35,7 +34,7 @@ interface DeviceAlert {
   parameter: string;
   currentValue: number;
   threshold: number;
-  severity: 'high' | 'medium' | 'low';
+  severity: 'Critical' | 'Warning' | 'Advisory';
   createdAt: Date;
   resolved: boolean;
 }
@@ -49,7 +48,12 @@ interface DeviceBySeverity {
 
 export const RealtimeAlertMonitor = () => {
   const token = useThemeToken();
-  const [alerts, setAlerts] = useState<DeviceAlert[]>([]);
+  
+  // Use the SWR-based hook for real-time alerts (fetch all, filter client-side)
+  const { alerts: rawAlerts, isLoading } = useRealtime_Alerts({
+    limit: 100,
+  });
+
   const [devicesBySeverity, setDevicesBySeverity] = useState<{
     high: DeviceBySeverity[];
     medium: DeviceBySeverity[];
@@ -60,101 +64,87 @@ export const RealtimeAlertMonitor = () => {
     low: [],
   });
 
-  // Real-time listener for alerts
+  // Process alerts and group by device/severity
   useEffect(() => {
-    const alertsRef = collection(db, 'alerts');
-    const alertsQuery = query(
-      alertsRef,
-      orderBy('createdAt', 'desc'),
-      limit(100)
-    );
+    if (!rawAlerts || rawAlerts.length === 0) {
+      setDevicesBySeverity({ high: [], medium: [], low: [] });
+      return;
+    }
 
-    const unsubscribe = onSnapshot(
-      alertsQuery,
-      (snapshot) => {
-        const fetchedAlerts = snapshot.docs
-          .filter((doc) => {
-            const data = doc.data();
-            // Only show unresolved and active alerts
-            return (data.resolved === false || data.status === 'Active') && 
-                   (data.severity === 'high' || data.severity === 'medium' || data.severity === 'low');
-          })
-          .map((doc) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              deviceId: data.deviceId || '',
-              deviceName: data.deviceName || 'Unknown Device',
-              location: typeof data.metadata?.location === 'string' 
-                ? data.metadata.location 
-                : data.metadata?.location?.building || 'Unknown Location',
-              parameter: data.parameter || 'Unknown',
-              currentValue: data.currentValue || 0,
-              threshold: data.threshold || 0,
-              severity: data.severity || 'low',
-              createdAt: data.createdAt ? new Date(data.createdAt.seconds * 1000) : new Date(),
-              resolved: data.resolved || false,
-            };
-          });
+    // Map WaterQualityAlert to DeviceAlert format
+    // Filter out resolved alerts
+    const mappedAlerts: DeviceAlert[] = rawAlerts
+      .filter((alert) => alert.status !== 'Resolved')
+      .map((alert) => ({
+        id: alert.alertId,
+        deviceId: alert.deviceId,
+        deviceName: alert.deviceName || 'Unknown Device',
+        location: typeof alert.metadata?.location === 'string'
+          ? alert.metadata.location
+          : alert.metadata?.location?.building || 'Unknown Location',
+        parameter: alert.parameter,
+        currentValue: alert.currentValue || 0,
+        threshold: alert.thresholdValue || 0,
+        severity: alert.severity,
+        createdAt: alert.createdAt instanceof Date ? alert.createdAt : new Date(alert.createdAt),
+        resolved: alert.status === 'Resolved',
+      }));
 
-        // Group alerts by device and organize by severity
-        const groupedByDevice: Record<string, DeviceBySeverity> = {};
+    // Group alerts by device and organize by severity
+    const groupedByDevice: Record<string, DeviceBySeverity> = {};
 
-        fetchedAlerts.forEach((alert) => {
-          const deviceKey = alert.deviceName;
-          
-          if (!groupedByDevice[deviceKey]) {
-            groupedByDevice[deviceKey] = {
-              device: alert.deviceName,
-              location: alert.location,
-              alerts: [],
-              highestSeverity: 'low',
-            };
-          }
+    mappedAlerts.forEach((alert) => {
+      const deviceKey = alert.deviceName;
 
-          groupedByDevice[deviceKey].alerts.push(alert);
-
-          // Update highest severity for this device
-          const severityOrder: Record<'high' | 'medium' | 'low', number> = { high: 3, medium: 2, low: 1 };
-          const alertSeverity = alert.severity as 'high' | 'medium' | 'low';
-          const currentSeverity = groupedByDevice[deviceKey].highestSeverity as 'high' | 'medium' | 'low';
-          if (severityOrder[alertSeverity] > severityOrder[currentSeverity]) {
-            groupedByDevice[deviceKey].highestSeverity = alertSeverity;
-          }
-        });
-
-        // Separate devices by highest severity level
-        const bySeverity = {
-          high: [] as DeviceBySeverity[],
-          medium: [] as DeviceBySeverity[],
-          low: [] as DeviceBySeverity[],
+      if (!groupedByDevice[deviceKey]) {
+        groupedByDevice[deviceKey] = {
+          device: alert.deviceName,
+          location: alert.location,
+          alerts: [],
+          highestSeverity: 'low',
         };
-
-        Object.values(groupedByDevice).forEach((device) => {
-          bySeverity[device.highestSeverity].push(device);
-        });
-
-        // Sort each severity level by most recent alert
-        Object.keys(bySeverity).forEach((key) => {
-          bySeverity[key as keyof typeof bySeverity].sort((a, b) => {
-            const aLatest = Math.max(...a.alerts.map(al => al.createdAt.getTime()));
-            const bLatest = Math.max(...b.alerts.map(al => al.createdAt.getTime()));
-            return bLatest - aLatest;
-          });
-        });
-
-        setAlerts(fetchedAlerts);
-        setDevicesBySeverity(bySeverity);
-      },
-      (error) => {
-        console.error('Error fetching alerts:', error);
       }
-    );
 
-    return () => unsubscribe();
-  }, []);
+      groupedByDevice[deviceKey].alerts.push(alert);
 
-  if (!token) {
+      // Update highest severity for this device (map API severity to UI severity)
+      const severityMap: Record<'Critical' | 'Warning' | 'Advisory', 'high' | 'medium' | 'low'> = {
+        Critical: 'high',
+        Warning: 'medium',
+        Advisory: 'low',
+      };
+      const severityOrder: Record<'high' | 'medium' | 'low', number> = { high: 3, medium: 2, low: 1 };
+      const alertSeverity = severityMap[alert.severity];
+      const currentSeverity = groupedByDevice[deviceKey].highestSeverity;
+      if (severityOrder[alertSeverity] > severityOrder[currentSeverity]) {
+        groupedByDevice[deviceKey].highestSeverity = alertSeverity;
+      }
+    });
+
+    // Separate devices by highest severity level
+    const bySeverity = {
+      high: [] as DeviceBySeverity[],
+      medium: [] as DeviceBySeverity[],
+      low: [] as DeviceBySeverity[],
+    };
+
+    Object.values(groupedByDevice).forEach((device) => {
+      bySeverity[device.highestSeverity].push(device);
+    });
+
+    // Sort each severity level by most recent alert
+    Object.keys(bySeverity).forEach((key) => {
+      bySeverity[key as keyof typeof bySeverity].sort((a, b) => {
+        const aLatest = Math.max(...a.alerts.map((al) => al.createdAt.getTime()));
+        const bLatest = Math.max(...b.alerts.map((al) => al.createdAt.getTime()));
+        return bLatest - aLatest;
+      });
+    });
+
+    setDevicesBySeverity(bySeverity);
+  }, [rawAlerts]);
+
+  if (!token || isLoading) {
     return <Skeleton active paragraph={{ rows: 5 }} />;
   }
 
@@ -267,9 +257,9 @@ export const RealtimeAlertMonitor = () => {
                   <Tag
                     key={idx}
                     color={
-                      alert.severity === 'high'
+                      alert.severity === 'Critical'
                         ? 'red'
-                        : alert.severity === 'medium'
+                        : alert.severity === 'Warning'
                         ? 'orange'
                         : 'blue'
                     }
@@ -306,7 +296,7 @@ export const RealtimeAlertMonitor = () => {
     );
   };
 
-  const totalAlerts = alerts.length;
+  const totalAlerts = rawAlerts.length;
   const totalDevicesWithAlerts = Object.keys(
     Object.values(devicesBySeverity)
       .flat()

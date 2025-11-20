@@ -1,89 +1,59 @@
 /**
  * Authentication Helper Utilities
- * Provides helper functions for token management and debugging
+ * 
+ * ⚠️ DEPRECATED - This file is no longer used after migration to Express REST API.
+ * 
+ * All authentication is now handled by:
+ * - authService (services/auth.Service.ts) - For login/logout operations
+ * - AuthContext (contexts/AuthContext.tsx) - For auth state management
+ * 
+ * Session-based authentication replaces Firebase token-based auth.
+ * 
+ * @deprecated Use authService and AuthContext instead
  */
 
-import { auth } from '../config/firebase';
+/**
+ * @deprecated Firebase auth is no longer used. Use authService.logout() instead.
+ */
 
 /**
- * Force refresh the current user's ID token
- * This is useful when custom claims have been updated on the backend
- * 
- * @returns {Promise<string>} The new token
+ * @deprecated Use authService.getStatus() to verify session instead
  */
 export async function refreshUserToken(): Promise<string> {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('No user is currently signed in');
-  }
-
-  // Force refresh the token (forceRefresh: true)
-  const token = await user.getIdToken(true);
-  return token;
+  throw new Error(
+    'refreshUserToken() is deprecated. Use authService.getStatus() to verify session.'
+  );
 }
 
 /**
- * Get the current user's token claims
- * Useful for debugging authentication issues
- * 
- * @returns {Promise<any>} The token claims object
+ * @deprecated Use AuthContext.userProfile to access user data instead
  */
 export async function getUserTokenClaims(): Promise<any> {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('No user is currently signed in');
-  }
-
-  const tokenResult = await user.getIdTokenResult();
-  return tokenResult.claims;
+  throw new Error(
+    'getUserTokenClaims() is deprecated. Use AuthContext.userProfile to access user data.'
+  );
 }
 
 /**
- * Check if the current user has admin role in their token
- * 
- * @returns {Promise<boolean>} True if user has admin role in token
+ * @deprecated Use AuthContext.isAdmin to check admin status instead
  */
 export async function isAdminInToken(): Promise<boolean> {
-  try {
-    const claims = await getUserTokenClaims();
-    return claims.role === 'Admin';
-  } catch {
-    return false;
-  }
+  throw new Error(
+    'isAdminInToken() is deprecated. Use AuthContext.isAdmin to check admin status.'
+  );
 }
 
 /**
- * Log current user's authentication details
- * Useful for debugging permission issues
+ * @deprecated Use browser dev tools to inspect session cookies instead
  */
 export async function logAuthDebugInfo(): Promise<void> {
-  const user = auth.currentUser;
-  if (!user) {
-    console.log('🔴 No user signed in');
-    return;
-  }
-
-  console.group('🔐 Auth Debug Info');
-  console.log('User ID:', user.uid);
-  console.log('Email:', user.email);
-  
-  try {
-    const tokenResult = await user.getIdTokenResult();
-    console.log('Token Claims:', tokenResult.claims);
-    console.log('Role in Token:', tokenResult.claims.role || 'NOT SET');
-    console.log('Status in Token:', tokenResult.claims.status || 'NOT SET');
-    console.log('Token Issue Time:', new Date(tokenResult.issuedAtTime));
-    console.log('Token Expiration:', new Date(tokenResult.expirationTime));
-  } catch (error) {
-    console.error('Error getting token:', error);
-  }
-  
-  console.groupEnd();
+  console.warn(
+    'logAuthDebugInfo() is deprecated. Use browser dev tools to inspect session cookies.'
+  );
 }
 
 /**
- * Refresh token and verify admin status
- * Returns detailed information about the refresh operation
+ * @deprecated Use authService.getStatus() to verify session and AuthContext for role checking
  */
 export async function refreshAndVerifyAdmin(): Promise<{
   success: boolean;
@@ -91,25 +61,7 @@ export async function refreshAndVerifyAdmin(): Promise<{
   role: string;
   message: string;
 }> {
-  try {
-    await refreshUserToken();
-    const claims = await getUserTokenClaims();
-    const isAdmin = claims.role === 'Admin';
-    
-    return {
-      success: true,
-      isAdmin,
-      role: claims.role || 'NOT SET',
-      message: isAdmin 
-        ? 'Token refreshed. Admin role confirmed.' 
-        : `Token refreshed but role is '${claims.role}', not 'Admin'.`
-    };
-  } catch (error: any) {
-    return {
-      success: false,
-      isAdmin: false,
-      role: 'ERROR',
-      message: error.message || 'Failed to refresh token'
-    };
-  }
+  throw new Error(
+    'refreshAndVerifyAdmin() is deprecated. Use authService.getStatus() and AuthContext.isAdmin instead.'
+  );
 }

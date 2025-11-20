@@ -1,35 +1,81 @@
 /**
  * Reports Service
  * 
- * Generates various types of analytical reports for water quality data.
+ * Generates various types of analytical reports for water quality data through Express REST API.
  * 
- * Write Operations: Cloud Functions (generateReport)
+ * Write Operations: REST API (POST /api/reports/water-quality, /device-status)
+ * Read Operations: REST API (GET /api/reports, /api/reports/:id)
  * 
  * Features:
  * - Water quality reports
  * - Device status reports
- * - Data summary reports
- * - Compliance reports
+ * - Report listing with filters
+ * - Report deletion (admin only)
  * 
  * @module services/reports
  */
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import type {
-  GenerateReportRequest,
-  WaterQualityReportData,
-  DeviceStatusReportData,
-  ReportResponse,
-} from '../schemas';
+import { apiClient, getErrorMessage } from '../config/api.config';
+import { REPORT_ENDPOINTS, buildReportsUrl } from '../config/endpoints';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: any;
+export interface WaterQualityReportRequest {
+  startDate: string;
+  endDate: string;
+  deviceIds?: string[];
+}
+
+export interface DeviceStatusReportRequest {
+  startDate: string;
+  endDate: string;
+  deviceIds?: string[];
+}
+
+export interface ReportFilters {
+  type?: 'water-quality' | 'device-status';
+  status?: 'generating' | 'completed' | 'failed';
+  generatedBy?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface Report {
+  id: string;
+  reportId: string;
+  type: string;
+  title: string;
+  generatedBy: string;
+  startDate: string;
+  endDate: string;
+  status: 'generating' | 'completed' | 'failed';
+  data: any;
+  summary?: any;
+  metadata?: any;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReportListResponse {
+  success: boolean;
+  data: Report[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface ReportResponse {
+  success: boolean;
+  data: Report;
+  message?: string;
 }
 
 // ============================================================================
@@ -37,199 +83,175 @@ export interface ErrorResponse {
 // ============================================================================
 
 export class ReportsService {
-  // ==========================================================================
-  // PROPERTIES
-  // ==========================================================================
-  
-  private readonly functions = getFunctions();
-  private readonly functionName = 'ReportCalls';
 
   // ==========================================================================
-  // ERROR MESSAGES
+  // WRITE OPERATIONS (REST API - Report Generation)
   // ==========================================================================
-  
-  private static readonly ERROR_MESSAGES: Record<string, string> = {
-    'functions/unauthenticated': 'Please log in to perform this action',
-    'functions/permission-denied': 'You do not have permission to generate reports',
-    'functions/not-found': 'Report generation function not found',
-    'functions/invalid-argument': 'Invalid report parameters',
-    'functions/failed-precondition': '', // Use backend message
-    'functions/internal': 'An internal error occurred. Please try again',
-    'functions/unavailable': 'Report service temporarily unavailable. Please try again',
-    'functions/deadline-exceeded': 'Report generation timeout. Please try again',
-  };
-
-  // ==========================================================================
-  // WRITE OPERATIONS (Cloud Functions)
-  // ==========================================================================
-
-  /**
-   * Generic Cloud Function caller with type safety
-   * 
-   * @template T - Request payload type
-   * @template R - Response data type
-   * @param action - Cloud Function action name
-   * @param data - Request data (without action field)
-   * @returns Typed response data
-   * @throws {ErrorResponse} If function call fails
-   */
-  private async callFunction<T, R = any>(
-    action: string, 
-    data: Omit<T, 'action'>
-  ): Promise<R> {
-    try {
-      const callable = httpsCallable<T, ReportResponse<R>>(
-        this.functions,
-        this.functionName
-      );
-      const result = await callable({ action, ...data } as T);
-      
-      if (!result.data.success) {
-        throw new Error(result.data.error || `Failed to ${action}`);
-      }
-      
-      return result.data.data;
-    } catch (error: any) {
-      throw this.handleError(error, `Failed to ${action}`);
-    }
-  }
 
   /**
    * Generate water quality report
    * 
-   * @param deviceIds - Optional device IDs to filter
-   * @param startDate - Optional start timestamp
-   * @param endDate - Optional end timestamp
-   * @returns Water quality report data
-   * @throws {ErrorResponse} If generation fails
+   * @param request - Report request with date range and optional device filter
+   * @returns Generated report with data and summary
+   * @throws {Error} If generation fails
+   * @example
+   * const report = await reportsService.generateWaterQualityReport({
+   *   startDate: '2025-01-01',
+   *   endDate: '2025-01-31',
+   *   deviceIds: ['WQ-001', 'WQ-002']
+   * });
    */
   async generateWaterQualityReport(
-    deviceIds?: string[],
-    startDate?: number,
-    endDate?: number
-  ): Promise<WaterQualityReportData> {
-    return this.callFunction<GenerateReportRequest, WaterQualityReportData>(
-      'generateWaterQualityReport',
-      { deviceIds, startDate, endDate }
-    );
+    request: WaterQualityReportRequest
+  ): Promise<ReportResponse> {
+    try {
+      const response = await apiClient.post<ReportResponse>(
+        REPORT_ENDPOINTS.WATER_QUALITY,
+        request
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Water quality report error:', message);
+      throw new Error(message);
+    }
   }
 
   /**
    * Generate device status report
    * 
-   * @param deviceIds - Optional device IDs to filter
-   * @returns Device status report data
-   * @throws {ErrorResponse} If generation fails
+   * @param request - Report request with date range and optional device filter
+   * @returns Generated report with device health metrics
+   * @throws {Error} If generation fails
+   * @example
+   * const report = await reportsService.generateDeviceStatusReport({
+   *   startDate: '2025-01-01',
+   *   endDate: '2025-01-31'
+   * });
    */
   async generateDeviceStatusReport(
-    deviceIds?: string[]
-  ): Promise<DeviceStatusReportData> {
-    return this.callFunction<GenerateReportRequest, DeviceStatusReportData>(
-      'generateDeviceStatusReport',
-      { deviceIds }
-    );
-  }
-
-  /**
-   * Generate data summary report
-   * 
-   * @param deviceIds - Optional device IDs to filter
-   * @param startDate - Optional start timestamp
-   * @param endDate - Optional end timestamp
-   * @returns Data summary report
-   * @throws {ErrorResponse} If generation fails
-   */
-  async generateDataSummaryReport(
-    deviceIds?: string[],
-    startDate?: number,
-    endDate?: number
-  ): Promise<any> {
-    return this.callFunction<GenerateReportRequest, any>(
-      'generateDataSummaryReport',
-      { deviceIds, startDate, endDate }
-    );
-  }
-
-  /**
-   * Generate compliance report
-   * 
-   * @param deviceIds - Optional device IDs to filter
-   * @param startDate - Optional start timestamp
-   * @param endDate - Optional end timestamp
-   * @returns Compliance report data
-   * @throws {ErrorResponse} If generation fails
-   */
-  async generateComplianceReport(
-    deviceIds?: string[],
-    startDate?: number,
-    endDate?: number
-  ): Promise<any> {
-    return this.callFunction<GenerateReportRequest, any>(
-      'generateComplianceReport',
-      { deviceIds, startDate, endDate }
-    );
-  }
-
-  /**
-   * Generate report (generic method)
-   * 
-   * @param request - Report generation request
-   * @returns Report data based on report type
-   * @throws {ErrorResponse} If generation fails
-   */
-  async generateReport(request: GenerateReportRequest): Promise<any> {
-    // Map reportType to action name for backend routing
-    const actionMap: Record<string, string> = {
-      'water_quality': 'generateWaterQualityReport',
-      'device_status': 'generateDeviceStatusReport',
-      'data_summary': 'generateDataSummaryReport',
-      'compliance': 'generateComplianceReport',
-    };
-
-    const reportType = request.reportType || 'water_quality';
-    const action = actionMap[reportType];
-    if (!action) {
-      throw new Error(`Unknown report type: ${reportType}`);
+    request: DeviceStatusReportRequest
+  ): Promise<ReportResponse> {
+    try {
+      const response = await apiClient.post<ReportResponse>(
+        REPORT_ENDPOINTS.DEVICE_STATUS,
+        request
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Device status report error:', message);
+      throw new Error(message);
     }
-
-    return this.callFunction<GenerateReportRequest, any>(
-      action,
-      {
-        deviceIds: request.deviceIds,
-        startDate: request.startDate,
-        endDate: request.endDate,
-      }
-    );
   }
 
   // ==========================================================================
-  // ERROR HANDLING
+  // READ OPERATIONS (REST API - Report Management)
   // ==========================================================================
 
   /**
-   * Transform errors into user-friendly messages
+   * Get list of generated reports with optional filters
    * 
-   * @param error - Raw error from Firebase or application
-   * @param defaultMessage - Fallback message if error unmapped
-   * @returns Standardized error response
+   * @param filters - Optional filters for type, status, date range
+   * @returns Promise with report list and pagination
+   * @example
+   * const response = await reportsService.getReports({ 
+   *   type: 'water-quality',
+   *   status: 'completed' 
+   * });
    */
-  private handleError(error: any, defaultMessage: string): ErrorResponse {
-    console.error('[ReportsService] Error:', error);
+  async getReports(filters?: ReportFilters): Promise<ReportListResponse> {
+    try {
+      const url = buildReportsUrl(filters);
+      const response = await apiClient.get<ReportListResponse>(url);
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Get reports error:', message);
+      throw new Error(message);
+    }
+  }
 
-    // Extract error details from Firebase Functions error
-    const code = error.code || 'unknown';
-    const message = error.message || defaultMessage;
-    const details = error.details || undefined;
+  /**
+   * Get single report by ID
+   * 
+   * @param reportId - Report ID to fetch
+   * @returns Promise with report data
+   * @example
+   * const response = await reportsService.getReportById('report-123');
+   */
+  async getReportById(reportId: string): Promise<ReportResponse> {
+    try {
+      const response = await apiClient.get<ReportResponse>(
+        REPORT_ENDPOINTS.BY_ID(reportId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Get report error:', message);
+      throw new Error(message);
+    }
+  }
 
-    const friendlyMessage = code === 'functions/failed-precondition'
-      ? message
-      : ReportsService.ERROR_MESSAGES[code] || message;
+  /**
+   * Delete a report (admin only)
+   * 
+   * @param reportId - Report ID to delete
+   * @throws {Error} If deletion fails
+   * @example
+   * await reportsService.deleteReport('report-123');
+   */
+  async deleteReport(reportId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.delete<{ success: boolean; message: string }>(
+        REPORT_ENDPOINTS.DELETE(reportId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Delete report error:', message);
+      throw new Error(message);
+    }
+  }
 
-    return {
-      code,
-      message: friendlyMessage,
-      details,
-    };
+  // ==========================================================================
+  // LEGACY METHODS (DEPRECATED - For backwards compatibility)
+  // ==========================================================================
+
+  /**
+   * @deprecated Use generateWaterQualityReport() with proper request format
+   * Legacy method for backwards compatibility with timestamp parameters
+   */
+  async generateReport(request: any): Promise<any> {
+    // Convert old format to new format
+    if (request.reportType === 'water_quality' || !request.reportType) {
+      return this.generateWaterQualityReport({
+        startDate: request.startDate || new Date(request.startDate || Date.now()).toISOString(),
+        endDate: request.endDate || new Date(request.endDate || Date.now()).toISOString(),
+        deviceIds: request.deviceIds,
+      });
+    } else if (request.reportType === 'device_status') {
+      return this.generateDeviceStatusReport({
+        startDate: request.startDate || new Date(request.startDate || Date.now()).toISOString(),
+        endDate: request.endDate || new Date(request.endDate || Date.now()).toISOString(),
+        deviceIds: request.deviceIds,
+      });
+    }
+    throw new Error(`Unsupported report type: ${request.reportType}`);
+  }
+
+  /**
+   * @deprecated Use generateDataSummaryReport() - not yet implemented on server
+   */
+  async generateDataSummaryReport(): Promise<any> {
+    throw new Error('Data summary reports not yet implemented on Express server');
+  }
+
+  /**
+   * @deprecated Use generateComplianceReport() - not yet implemented on server
+   */
+  async generateComplianceReport(): Promise<any> {
+    throw new Error('Compliance reports not yet implemented on Express server');
   }
 }
 

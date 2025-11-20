@@ -3,7 +3,7 @@
  * Displays recent alerts in a dropdown from the header bell icon
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Badge,
   Button,
@@ -22,66 +22,39 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import type { WaterQualityAlert } from '../schemas';
+import { useRealtime_Alerts } from '../hooks/reads/useRealtime_Alerts';
 import { getSeverityColor } from '../schemas';
 
 const { Text } = Typography;
 
 export default function AlertNotificationCenter() {
-  const [alerts, setAlerts] = useState<WaterQualityAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Subscribe to active alerts (most recent 10)
-    // Modified query to avoid composite index requirement
-    const alertsRef = collection(db, 'alerts');
-    const q = query(
-      alertsRef,
-      orderBy('createdAt', 'desc'),
-      limit(50) // Get more to filter client-side
-    );
+  // Use the SWR-based hook for real-time alerts
+  const { alerts: allAlerts, isLoading } = useRealtime_Alerts({
+    limit: 50,
+  });
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const alertsData = snapshot.docs
-          .map((doc) => ({
-            ...doc.data(),
-            alertId: doc.id,
-            createdAt: doc.data().createdAt as Timestamp,
-          })) as WaterQualityAlert[];
+  // Filter for active/acknowledged alerts and limit to 10
+  const alerts = useMemo(() => {
+    return allAlerts
+      .filter((a) => a.status === 'Active' || a.status === 'Acknowledged')
+      .slice(0, 10);
+  }, [allAlerts]);
 
-        // Filter for active/acknowledged alerts client-side
-        const filteredAlerts = alertsData
-          .filter((a) => a.status === 'Active' || a.status === 'Acknowledged')
-          .slice(0, 10); // Limit to 10 after filtering
-
-        setAlerts(filteredAlerts);
-        setUnreadCount(filteredAlerts.filter((a) => a.status === 'Active').length);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Error loading alerts:', error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
+  const unreadCount = useMemo(() => {
+    return alerts.filter((a) => a.status === 'Active').length;
+  }, [alerts]);
 
   const viewAllAlerts = () => {
     setDropdownOpen(false);
     navigate('/admin/alerts');
   };
 
-  const getTimeSince = (timestamp: Timestamp): string => {
+  const getTimeSince = (timestamp: Date | string): string => {
     const now = Date.now();
-    const alertTime = timestamp.toMillis();
+    const alertTime = timestamp instanceof Date ? timestamp.getTime() : new Date(timestamp).getTime();
     const diff = now - alertTime;
 
     const minutes = Math.floor(diff / 60000);
@@ -136,7 +109,7 @@ export default function AlertNotificationCenter() {
 
       {/* Alert List */}
       <div style={{ maxHeight: 400, overflow: 'auto' }}>
-        {loading ? (
+        {isLoading ? (
           <div style={{ padding: 40, textAlign: 'center' }}>
             <Spin />
           </div>

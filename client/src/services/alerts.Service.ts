@@ -1,39 +1,76 @@
 /**
  * Alerts Service
  * 
- * Manages water quality alerts through Firebase Cloud Functions and Firestore.
+ * Manages water quality alerts through Express REST API.
  * 
- * Write Operations: Cloud Functions (AlertsCalls)
- * Read Operations: Firestore real-time listeners with defensive caching
+ * Write Operations: REST API (PATCH /api/alerts/:id/acknowledge, /resolve)
+ * Read Operations: Handled by global hooks with SWR polling
  * 
  * Features:
  * - Acknowledge and resolve alerts
- * - Real-time alert subscriptions
- * - Defensive snapshot validation to prevent stale data
+ * - Get alert statistics
+ * - List alerts with filters
  * - Centralized error handling with user-friendly messages
  * 
  * @module services/alerts
  */
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getFirestore, collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import type { Unsubscribe } from 'firebase/firestore';
+import { apiClient, getErrorMessage } from '../config/api.config';
+import { 
+  ALERT_ENDPOINTS, 
+  buildAlertsUrl 
+} from '../config/endpoints';
 import type {
   WaterQualityAlert,
-  AcknowledgeAlertRequest,
-  ResolveAlertRequest,
-  AlertResponse,
 } from '../schemas';
-import { dataFlowLogger, DataSource, FlowLayer } from '../utils/dataFlowLogger';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: any;
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+export interface AlertFilters {
+  status?: 'Unacknowledged' | 'Acknowledged' | 'Resolved';
+  severity?: 'Critical' | 'Warning' | 'Advisory';
+  deviceId?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AlertStats {
+  total: number;
+  acknowledged: number;
+  resolved: number;
+  unacknowledged: number;
+  bySeverity: Record<string, number>;
+  byDevice: Record<string, number>;
+}
+
+export interface AlertListResponse {
+  success: boolean;
+  data: WaterQualityAlert[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface AlertResponse {
+  success: boolean;
+  data: WaterQualityAlert;
+  message?: string;
+}
+
+export interface AlertStatsResponse {
+  success: boolean;
+  data: AlertStats;
 }
 
 // ============================================================================
@@ -41,205 +78,144 @@ export interface ErrorResponse {
 // ============================================================================
 
 export class AlertsService {
-  // ==========================================================================
-  // PROPERTIES
-  // ==========================================================================
-  
-  private readonly functions = getFunctions();
-  private readonly functionName = 'AlertsCalls';
-  private readonly db = getFirestore();
 
   // ==========================================================================
-  // ERROR MESSAGES
-  // ==========================================================================
-  
-  private static readonly ERROR_MESSAGES: Record<string, string> = {
-    'functions/unauthenticated': 'Please log in to perform this action',
-    'functions/permission-denied': 'You do not have permission to manage alerts',
-    'functions/not-found': 'Alert not found',
-    'functions/failed-precondition': '', // Use backend message (already acknowledged/resolved)
-    'functions/invalid-argument': 'Invalid request parameters',
-    'functions/internal': 'An internal error occurred. Please try again',
-    'functions/unavailable': 'Alert service temporarily unavailable. Please try again',
-    'functions/deadline-exceeded': 'Request timeout. Please try again',
-  };
-
-  // ==========================================================================
-  // WRITE OPERATIONS (Cloud Functions)
+  // WRITE OPERATIONS (REST API)
   // ==========================================================================
 
   /**
-   * Generic Cloud Function caller with type safety
+   * Acknowledge an alert
+   * Marks alert as acknowledged with timestamp and user info
    * 
-   * @template T - Request payload type
-   * @param action - Cloud Function action name
-   * @param data - Request data (without action field)
-   * @throws {ErrorResponse} Transformed error with user-friendly message
+   * @param alertId - ID of the alert to acknowledge
+   * @throws {Error} If acknowledgment fails
+   * @example
+   * await alertsService.acknowledgeAlert('alert-123');
    */
-  private async callFunction<T>(action: string, data: Omit<T, 'action'>): Promise<void> {
+  async acknowledgeAlert(alertId: string): Promise<AlertResponse> {
     try {
-      const callable = httpsCallable<T, AlertResponse>(this.functions, this.functionName);
-      const result = await callable({ action, ...data } as T);
-
-      if (!result.data.success) {
-        throw new Error(result.data.error || `Failed to ${action}`);
-      }
+      const response = await apiClient.patch<AlertResponse>(
+        ALERT_ENDPOINTS.ACKNOWLEDGE(alertId)
+      );
+      return response.data;
     } catch (error: any) {
-      throw this.handleError(error, `Failed to ${action}`);
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Acknowledge error:', message);
+      throw new Error(message);
     }
   }
 
   /**
-   * Acknowledge an alert
-   * 
-   * @param alertId - ID of the alert to acknowledge
-   * @throws {ErrorResponse} If acknowledgment fails
-   */
-  async acknowledgeAlert(alertId: string): Promise<void> {
-    return this.callFunction<AcknowledgeAlertRequest>('acknowledgeAlert', { alertId });
-  }
-
-  /**
-   * Resolve an alert with optional notes
+   * Resolve an alert with optional resolution notes
+   * Marks alert as resolved with timestamp, user info, and notes
    * 
    * @param alertId - ID of the alert to resolve
    * @param notes - Optional resolution notes
-   * @throws {ErrorResponse} If resolution fails
+   * @throws {Error} If resolution fails
+   * @example
+   * await alertsService.resolveAlert('alert-123', 'Water quality normalized');
    */
-  async resolveAlert(alertId: string, notes?: string): Promise<void> {
-    return this.callFunction<ResolveAlertRequest>('resolveAlert', { alertId, notes });
+  async resolveAlert(alertId: string, notes?: string): Promise<AlertResponse> {
+    try {
+      const response = await apiClient.patch<AlertResponse>(
+        ALERT_ENDPOINTS.RESOLVE(alertId),
+        { notes }
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Resolve error:', message);
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Delete an alert (admin only)
+   * 
+   * @param alertId - ID of the alert to delete
+   * @throws {Error} If deletion fails
+   * @example
+   * await alertsService.deleteAlert('alert-123');
+   */
+  async deleteAlert(alertId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.delete<{ success: boolean; message: string }>(
+        ALERT_ENDPOINTS.DELETE(alertId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Delete error:', message);
+      throw new Error(message);
+    }
   }
 
   // ==========================================================================
-  // READ OPERATIONS (Realtime Subscriptions)
+  // READ OPERATIONS (REST API)
   // ==========================================================================
 
   /**
-   * Subscribe to real-time alert updates
+   * Get list of alerts with optional filters
+   * Use global hooks for real-time polling instead of calling this directly
    * 
-   * Implements defensive caching to prevent:
-   * - Null snapshot propagation
-   * - Empty state regression during active sessions
-   * - UI flicker from Firestore listener stalls
-   * 
-   * @param onUpdate - Callback invoked with updated alerts
-   * @param onError - Callback invoked on subscription errors
-   * @param maxAlerts - Maximum number of alerts to fetch (default: 20)
-   * @returns Unsubscribe function
+   * @param filters - Optional filters for status, severity, device, dates
+   * @returns Promise with alert list and pagination
+   * @example
+   * const response = await alertsService.getAlerts({ status: 'Unacknowledged' });
    */
-  subscribeToAlerts(
-    onUpdate: (alerts: WaterQualityAlert[]) => void,
-    onError: (error: Error) => void,
-    maxAlerts: number = 20
-  ): Unsubscribe {
-    const alertsQuery = query(
-      collection(this.db, 'alerts'),
-      orderBy('createdAt', 'desc'),
-      limit(maxAlerts)
-    );
-
-    // Cache to prevent propagating invalid snapshots
-    let lastValidSnapshot: WaterQualityAlert[] | null = null;
-    let isFirstSnapshot = true;
-
-    return onSnapshot(
-      alertsQuery,
-      (snapshot) => {
-        // DEFENSIVE: Validate snapshot before propagating to UI
-        if (!snapshot) {
-          dataFlowLogger.logValidationIssue(
-            DataSource.FIRESTORE,
-            FlowLayer.SERVICE,
-            'Received null snapshot',
-            null
-          );
-          console.warn('[AlertsService] Received null snapshot, maintaining cached state');
-          return;
-        }
-
-        // Parse alerts from snapshot
-        const alerts = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            alertId: doc.id,
-            ...data,
-            // ✅ CRITICAL: Database uses 'value', but schema expects 'currentValue'
-            // Map 'value' to 'currentValue' for consistent component usage
-            currentValue: data.value ?? data.currentValue,
-          } as WaterQualityAlert;
-        });
-
-        dataFlowLogger.log(
-          DataSource.FIRESTORE,
-          FlowLayer.SERVICE,
-          'Snapshot received',
-          { alertCount: alerts.length, isFirstSnapshot }
-        );
-
-        // DEFENSIVE: Prevent empty state regression during active session
-        if (!isFirstSnapshot && alerts.length === 0 && lastValidSnapshot && lastValidSnapshot.length > 0) {
-          dataFlowLogger.logStateRejection(
-            DataSource.FIRESTORE,
-            FlowLayer.SERVICE,
-            'Empty snapshot during active session - likely Firestore listener stall',
-            alerts,
-            lastValidSnapshot
-          );
-          console.warn('[AlertsService] Rejecting empty snapshot - likely Firestore listener stall');
-          console.warn('[AlertsService] Maintaining cached state with', lastValidSnapshot.length, 'alerts');
-          return;
-        }
-
-        // Valid data - cache and propagate
-        lastValidSnapshot = alerts;
-        isFirstSnapshot = false;
-        
-        dataFlowLogger.log(
-          DataSource.FIRESTORE,
-          FlowLayer.SERVICE,
-          'Propagating valid alert data',
-          { alertCount: alerts.length }
-        );
-        
-        onUpdate(alerts);
-      },
-      (err) => {
-        dataFlowLogger.log(
-          DataSource.FIRESTORE,
-          FlowLayer.SERVICE,
-          'Snapshot error',
-          { error: err.message }
-        );
-        console.error('[AlertsService] Snapshot error:', err);
-        onError(err instanceof Error ? err : new Error('Failed to fetch alerts'));
-      }
-    );
+  async getAlerts(filters?: AlertFilters): Promise<AlertListResponse> {
+    try {
+      const url = buildAlertsUrl(filters);
+      const response = await apiClient.get<AlertListResponse>(url);
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Get alerts error:', message);
+      throw new Error(message);
+    }
   }
 
-  // ==========================================================================
-  // ERROR HANDLING
-  // ==========================================================================
+  /**
+   * Get single alert by ID
+   * 
+   * @param alertId - Alert ID to fetch
+   * @returns Promise with alert data
+   * @example
+   * const response = await alertsService.getAlertById('alert-123');
+   */
+  async getAlertById(alertId: string): Promise<AlertResponse> {
+    try {
+      const response = await apiClient.get<AlertResponse>(
+        ALERT_ENDPOINTS.BY_ID(alertId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Get alert error:', message);
+      throw new Error(message);
+    }
+  }
 
   /**
-   * Transform errors into user-friendly messages
+   * Get alert statistics
+   * Returns aggregate statistics including counts by severity, status, device
    * 
-   * @param error - Raw error from Firebase or application
-   * @param defaultMessage - Fallback message if error unmapped
-   * @returns Standardized error response
+   * @returns Promise with alert statistics
+   * @example
+   * const response = await alertsService.getAlertStats();
+   * console.log(response.data.total, response.data.bySeverity);
    */
-  private handleError(error: any, defaultMessage: string): ErrorResponse {
-    console.error('[AlertsService] Error:', error);
-
-    const code = error.code || 'unknown';
-    const message = code === 'functions/failed-precondition' 
-      ? error.message 
-      : AlertsService.ERROR_MESSAGES[code] || error.message || defaultMessage;
-
-    return {
-      code,
-      message,
-      details: error.details,
-    };
+  async getAlertStats(): Promise<AlertStatsResponse> {
+    try {
+      const response = await apiClient.get<AlertStatsResponse>(
+        ALERT_ENDPOINTS.STATS
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Get stats error:', message);
+      throw new Error(message);
+    }
   }
 }
 

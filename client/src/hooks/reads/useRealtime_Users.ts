@@ -1,26 +1,31 @@
 /**
  * useRealtime_Users - Read Hook
  * 
- * Polling-based user list updates via Express API.
- * Fetches user data at regular intervals to simulate real-time updates.
+ * Real-time user list polling via SWR and Express REST API.
+ * Polls user data at regular intervals using SWR's built-in polling.
  * 
  * ⚠️ READ ONLY - No write operations allowed
  * 
  * @module hooks/reads
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { usersService } from '../../services/user.Service';
-import type { UserListData } from '../../schemas';
+import useSWR from 'swr';
+import { fetcher, swrImportantConfig } from '../../config/swr.config';
+import { USER_ENDPOINTS } from '../../config/endpoints';
+import type { UserListData, UserRole, UserStatus } from '../../schemas';
 
 /**
  * Hook configuration options
  */
 interface UseRealtimeUsersOptions {
+  /** Filter by user role */
+  role?: UserRole;
+  /** Filter by user status */
+  status?: UserStatus;
+  /** Maximum number of users to fetch */
+  limit?: number;
   /** Enable/disable auto-fetching (default: true) */
   enabled?: boolean;
-  /** Polling interval in milliseconds (default: 5000ms = 5 seconds) */
-  pollInterval?: number;
 }
 
 /**
@@ -35,20 +40,28 @@ interface UseRealtimeUsersReturn {
   error: Error | null;
   /** Manual refetch function */
   refetch: () => void;
+  /** Whether a revalidation is in progress */
+  isValidating: boolean;
 }
 
 /**
- * Subscribe to user updates via polling Express API
+ * Subscribe to user updates via SWR polling of Express API
+ * 
+ * Uses SWR with 15-second polling interval for user management.
+ * Automatically handles caching, deduplication, and revalidation.
  * 
  * @example
  * ```tsx
  * const { users, isLoading, error } = useRealtime_Users();
  * 
+ * // Filter by role
+ * const { users } = useRealtime_Users({ role: 'staff' });
+ * 
+ * // Filter by status
+ * const { users } = useRealtime_Users({ status: 'active' });
+ * 
  * // Conditional fetching
  * const { users } = useRealtime_Users({ enabled: isAdmin });
- * 
- * // Custom poll interval
- * const { users } = useRealtime_Users({ pollInterval: 10000 });
  * ```
  * 
  * @param options - Configuration options
@@ -57,66 +70,35 @@ interface UseRealtimeUsersReturn {
 export const useRealtime_Users = (
   options: UseRealtimeUsersOptions = {}
 ): UseRealtimeUsersReturn => {
-  const { enabled = true, pollInterval = 5000 } = options;
+  const { role, status, limit = 100, enabled = true } = options;
 
-  const [users, setUsers] = useState<UserListData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  // Build query parameters
+  const params = new URLSearchParams();
+  if (role) params.append('role', role);
+  if (status) params.append('status', status);
+  if (limit) params.append('limit', limit.toString());
 
-  /**
-   * Fetch users from Express API
-   */
-  const fetchUsers = useCallback(async () => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
+  const queryString = params.toString();
+  const url = enabled 
+    ? `${USER_ENDPOINTS.LIST}${queryString ? `?${queryString}` : ''}`
+    : null;
+
+  // Use SWR with important data config (15s polling)
+  const { data, error, isLoading, mutate, isValidating } = useSWR(
+    url,
+    fetcher,
+    {
+      ...swrImportantConfig,
+      refreshInterval: enabled ? 15000 : 0, // 15 seconds
     }
-
-    try {
-      const response = await usersService.getAllUsers({ limit: 100 });
-      setUsers(response.data);
-      setError(null);
-      setIsLoading(false);
-    } catch (err) {
-      console.error('[useRealtime_Users] Fetch error:', err);
-      setError(err instanceof Error ? err : new Error('Failed to fetch users'));
-      setIsLoading(false);
-    }
-  }, [enabled]);
-
-  /**
-   * Manual refetch function
-   */
-  const refetch = useCallback(() => {
-    setRefetchTrigger((prev) => prev + 1);
-  }, []);
-
-  useEffect(() => {
-    if (!enabled) {
-      setIsLoading(false);
-      return;
-    }
-
-    // Initial fetch
-    fetchUsers();
-
-    // Set up polling interval
-    const intervalId = setInterval(() => {
-      fetchUsers();
-    }, pollInterval);
-
-    // Cleanup interval on unmount
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [enabled, pollInterval, refetchTrigger, fetchUsers]);
+  );
 
   return {
-    users,
+    users: data?.data || [],
     isLoading,
-    error,
-    refetch,
+    error: error || null,
+    refetch: mutate,
+    isValidating,
   };
 };
 

@@ -14,44 +14,33 @@ import {
   IdcardOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../contexts/AuthContext";
-// --- Inlined from authUtils.ts ---
-import { signOut } from "firebase/auth";
-import { auth } from "../config/firebase";
+import { authService } from "../services/auth.Service";
 
-async function logout(): Promise<void> {
-  try {
-    await signOut(auth);
-    console.log("✓ User signed out successfully");
-  } catch (error) {
-    console.error("Error signing out:", error);
-    throw error;
-  }
-}
-
-function getUserDisplayName(profile: { firstname?: string; lastname?: string } | null): string {
+function getUserDisplayName(profile: { firstName?: string; lastName?: string; displayName?: string } | null): string {
   if (!profile) return "User";
-  const { firstname, lastname } = profile;
-  if (firstname && lastname) {
-    return `${firstname} ${lastname}`;
+  if (profile.displayName) return profile.displayName;
+  const { firstName, lastName } = profile;
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`;
   }
-  return firstname || lastname || "User";
+  return firstName || lastName || "User";
 }
 
-function getUserInitials(profile: { firstname?: string; lastname?: string } | null): string {
+function getUserInitials(profile: { firstName?: string; lastName?: string } | null): string {
   if (!profile) return "U";
-  const { firstname, lastname } = profile;
-  const firstInitial = firstname?.charAt(0)?.toUpperCase() || "";
-  const lastInitial = lastname?.charAt(0)?.toUpperCase() || "";
+  const { firstName, lastName } = profile;
+  const firstInitial = firstName?.charAt(0)?.toUpperCase() || "";
+  const lastInitial = lastName?.charAt(0)?.toUpperCase() || "";
   return `${firstInitial}${lastInitial}` || "U";
 }
 
-function getStatusColor(status: "Pending" | "Approved" | "Suspended"): string {
+function getStatusColor(status: "active" | "inactive" | "suspended"): string {
   switch (status) {
-    case "Approved":
+    case "active":
       return "green";
-    case "Pending":
+    case "inactive":
       return "orange";
-    case "Suspended":
+    case "suspended":
       return "red";
     default:
       return "default";
@@ -62,14 +51,14 @@ function getStatusColor(status: "Pending" | "Approved" | "Suspended"): string {
 const { Text } = Typography;
 
 export default function UserMenu() {
-  const { userProfile, isAdmin } = useAuth();
+  const { user: userProfile, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await logout();
+      await authService.logout();
       message.success("Signed out successfully");
       navigate("/auth/login");
     } catch (error) {
@@ -92,7 +81,7 @@ export default function UserMenu() {
           </Text>
           <Space size={4} style={{ marginTop: 4 }}>
             <Badge
-              status={getStatusColor(userProfile?.status || "Pending") as any}
+              status={getStatusColor(userProfile?.status || "inactive") as any}
               text={userProfile?.status}
             />
             <Text type="secondary" style={{ fontSize: "12px" }}>

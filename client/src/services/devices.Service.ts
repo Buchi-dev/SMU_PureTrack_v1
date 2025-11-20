@@ -1,363 +1,313 @@
 ﻿/**
  * Devices Service
  * 
- * Manages IoT devices and their sensor readings through Firebase services.
+ * Manages IoT devices and their sensor readings through Express REST API.
  * 
- * Write Operations: Cloud Functions (DevicesCalls)
- * Read Operations: Realtime Database (RTDB) listeners for sensor data
- * Metadata: Firestore for device configuration
+ * Write Operations: REST API (PATCH /api/devices/:id, DELETE /api/devices/:id)
+ * Read Operations: REST API with SWR polling for real-time updates
  * 
  * Features:
  * - Device CRUD operations
- * - Real-time sensor reading subscriptions
- * - Sensor history with configurable limits
+ * - Sensor reading retrieval with pagination
+ * - Device statistics
  * - Multi-device monitoring
- * - Defensive caching to prevent null propagation
- * 
- * Architecture Pattern:
- * - READ operations: Direct Firebase access (Firestore/RTDB) for real-time data
- * - WRITE operations: Cloud Functions only for security and validation
- * 
- * Cloud Functions (functions/src_new/callable/Devices.ts):
- *   - updateDevice: Modify device properties and register location (admin only)
- *   - deleteDevice: Remove device and sensor data (admin only)
- * 
- * Device Creation:
- *   - Devices are AUTO-CREATED by autoRegisterDevice Cloud Function when detected via MQTT
- *   - Admin assigns location via updateDevice to complete registration
  * 
  * @module services/devices
  */
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { getDatabase, ref, onValue } from 'firebase/database';
-import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
-import type { Unsubscribe } from 'firebase/database';
-import type { 
-  Device, 
-  SensorReading, 
-  DeviceData, 
-  DeviceResponse 
-} from '../schemas';
-import { dataFlowLogger, DataSource, FlowLayer } from '../utils/dataFlowLogger';
+import { apiClient, getErrorMessage } from '../config/api.config';
+import {
+  DEVICE_ENDPOINTS,
+  buildDevicesUrl,
+  buildDeviceReadingsUrl,
+} from '../config/endpoints';
+import type { Device, SensorReading } from '../schemas';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: any;
+export interface DeviceFilters {
+  status?: 'online' | 'offline';
+  registrationStatus?: 'registered' | 'pending';
+  page?: number;
+  limit?: number;
+}
+
+export interface DeviceReadingFilters {
+  limit?: number;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+}
+
+export interface DeviceListResponse {
+  success: boolean;
+  data: Device[];
+  pagination?: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface DeviceResponse {
+  success: boolean;
+  data: Device;
+  message?: string;
+}
+
+export interface DeviceReadingsResponse {
+  success: boolean;
+  data: SensorReading[];
+  metadata?: {
+    count: number;
+    avgPH: number;
+    avgTurbidity: number;
+    avgTDS: number;
+    avgTemperature: number;
+  };
+}
+
+export interface DeviceStats {
+  total: number;
+  online: number;
+  offline: number;
+  registered: number;
+  unregistered: number;
+}
+
+export interface DeviceStatsResponse {
+  success: boolean;
+  data: DeviceStats;
+}
+
+export interface UpdateDevicePayload {
+  location?: string;
+  registrationStatus?: 'registered' | 'pending';
+  status?: 'online' | 'offline';
+  deviceName?: string;
 }
 
 // ============================================================================
 // SERVICE CLASS
 // ============================================================================
 
-/**
- * DevicesService
- * 
- * Client Direct Access (this service):
- *   - listDevices: Query Firestore devices collection
- *   - getSensorReadings: Read from RTDB sensorReadings/{deviceId}/latestReading
- *   - getSensorHistory: Read from RTDB sensorReadings/{deviceId}/history
- *   - subscribeToSensorReadings: Real-time RTDB listener
- *   - subscribeToSensorHistory: Real-time RTDB listener
- * 
- * Helper Methods:
- *   - registerDevice: Convenience wrapper for updateDevice with location metadata
- */
 export class DevicesService {
-  // ==========================================================================
-  // PROPERTIES
-  // ==========================================================================
-  
-  private readonly functions = getFunctions();
-  private readonly db = getDatabase();
-  private readonly firestore = getFirestore();
-  private readonly functionName = 'DevicesCalls'; // Must match exported function name in functions/src_new/index.ts
 
   // ==========================================================================
-  // ERROR MESSAGES
-  // ==========================================================================
-  
-  private static readonly ERROR_MESSAGES: Record<string, string> = {
-    'functions/unauthenticated': 'Please log in to perform this action',
-    'functions/permission-denied': 'You do not have permission to perform this action',
-    'functions/not-found': 'Device not found',
-    'functions/already-exists': 'Device already exists',
-    'functions/invalid-argument': 'Invalid request parameters',
-    'functions/internal': 'An internal error occurred. Please try again',
-    'functions/unavailable': 'Service temporarily unavailable. Please try again',
-    'functions/deadline-exceeded': 'Request timeout. Please try again',
-  };
-
-  // ==========================================================================
-  // READ OPERATIONS (Firestore Queries)
+  // WRITE OPERATIONS (REST API)
   // ==========================================================================
 
   /**
-   * List all devices from Firestore
+   * Update device properties (admin only)
+   * Used to set location, registration status, or device name
    * 
-   * @returns Promise with array of devices
-   * @throws {Error} If fetch fails
+   * @param deviceId - Device ID to update
+   * @param data - Device properties to update
+   * @throws {Error} If update fails
+   * @example
+   * await devicesService.updateDevice('WQ-001', { 
+   *   location: 'Building A', 
+   *   registrationStatus: 'registered' 
+   * });
    */
-  async listDevices(): Promise<Device[]> {
+  async updateDevice(
+    deviceId: string,
+    data: UpdateDevicePayload
+  ): Promise<DeviceResponse> {
     try {
-      const devicesRef = collection(this.firestore, 'devices');
-      
-      let snapshot;
-      try {
-        const q = query(devicesRef, orderBy('registeredAt', 'desc'));
-        snapshot = await getDocs(q);
-      } catch (orderError: any) {
-        // Fallback to query without orderBy if index is missing
-        snapshot = await getDocs(devicesRef);
-      }
-      
-      const devices = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          deviceId: doc.id,
-          ...data
-        } as Device;
-      });
-      
-      return devices;
+      const response = await apiClient.patch<DeviceResponse>(
+        DEVICE_ENDPOINTS.UPDATE(deviceId),
+        data
+      );
+      return response.data;
     } catch (error: any) {
-      console.error('Error fetching devices from Firestore:', error);
-      throw new Error('Failed to list devices');
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Update error:', message);
+      throw new Error(message);
     }
   }
-
-  /** READ - Real-time RTDB listener */
-  subscribeToSensorReadings(
-    deviceId: string,
-    onUpdate: (reading: SensorReading | null) => void,
-    onError: (error: Error) => void
-  ): Unsubscribe {
-    // Cache last valid reading to prevent null propagation during RTDB stalls
-    let lastValidReading: SensorReading | null = null;
-    let isFirstSnapshot = true;
-
-    return onValue(
-      ref(this.db, `sensorReadings/${deviceId}/latestReading`),
-      (snapshot) => {
-        const reading = snapshot.val() as SensorReading | null;
-        
-        dataFlowLogger.log(
-          DataSource.RTDB,
-          FlowLayer.SERVICE,
-          `Device ${deviceId}: Reading received`,
-          { reading: reading ? 'valid' : 'null', isFirstSnapshot }
-        );
-        
-        // DEFENSIVE: If we get null on a subsequent update and had valid data before,
-        // this might be a temporary RTDB disconnection - don't propagate it
-        if (!isFirstSnapshot && reading === null && lastValidReading !== null) {
-          dataFlowLogger.logStateRejection(
-            DataSource.RTDB,
-            FlowLayer.SERVICE,
-            `Device ${deviceId}: Null reading during active session - likely RTDB stall`,
-            reading,
-            lastValidReading
-          );
-          console.warn(`[DeviceService] Device ${deviceId}: Rejecting null reading - likely RTDB stall`);
-          console.warn(`[DeviceService] Device ${deviceId}: Maintaining cached reading`);
-          return; // Don't propagate null
-        }
-
-        // Valid data (including legitimate null on first load) - cache and propagate
-        lastValidReading = reading;
-        isFirstSnapshot = false;
-        
-        dataFlowLogger.log(
-          DataSource.RTDB,
-          FlowLayer.SERVICE,
-          `Device ${deviceId}: Propagating reading`,
-          { reading }
-        );
-        
-        onUpdate(reading);
-      },
-      (err) => {
-        dataFlowLogger.log(
-          DataSource.RTDB,
-          FlowLayer.SERVICE,
-          `Device ${deviceId}: Subscription error`,
-          { error: err instanceof Error ? err.message : 'Unknown error' }
-        );
-        onError(err instanceof Error ? err : new Error('Failed to fetch sensor data'));
-      }
-    );
-  }
-
-  /** READ - Real-time RTDB listener */
-  subscribeToSensorHistory(
-    deviceId: string,
-    onUpdate: (history: SensorReading[]) => void,
-    onError: (error: Error) => void,
-    limit: number = 50
-  ): Unsubscribe {
-    return onValue(
-      ref(this.db, `sensorReadings/${deviceId}/history`),
-      (snapshot) => {
-        const data = snapshot.val();
-        const readings = data ? (Object.values(data) as SensorReading[]) : [];
-        onUpdate(readings.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit));
-      },
-      (err) => onError(err instanceof Error ? err : new Error('Failed to fetch sensor history'))
-    );
-  }
-
-  /** READ - Get sensor readings once (async) */
-  async getSensorReadings(deviceId: string): Promise<SensorReading | null> {
-    try {
-      const snapshot = await new Promise<any>((resolve, reject) => {
-        const unsubscribe = onValue(
-          ref(this.db, `sensorReadings/${deviceId}/latestReading`),
-          (snapshot) => {
-            unsubscribe();
-            resolve(snapshot);
-          },
-          (error) => {
-            unsubscribe();
-            reject(error);
-          }
-        );
-      });
-      return snapshot.val() as SensorReading | null;
-    } catch (error) {
-      console.error(`Error fetching sensor readings for device ${deviceId}:`, error);
-      throw new Error(`Failed to fetch sensor readings for device ${deviceId}`);
-    }
-  }
-
-  /** READ - Get sensor history once (async) */
-  async getSensorHistory(deviceId: string, limit: number = 50): Promise<SensorReading[]> {
-    try {
-      const snapshot = await new Promise<any>((resolve, reject) => {
-        const unsubscribe = onValue(
-          ref(this.db, `sensorReadings/${deviceId}/history`),
-          (snapshot) => {
-            unsubscribe();
-            resolve(snapshot);
-          },
-          (error) => {
-            unsubscribe();
-            reject(error);
-          }
-        );
-      });
-      
-      const data = snapshot.val();
-      const readings = data ? (Object.values(data) as SensorReading[]) : [];
-      return readings.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
-    } catch (error) {
-      console.error(`Error fetching sensor history for device ${deviceId}:`, error);
-      throw new Error(`Failed to fetch sensor history for device ${deviceId}`);
-    }
-  }
-
-  /** READ - Real-time RTDB listeners */
-  subscribeToMultipleDevices(
-    deviceIds: string[],
-    onUpdate: (deviceId: string, reading: SensorReading | null) => void,
-    onError: (deviceId: string, error: Error) => void
-  ): () => void {
-    const unsubscribers = deviceIds.map((deviceId) =>
-      this.subscribeToSensorReadings(
-        deviceId,
-        (reading) => onUpdate(deviceId, reading),
-        (error) => onError(deviceId, error)
-      )
-    );
-
-    return () => unsubscribers.forEach((unsub) => unsub());
-  }
-
-  // ============================================================================
-  // WRITE OPERATIONS (Cloud Functions)
-  // ============================================================================
 
   /**
-   * Generic Cloud Function caller with type safety
+   * Register a device by setting its location (convenience method)
    * 
-   * @template T - Request payload type
-   * @param action - Cloud Function action name
-   * @param data - Request data (without action field)
-   * @throws {ErrorResponse} Transformed error with user-friendly message
+   * @param deviceId - Device ID to register
+   * @param location - Physical location of device
+   * @throws {Error} If registration fails
+   * @example
+   * await devicesService.registerDevice('WQ-001', 'Building A - Floor 2');
    */
-  private async callFunction<T>(action: string, data: Omit<T, 'action'>): Promise<DeviceResponse> {
-    try {
-      const callable = httpsCallable<T, DeviceResponse>(this.functions, this.functionName);
-      const result = await callable({ action, ...data } as T);
-      
-      if (!result.data.success) {
-        throw new Error(result.data.message || `Failed to ${action}`);
-      }
-      
-      return result.data;
-    } catch (error: any) {
-      throw this.handleError(error, `Failed to ${action}`);
-    }
-  }
-
-  /**
-   * ⚠️ MANUAL DEVICE CREATION REMOVED
-   * Devices are now auto-created by backend when detected via MQTT.
-   * Use registerDevice() to assign location to unregistered devices.
-   */
-
-  /** WRITE - Cloud Function */
-  async updateDevice(deviceId: string, deviceData: DeviceData): Promise<void> {
-    await this.callFunction<{ action: string; deviceId: string; deviceData: DeviceData }>(
-      'updateDevice',
-      { deviceId, deviceData }
-    );
-  }
-
-  /** WRITE - Cloud Function */
-  async deleteDevice(deviceId: string): Promise<void> {
-    await this.callFunction<{ action: string; deviceId: string }>(
-      'deleteDevice',
-      { deviceId }
-    );
-  }
-
-  /**
-   * Register a device by updating its location metadata
-   * This is a convenience method that calls updateDevice
-   */
-  async registerDevice(deviceId: string, building: string, floor: string, notes?: string): Promise<void> {
-    await this.updateDevice(deviceId, {
-      metadata: { location: { building, floor, notes: notes || '' } }
+  async registerDevice(deviceId: string, location: string): Promise<DeviceResponse> {
+    return this.updateDevice(deviceId, {
+      location,
+      registrationStatus: 'registered',
     });
   }
 
+  /**
+   * Delete a device (admin only)
+   * Removes device and all associated sensor readings
+   * 
+   * @param deviceId - Device ID to delete
+   * @throws {Error} If deletion fails
+   * @example
+   * await devicesService.deleteDevice('WQ-001');
+   */
+  async deleteDevice(deviceId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.delete<{ success: boolean; message: string }>(
+        DEVICE_ENDPOINTS.DELETE(deviceId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Delete error:', message);
+      throw new Error(message);
+    }
+  }
+
   // ==========================================================================
-  // ERROR HANDLING
+  // READ OPERATIONS (REST API)
   // ==========================================================================
 
   /**
-   * Transform errors into user-friendly messages
+   * Get list of devices with optional filters
+   * Use global hooks for real-time polling instead of calling this directly
    * 
-   * @param error - Raw error from Firebase or application
-   * @param defaultMessage - Fallback message if error unmapped
-   * @returns Standardized error response
+   * @param filters - Optional filters for status, registration
+   * @returns Promise with device list and pagination
+   * @example
+   * const response = await devicesService.getDevices({ status: 'online' });
    */
-  private handleError(error: any, defaultMessage: string): ErrorResponse {
-    console.error('[DevicesService] Error:', error);
+  async getDevices(filters?: DeviceFilters): Promise<DeviceListResponse> {
+    try {
+      const url = buildDevicesUrl(filters);
+      const response = await apiClient.get<DeviceListResponse>(url);
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Get devices error:', message);
+      throw new Error(message);
+    }
+  }
 
-    const code = error.code || 'unknown';
-    const message = error.message || defaultMessage;
-    const friendlyMessage = code === 'functions/failed-precondition' 
-      ? message 
-      : DevicesService.ERROR_MESSAGES[code] || message;
+  /**
+   * Get single device by ID
+   * 
+   * @param deviceId - Device ID to fetch
+   * @returns Promise with device data
+   * @example
+   * const response = await devicesService.getDeviceById('WQ-001');
+   */
+  async getDeviceById(deviceId: string): Promise<DeviceResponse> {
+    try {
+      const response = await apiClient.get<DeviceResponse>(
+        DEVICE_ENDPOINTS.BY_ID(deviceId)
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Get device error:', message);
+      throw new Error(message);
+    }
+  }
 
-    return { code, message: friendlyMessage, details: error.details };
+  /**
+   * Get sensor readings for a device
+   * Returns paginated sensor readings with optional date range
+   * 
+   * @param deviceId - Device ID to fetch readings for
+   * @param filters - Optional filters for limit, dates, pagination
+   * @returns Promise with sensor readings and metadata
+   * @example
+   * const response = await devicesService.getDeviceReadings('WQ-001', { 
+   *   limit: 100,
+   *   startDate: '2025-01-01',
+   *   endDate: '2025-01-31'
+   * });
+   */
+  async getDeviceReadings(
+    deviceId: string,
+    filters?: DeviceReadingFilters
+  ): Promise<DeviceReadingsResponse> {
+    try {
+      const url = buildDeviceReadingsUrl(deviceId, filters);
+      const response = await apiClient.get<DeviceReadingsResponse>(url);
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Get readings error:', message);
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Get latest sensor reading for a device
+   * Convenience method to get most recent reading only
+   * 
+   * @param deviceId - Device ID to fetch latest reading for
+   * @returns Promise with latest sensor reading
+   * @example
+   * const response = await devicesService.getLatestReading('WQ-001');
+   * const reading = response.data[0];
+   */
+  async getLatestReading(deviceId: string): Promise<DeviceReadingsResponse> {
+    return this.getDeviceReadings(deviceId, { limit: 1 });
+  }
+
+  /**
+   * Get device statistics
+   * Returns aggregate statistics for all devices
+   * 
+   * @returns Promise with device statistics
+   * @example
+   * const response = await devicesService.getDeviceStats();
+   * console.log(response.data.total, response.data.online, response.data.offline);
+   */
+  async getDeviceStats(): Promise<DeviceStatsResponse> {
+    try {
+      const response = await apiClient.get<DeviceStatsResponse>(
+        DEVICE_ENDPOINTS.STATS
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Get stats error:', message);
+      throw new Error(message);
+    }
+  }
+
+  // ==========================================================================
+  // LEGACY METHODS (DEPRECATED - For backwards compatibility)
+  // ==========================================================================
+
+  /**
+   * @deprecated Use getDevices() instead
+   * Legacy method for backwards compatibility
+   */
+  async listDevices(): Promise<Device[]> {
+    const response = await this.getDevices();
+    return response.data;
+  }
+
+  /**
+   * @deprecated Use getLatestReading() instead  
+   * Legacy method for backwards compatibility
+   */
+  async getSensorReadings(deviceId: string): Promise<SensorReading | null> {
+    const response = await this.getLatestReading(deviceId);
+    return response.data[0] || null;
+  }
+
+  /**
+   * @deprecated Use getDeviceReadings() instead
+   * Legacy method for backwards compatibility
+   */
+  async getSensorHistory(deviceId: string, limit: number = 50): Promise<SensorReading[]> {
+    const response = await this.getDeviceReadings(deviceId, { limit });
+    return response.data;
   }
 }
 
