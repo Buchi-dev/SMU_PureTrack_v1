@@ -28,6 +28,21 @@ const userSchema = new mongoose.Schema(
     lastName: {
       type: String,
     },
+    middleName: {
+      type: String,
+    },
+    department: {
+      type: String,
+    },
+    phoneNumber: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          return !v || /^\+?\d{10,15}$/.test(v);
+        },
+        message: props => `${props.value} is not a valid phone number!`
+      },
+    },
     profilePicture: {
       type: String,
     },
@@ -49,6 +64,46 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       default: Date.now,
+    },
+    notificationPreferences: {
+      emailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      pushNotifications: {
+        type: Boolean,
+        default: false,
+      },
+      sendScheduledAlerts: {
+        type: Boolean,
+        default: true,
+      },
+      alertSeverities: {
+        type: [String],
+        enum: ['Critical', 'Warning', 'Advisory'],
+        default: ['Critical', 'Warning'],
+      },
+      parameters: {
+        type: [String],
+        enum: ['pH', 'Turbidity', 'TDS', 'Temperature'],
+        default: ['pH', 'Turbidity', 'TDS', 'Temperature'],
+      },
+      devices: {
+        type: [String],
+        default: [],
+      },
+      quietHoursEnabled: {
+        type: Boolean,
+        default: false,
+      },
+      quietHoursStart: {
+        type: String,
+        default: '22:00',
+      },
+      quietHoursEnd: {
+        type: String,
+        default: '08:00',
+      },
     },
   },
   {
@@ -73,9 +128,17 @@ userSchema.methods.toPublicProfile = function () {
     displayName: this.displayName,
     firstName: this.firstName,
     lastName: this.lastName,
+    middleName: this.middleName,
+    department: this.department,
+    phoneNumber: this.phoneNumber,
     profilePicture: this.profilePicture,
     role: this.role,
     status: this.status,
+    provider: this.provider,
+    lastLogin: this.lastLogin,
+    notificationPreferences: this.notificationPreferences,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt,
   };
 };
 

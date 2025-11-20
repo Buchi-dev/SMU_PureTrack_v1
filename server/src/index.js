@@ -5,10 +5,15 @@ const passport = require('passport');
 const cors = require('cors');
 const connectDB = require('./configs/mongo.Config');
 const configurePassport = require('./configs/passport.Config');
+const { startBackgroundJobs, stopBackgroundJobs } = require('./jobs/backgroundJobs');
 
 // Import routes
 const authRoutes = require('./auth/auth.Routes');
 const userRoutes = require('./users/user.Routes');
+const alertRoutes = require('./alerts/alert.Routes');
+const deviceRoutes = require('./devices/device.Routes');
+const reportRoutes = require('./reports/report.Routes');
+const analyticsRoutes = require('./analytics/analytics.Routes');
 
 // Initialize Express app
 const app = express();
@@ -63,6 +68,10 @@ app.get('/', (req, res) => {
 // API Routes
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/alerts', alertRoutes);
+app.use('/api/devices', deviceRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // 404 Handler
 app.use((req, res) => {
@@ -84,11 +93,23 @@ app.use((err, req, res, next) => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
   console.log(`📡 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 Client URL: ${process.env.CLIENT_URL}`);
   console.log(`🔐 Google OAuth: ${process.env.GOOGLE_CLIENT_ID ? 'Configured' : 'Not configured'}\n`);
+  
+  // Start background jobs
+  startBackgroundJobs();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  stopBackgroundJobs();
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
 });
 
 module.exports = app;

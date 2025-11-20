@@ -53,11 +53,11 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 }
 
 /**
- * Approved Route - Requires Approved Status
+ * Approved Route - Requires Active Status
  * Redirects based on user status
  */
 export function ApprovedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, userProfile, loading, isPending, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isInactive, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -68,25 +68,20 @@ export function ApprovedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  if (!userProfile) {
-    return <Navigate to="/auth/complete-account" replace />;
+  if (!user) {
+    return <Navigate to="/auth/login" replace />;
   }
 
-  // Check if profile is incomplete
-  if (!userProfile.department || !userProfile.phoneNumber) {
-    return <Navigate to="/auth/complete-account" replace />;
-  }
-
-  // Check status
-  if (isPending) {
+  // Check status - inactive means pending approval
+  if (isInactive) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
   if (isSuspended) {
-    return <Navigate to="/auth/account-inactive" replace />;
+    return <Navigate to="/auth/account-suspended" replace />;
   }
 
-  // User is approved, allow access
+  // User is active, allow access
   return <>{children}</>;
 }
 
@@ -95,7 +90,7 @@ export function ApprovedRoute({ children }: ProtectedRouteProps) {
  * Redirects if not admin
  */
 export function AdminRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, userProfile, loading, isAdmin, isPending, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isAdmin, isInactive, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -106,22 +101,17 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  if (!userProfile) {
-    return <Navigate to="/auth/complete-account" replace />;
-  }
-
-  // Check if profile is incomplete
-  if (!userProfile.department || !userProfile.phoneNumber) {
-    return <Navigate to="/auth/complete-account" replace />;
+  if (!user) {
+    return <Navigate to="/auth/login" replace />;
   }
 
   // Check status
-  if (isPending) {
+  if (isInactive) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
   if (isSuspended) {
-    return <Navigate to="/auth/account-inactive" replace />;
+    return <Navigate to="/auth/account-suspended" replace />;
   }
 
   // Check if user is admin
@@ -142,7 +132,7 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
           title="Access Denied"
           subTitle="You do not have permission to access this page. Admin privileges required."
           extra={
-            <Button type="primary" onClick={() => window.location.href = "/dashboard"}>
+            <Button type="primary" onClick={() => window.location.href = "/staff/dashboard"}>
               Go to Dashboard
             </Button>
           }
@@ -151,7 +141,7 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // User is admin and approved, allow access
+  // User is admin and active, allow access
   return <>{children}</>;
 }
 
@@ -160,15 +150,15 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
  * Redirects to dashboard if already logged in
  */
 export function PublicRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, isApproved, isAdmin } = useAuth();
+  const { isAuthenticated, loading, isActive, isAdmin } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
-  if (isAuthenticated && isApproved) {
-    // User is already logged in and approved, redirect to appropriate dashboard
-    const redirectPath = isAdmin ? "/admin/dashboard" : "/dashboard";
+  if (isAuthenticated && isActive) {
+    // User is already logged in and active, redirect to appropriate dashboard
+    const redirectPath = isAdmin ? "/admin/dashboard" : "/staff/dashboard";
     return <Navigate to={redirectPath} replace />;
   }
 
@@ -180,11 +170,11 @@ export function PublicRoute({ children }: ProtectedRouteProps) {
  */
 interface RoleRouteProps {
   children: ReactNode;
-  allowedRoles: ("Admin" | "Staff")[];
+  allowedRoles: ("admin" | "staff" | "user")[];
 }
 
 export function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
-  const { isAuthenticated, userProfile, loading, isPending, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isInactive, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -195,21 +185,21 @@ export function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  if (!userProfile) {
-    return <Navigate to="/auth/complete-account" replace />;
+  if (!user) {
+    return <Navigate to="/auth/login" replace />;
   }
 
   // Check status
-  if (isPending) {
+  if (isInactive) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
   if (isSuspended) {
-    return <Navigate to="/auth/account-inactive" replace />;
+    return <Navigate to="/auth/account-suspended" replace />;
   }
 
   // Check if user's role is allowed
-  if (!allowedRoles.includes(userProfile.role)) {
+  if (!allowedRoles.includes(user.role)) {
     return (
       <div
         style={{

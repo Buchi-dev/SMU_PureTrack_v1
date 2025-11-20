@@ -1,11 +1,10 @@
 /**
- * Account Inactive Component
+ * Account Suspended Component
  * Displays an error screen for suspended/inactive accounts
- * Compact single-page design following theme configuration
- * Consistent design pattern with other auth pages
+ * Works with Express/Passport.js session-based authentication
  */
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Typography, Space, Button, Tag, Divider, theme, Spin } from "antd";
 import { 
@@ -15,113 +14,80 @@ import {
   WarningOutlined,
   InfoCircleOutlined 
 } from "@ant-design/icons";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../../../config/firebase";
+import { useAuth } from "../../../contexts/AuthContext";
+import { authService } from "../../../services/auth.Service";
 
 const { Title, Text } = Typography;
 
 export const AuthAccountSuspended = () => {
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [userName, setUserName] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading, isAuthenticated, refetchUser } = useAuth();
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
   useEffect(() => {
-    let unsubscribeSnapshot: (() => void) | undefined;
+    // Redirect if not authenticated
+    if (!authLoading && !isAuthenticated) {
+      navigate("/auth/login");
+      return;
+    }
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        // Not logged in - redirect to login
-        navigate("/auth/login");
+    // Check status and redirect accordingly
+    if (!authLoading && user) {
+      console.log("User status:", user.status);
+
+      // If status changes to active, redirect to dashboard
+      if (user.status === "active") {
+        console.log("User activated! Redirecting to dashboard...");
+        
+        if (user.role === "admin") {
+          navigate("/admin/dashboard");
+        } else if (user.role === "staff") {
+          navigate("/staff/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
         return;
       }
 
-      setUserEmail(user.email || "");
-
-      // Listen for real-time updates to user status
-      const userDocRef = doc(db, "users", user.uid);
-      
-      unsubscribeSnapshot = onSnapshot(
-        userDocRef,
-        (docSnapshot) => {
-          if (!docSnapshot.exists()) {
-            console.warn("User document does not exist");
-            setLoading(false);
-            return;
-          }
-
-          const userData = docSnapshot.data();
-          const status = userData.status;
-          
-          // Set user name for display
-          setUserName(`${userData.firstname} ${userData.lastname}`);
-
-          console.log("User status:", status);
-
-          // Check if profile is incomplete
-          if (!userData.department || !userData.phoneNumber) {
-            console.log("User needs to complete profile");
-            navigate("/auth/complete-account");
-            return;
-          }
-
-          // If status changes to Approved, redirect to dashboard
-          if (status === "Approved") {
-            console.log("User approved! Redirecting to dashboard...");
-            const role = userData.role;
-            
-            if (role === "Admin") {
-              navigate("/admin/dashboard");
-            } else {
-              navigate("/staff/dashboard");
-            }
-            return;
-          }
-
-          // If status changes to Pending
-          if (status === "Pending") {
-            console.log("Status changed to Pending");
-            navigate("/auth/pending-approval");
-            return;
-          }
-
-          // Status is Suspended - stay on this page
-          setLoading(false);
-        },
-        (error) => {
-          console.error("Error listening to user status:", error);
-          setLoading(false);
-        }
-      );
-    });
-
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
+      // If status is inactive
+      if (user.status === "inactive") {
+        console.log("Status is inactive");
+        // Stay on this page or show different message
       }
-    };
-  }, [navigate]);
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
+
+  // Periodic status check every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const interval = setInterval(async () => {
+      console.log("Checking for status updates...");
+      await refetchUser();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user, refetchUser]);
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
-      navigate("/auth/login");
+      await authService.logout();
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
   const handleContactAdmin = () => {
+    const userName = user?.displayName || `${user?.firstName} ${user?.lastName}`;
+    const userEmail = user?.email || "";
+    
     // Open email client with pre-filled subject
     const subject = encodeURIComponent(`Account Suspended - Support Request from ${userName || userEmail}`);
     const body = encodeURIComponent(`Hello Admin,\n\nMy account has been suspended and I would like to request a review.\n\nAccount Details:\nName: ${userName}\nEmail: ${userEmail}\n\nThank you.`);
     window.location.href = `mailto:admin@wqm.com?subject=${subject}&body=${body}`;
   };
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div
         style={{
@@ -218,17 +184,17 @@ export const AuthAccountSuspended = () => {
                   Account Details
                 </Text>
                 <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                  {userName && (
+                  {user?.displayName && (
                     <div>
                       <Text strong style={{ fontSize: token.fontSize }}>Name:</Text>
                       <br />
-                      <Text style={{ fontSize: token.fontSize }}>{userName}</Text>
+                      <Text style={{ fontSize: token.fontSize }}>{user.displayName}</Text>
                     </div>
                   )}
                   <div>
                     <Text strong style={{ fontSize: token.fontSize }}>Email:</Text>
                     <br />
-                    <Text style={{ fontSize: token.fontSize }}>{userEmail}</Text>
+                    <Text style={{ fontSize: token.fontSize }}>{user?.email}</Text>
                   </div>
                 </Space>
               </div>

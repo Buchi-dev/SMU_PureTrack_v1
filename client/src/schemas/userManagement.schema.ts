@@ -1,6 +1,7 @@
 /**
  * User Management Schemas
  * Zod schemas for user management data validation
+ * Aligned with MongoDB user model from Express backend
  * 
  * @module schemas/userManagement
  */
@@ -8,22 +9,47 @@
 import { z } from 'zod';
 
 // ============================================================================
-// ENUMS (imported from contexts, defined here for schema validation)
+// ENUMS (aligned with MongoDB model)
 // ============================================================================
 
 /**
- * User Status Schema
+ * User Status Schema (MongoDB enum values)
  */
-export const UserStatusSchema = z.enum(['Pending', 'Approved', 'Suspended']);
+export const UserStatusSchema = z.enum(['active', 'inactive', 'suspended']);
 
 /**
- * User Role Schema
+ * User Role Schema (MongoDB enum values)
  */
-export const UserRoleSchema = z.enum(['Admin', 'Staff']);
+export const UserRoleSchema = z.enum(['admin', 'staff', 'user']);
+
+/**
+ * Auth Provider Schema
+ */
+export const AuthProviderSchema = z.enum(['google', 'local']);
 
 // ============================================================================
 // DOCUMENT SCHEMAS
 // ============================================================================
+
+/**
+ * User Schema
+ * Represents complete user data from MongoDB
+ */
+export const UserSchema = z.object({
+  id: z.string(),
+  googleId: z.string().optional(),
+  email: z.string().email(),
+  displayName: z.string(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  profilePicture: z.string().optional(),
+  role: UserRoleSchema,
+  status: UserStatusSchema,
+  provider: AuthProviderSchema,
+  lastLogin: z.date().optional(),
+  createdAt: z.date(),
+  updatedAt: z.date().optional(),
+});
 
 /**
  * User List Data Schema
@@ -31,18 +57,20 @@ export const UserRoleSchema = z.enum(['Admin', 'Staff']);
  */
 export const UserListDataSchema = z.object({
   id: z.string(),
-  uuid: z.string(),
   email: z.string().email(),
-  firstname: z.string(),
-  middlename: z.string(),
-  lastname: z.string(),
-  phoneNumber: z.string(),
-  department: z.string(),
+  displayName: z.string(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  middleName: z.string().optional(),
+  department: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  profilePicture: z.string().optional(),
   role: UserRoleSchema,
   status: UserStatusSchema,
+  provider: AuthProviderSchema.optional(),
+  lastLogin: z.date().optional(),
   createdAt: z.date(),
   updatedAt: z.date().optional(),
-  lastLogin: z.date().optional(),
 });
 
 // ============================================================================
@@ -71,11 +99,12 @@ export const UpdateUserRequestSchema = z.object({
  */
 export const UpdateUserProfileRequestSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
-  firstname: z.string().min(1, 'First name is required').optional(),
-  middlename: z.string().optional(),
-  lastname: z.string().min(1, 'Last name is required').optional(),
-  department: z.string().min(1, 'Department is required').optional(),
-  phoneNumber: z.string().regex(/^\d{11}$/, 'Phone number must be exactly 11 digits'),
+  displayName: z.string().optional(),
+  firstName: z.string().optional(),
+  middleName: z.string().optional(),
+  lastName: z.string().optional(),
+  department: z.string().optional(),
+  phoneNumber: z.string().optional(),
 });
 
 // ============================================================================
@@ -113,9 +142,10 @@ export const UpdateUserProfileResponseSchema = z.object({
   message: z.string(),
   userId: z.string(),
   updates: z.object({
-    firstname: z.string().optional(),
-    middlename: z.string().optional(),
-    lastname: z.string().optional(),
+    displayName: z.string().optional(),
+    firstName: z.string().optional(),
+    middleName: z.string().optional(),
+    lastName: z.string().optional(),
     department: z.string().optional(),
     phoneNumber: z.string().optional(),
   }),
@@ -136,6 +166,8 @@ export const ListUsersResponseSchema = z.object({
 
 export type UserStatus = z.infer<typeof UserStatusSchema>;
 export type UserRole = z.infer<typeof UserRoleSchema>;
+export type AuthProvider = z.infer<typeof AuthProviderSchema>;
+export type User = z.infer<typeof UserSchema>;
 export type UserListData = z.infer<typeof UserListDataSchema>;
 export type UpdateUserStatusRequest = z.infer<typeof UpdateUserStatusRequestSchema>;
 export type UpdateUserRequest = z.infer<typeof UpdateUserRequestSchema>;

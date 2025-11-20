@@ -29,7 +29,7 @@ import {
 
 // Auth Pages
 import {
-  AuthGoogleAuth,
+  AuthLogin,
   AuthAccountCompletion,
   AuthPendingApproval,
   AuthAccountSuspended
@@ -90,7 +90,7 @@ export const router = createBrowserRouter([
     path: '/auth/login',
     element: (
       <PublicRoute>
-        <AuthGoogleAuth />
+        <AuthLogin />
       </PublicRoute>
     ),
   },
@@ -104,6 +104,10 @@ export const router = createBrowserRouter([
   },
   {
     path: '/auth/account-inactive',
+    element: <AuthAccountSuspended />,
+  },
+  {
+    path: '/auth/account-suspended',
     element: <AuthAccountSuspended />,
   },
 

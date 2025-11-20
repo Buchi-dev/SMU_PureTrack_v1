@@ -1,10 +1,11 @@
 /**
  * Pending Approval Component
  * Displays a waiting screen for users whose accounts are pending admin approval
- * Compact single-page design following theme configuration
+ * Works with Express/Passport.js session-based authentication
+ * Handles "inactive" status as pending approval
  */
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Typography, Space, Button, Tag, Divider, theme } from "antd";
 import { 
@@ -14,109 +15,72 @@ import {
   CheckCircleOutlined,
   MailOutlined 
 } from "@ant-design/icons";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../../../config/firebase";
+import { useAuth } from "../../../contexts/AuthContext";
+import { authService } from "../../../services/auth.Service";
 
 const { Title, Text } = Typography;
 
 export const AuthPendingApproval = () => {
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [userName, setUserName] = useState<string>("");
-  const [checking, setChecking] = useState(true);
+  const { user, loading: authLoading, isAuthenticated, refetchUser } = useAuth();
   const navigate = useNavigate();
   const { token } = theme.useToken();
 
   useEffect(() => {
-    let unsubscribeSnapshot: (() => void) | undefined;
+    // Redirect if not authenticated
+    if (!authLoading && !isAuthenticated) {
+      navigate("/auth/login");
+      return;
+    }
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        // Not logged in - redirect to login
-        navigate("/auth/login");
+    // Check status and redirect accordingly
+    if (!authLoading && user) {
+      console.log("User status:", user.status);
+
+      // If status changes to active, redirect to dashboard
+      if (user.status === "active") {
+        console.log("User approved! Redirecting to dashboard...");
+        
+        if (user.role === "admin") {
+          navigate("/admin/dashboard");
+        } else if (user.role === "staff") {
+          navigate("/staff/dashboard");
+        } else {
+          navigate("/dashboard");
+        }
         return;
       }
 
-      setUserEmail(user.email || "");
-
-      // Listen for real-time updates to user status
-      const userDocRef = doc(db, "users", user.uid);
-      
-      unsubscribeSnapshot = onSnapshot(
-        userDocRef,
-        (docSnapshot) => {
-          if (!docSnapshot.exists()) {
-            console.warn("User document does not exist");
-            setChecking(false);
-            return;
-          }
-
-          const userData = docSnapshot.data();
-          const status = userData.status;
-          
-          // Set user name for display
-          setUserName(`${userData.firstname} ${userData.lastname}`);
-
-          console.log("User status:", status);
-
-          // Check if profile is incomplete
-          if (!userData.department || !userData.phoneNumber) {
-            console.log("User needs to complete profile");
-            navigate("/auth/complete-account");
-            return;
-          }
-
-          // If status changes to Approved, redirect to dashboard
-          if (status === "Approved") {
-            console.log("User approved! Redirecting to dashboard...");
-            const role = userData.role;
-            
-            if (role === "Admin") {
-              navigate("/admin/dashboard");
-            } else {
-              navigate("/staff/dashboard");
-            }
-            return;
-          }
-
-          // If status changes to Suspended
-          if (status === "Suspended") {
-            console.log("User suspended! Redirecting...");
-            navigate("/auth/account-inactive");
-            return;
-          }
-
-          setChecking(false);
-        },
-        (error) => {
-          console.error("Error listening to user status:", error);
-          setChecking(false);
-        }
-      );
-    });
-
-    // Cleanup subscriptions
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
+      // If status changes to suspended
+      if (user.status === "suspended") {
+        console.log("User suspended! Redirecting...");
+        navigate("/auth/account-suspended");
+        return;
       }
-    };
-  }, [navigate]);
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
+
+  // Periodic status check every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const interval = setInterval(async () => {
+      console.log("Checking for status updates...");
+      await refetchUser();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user, refetchUser]);
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
-      navigate("/auth/login");
+      await authService.logout();
     } catch (error) {
       console.error("Error signing out:", error);
     }
   };
 
-  const handleCheckAgain = () => {
-    setChecking(true);
-    // The onSnapshot listener will automatically check the status
-    setTimeout(() => setChecking(false), 1000);
+  const handleCheckAgain = async () => {
+    await refetchUser();
   };
 
   return (
@@ -171,10 +135,10 @@ export const AuthPendingApproval = () => {
             }}>
               <Space direction="vertical" size={4} style={{ width: "100%" }}>
                 <Text strong style={{ fontSize: 13 }}>
-                  {userName || "User"}
+                  {user?.displayName || "User"}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {userEmail}
+                  {user?.email}
                 </Text>
               </Space>
             </div>
@@ -221,7 +185,6 @@ export const AuthPendingApproval = () => {
             <Button
               icon={<ReloadOutlined />}
               onClick={handleCheckAgain}
-              loading={checking}
             >
               Refresh
             </Button>
