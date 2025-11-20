@@ -103,10 +103,6 @@ export const router = createBrowserRouter([
     element: <AuthPendingApproval />,
   },
   {
-    path: '/auth/account-inactive',
-    element: <AuthAccountSuspended />,
-  },
-  {
     path: '/auth/account-suspended',
     element: <AuthAccountSuspended />,
   },
@@ -296,6 +292,6 @@ export const ROUTES = {
     LOGIN: '/auth/login',
     COMPLETE_ACCOUNT: '/auth/complete-account',
     PENDING_APPROVAL: '/auth/pending-approval',
-    ACCOUNT_INACTIVE: '/auth/account-inactive',
+    ACCOUNT_SUSPENDED: '/auth/account-suspended',
   },
 } as const;

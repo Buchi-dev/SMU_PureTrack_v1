@@ -7,7 +7,7 @@ import { Spin } from 'antd';
  * Redirects users to appropriate dashboard based on their role and status
  */
 export const RootRedirect = () => {
-  const { isAuthenticated, isAdmin, isActive, isInactive, isSuspended, user, loading } = useAuth();
+  const { isAuthenticated, isAdmin, isActive, isPending, isSuspended, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -32,7 +32,7 @@ export const RootRedirect = () => {
     return <Navigate to="/auth/account-suspended" replace />;
   }
 
-  if (isInactive) {
+  if (isPending) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 

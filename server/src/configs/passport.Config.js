@@ -78,8 +78,8 @@ const configurePassport = () => {
             lastName: name?.familyName || '',
             profilePicture: photos && photos[0] ? photos[0].value : '',
             provider: 'google',
-            role: 'user', // Default role
-            status: 'active',
+            role: 'staff', // Default role
+            status: 'pending',
             lastLogin: new Date(),
           });
 

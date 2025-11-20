@@ -171,7 +171,7 @@ class UserService {
   }
 
   /**
-   * Update user status (active/inactive/suspended)
+   * Update user status (active/pending/suspended)
    * @param userId - User ID
    * @param status - New status
    * @returns Promise resolving to update result
@@ -188,7 +188,7 @@ class UserService {
   }
 
   /**
-   * Update user role (admin/staff/user)
+   * Update user role (admin/staff)
    * @param userId - User ID
    * @param role - New role
    * @returns Promise resolving to update result
@@ -279,14 +279,6 @@ class UserService {
    */
   async demoteToStaff(userId: string): Promise<UpdateUserResponse> {
     return this.updateUserRole(userId, 'staff');
-  }
-
-  /**
-   * Demote user to regular user
-   * @param userId - User ID
-   */
-  async demoteToUser(userId: string): Promise<UpdateUserResponse> {
-    return this.updateUserRole(userId, 'user');
   }
 }
 

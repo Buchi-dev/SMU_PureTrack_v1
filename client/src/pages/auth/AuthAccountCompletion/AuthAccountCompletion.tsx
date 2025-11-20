@@ -1,5 +1,5 @@
 ﻿/**
- * Account Completion / Inactive Component
+ * Account Completion / Pending Component
  * Redirects new users to pending approval page
  * This page is kept for backward compatibility
  */
@@ -35,7 +35,7 @@ export const AuthAccountCompletion = () => {
         }
       } else if (user.status === "suspended") {
         navigate("/auth/account-suspended");
-      } else if (user.status === "inactive") {
+      } else if (user.status === "pending") {
         navigate("/auth/pending-approval");
       }
     }

@@ -14,13 +14,16 @@ import { z } from 'zod';
 
 /**
  * User Status Schema (MongoDB enum values)
+ * - active: User can access the system
+ * - pending: User account is pending admin approval (new registrations)
+ * - suspended: User account is suspended by admin
  */
-export const UserStatusSchema = z.enum(['active', 'inactive', 'suspended']);
+export const UserStatusSchema = z.enum(['active', 'pending', 'suspended']);
 
 /**
  * User Role Schema (MongoDB enum values)
  */
-export const UserRoleSchema = z.enum(['admin', 'staff', 'user']);
+export const UserRoleSchema = z.enum(['admin', 'staff']);
 
 /**
  * Auth Provider Schema

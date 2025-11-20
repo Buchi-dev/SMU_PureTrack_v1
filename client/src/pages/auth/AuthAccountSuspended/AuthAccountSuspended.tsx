@@ -1,6 +1,6 @@
 /**
  * Account Suspended Component
- * Displays an error screen for suspended/inactive accounts
+ * Displays an error screen for suspended/pending accounts
  * Works with Express/Passport.js session-based authentication
  */
 
@@ -49,9 +49,9 @@ export const AuthAccountSuspended = () => {
         return;
       }
 
-      // If status is inactive
-      if (user.status === "inactive") {
-        console.log("Status is inactive");
+      // If status is pending
+      if (user.status === "pending") {
+        console.log("Status is pending");
         // Stay on this page or show different message
       }
     }
@@ -95,7 +95,7 @@ export const AuthAccountSuspended = () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+          backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
@@ -115,7 +115,7 @@ export const AuthAccountSuspended = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

@@ -2,7 +2,7 @@
  * Pending Approval Component
  * Displays a waiting screen for users whose accounts are pending admin approval
  * Works with Express/Passport.js session-based authentication
- * Handles "inactive" status as pending approval
+ * Handles "pending" status for new user registrations
  */
 
 import { useEffect } from "react";
@@ -90,7 +90,7 @@ export const AuthPendingApproval = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: `linear-gradient(rgba(240, 242, 245, 0.65), rgba(240, 242, 245, 0.65)), url('/4pillars.jpg')`,
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",

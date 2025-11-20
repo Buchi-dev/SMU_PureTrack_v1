@@ -29,8 +29,8 @@ export interface AuthUser {
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
-  role: 'admin' | 'staff' | 'user';
-  status: 'active' | 'inactive' | 'suspended';
+  role: 'admin' | 'staff';
+  status: 'active' | 'pending' | 'suspended';
 }
 
 export interface AuthStatusResponse {

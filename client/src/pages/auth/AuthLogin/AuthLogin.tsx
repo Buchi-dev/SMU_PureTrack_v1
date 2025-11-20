@@ -36,8 +36,8 @@ export default function AuthLogin() {
       // Route based on user role and status
       if (user.status === 'suspended') {
         navigate('/auth/account-suspended');
-      } else if (user.status === 'inactive') {
-        navigate('/auth/account-inactive');
+      } else if (user.status === 'pending') {
+        navigate('/auth/pending-approval');
       } else if (user.status === 'active') {
         // Active user - redirect to appropriate dashboard
         if (user.role === 'admin') {
@@ -67,7 +67,10 @@ export default function AuthLogin() {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
-          backgroundColor: token.colorBgLayout,
+          backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
         }}
       >
         <Card
@@ -95,7 +98,10 @@ export default function AuthLogin() {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
-        backgroundColor: token.colorBgLayout,
+        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
         padding: "24px 16px",
       }}
     >

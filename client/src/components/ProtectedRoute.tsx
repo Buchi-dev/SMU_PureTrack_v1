@@ -57,7 +57,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
  * Redirects based on user status
  */
 export function ApprovedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, user, loading, isInactive, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isPending, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -72,8 +72,8 @@ export function ApprovedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/auth/login" replace />;
   }
 
-  // Check status - inactive means pending approval
-  if (isInactive) {
+  // Check status - pending means awaiting admin approval
+  if (isPending) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
@@ -90,7 +90,7 @@ export function ApprovedRoute({ children }: ProtectedRouteProps) {
  * Redirects if not admin
  */
 export function AdminRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, user, loading, isAdmin, isInactive, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isAdmin, isPending, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -106,7 +106,7 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
   }
 
   // Check status
-  if (isInactive) {
+  if (isPending) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 
@@ -170,11 +170,11 @@ export function PublicRoute({ children }: ProtectedRouteProps) {
  */
 interface RoleRouteProps {
   children: ReactNode;
-  allowedRoles: ("admin" | "staff" | "user")[];
+  allowedRoles: ("admin" | "staff")[];
 }
 
 export function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
-  const { isAuthenticated, user, loading, isInactive, isSuspended } = useAuth();
+  const { isAuthenticated, user, loading, isPending, isSuspended } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -190,7 +190,7 @@ export function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
   }
 
   // Check status
-  if (isInactive) {
+  if (isPending) {
     return <Navigate to="/auth/pending-approval" replace />;
   }
 

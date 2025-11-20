@@ -34,11 +34,11 @@ function getUserInitials(profile: { firstName?: string; lastName?: string } | nu
   return `${firstInitial}${lastInitial}` || "U";
 }
 
-function getStatusColor(status: "active" | "inactive" | "suspended"): string {
+function getStatusColor(status: "active" | "pending" | "suspended"): string {
   switch (status) {
     case "active":
       return "green";
-    case "inactive":
+    case "pending":
       return "orange";
     case "suspended":
       return "red";
@@ -81,7 +81,7 @@ export default function UserMenu() {
           </Text>
           <Space size={4} style={{ marginTop: 4 }}>
             <Badge
-              status={getStatusColor(userProfile?.status || "inactive") as any}
+              status={getStatusColor(userProfile?.status || "pending") as any}
               text={userProfile?.status}
             />
             <Text type="secondary" style={{ fontSize: "12px" }}>

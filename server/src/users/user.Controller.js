@@ -77,7 +77,7 @@ const updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
     
-    if (!['admin', 'staff', 'user'].includes(role)) {
+    if (!['admin', 'staff'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid role',
@@ -124,10 +124,10 @@ const updateUserStatus = async (req, res) => {
   try {
     const { status } = req.body;
     
-    if (!['active', 'inactive', 'suspended'].includes(status)) {
+    if (!['active', 'pending', 'suspended'].includes(status)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status',
+        message: 'Invalid status. Must be active, pending, or suspended',
       });
     }
 

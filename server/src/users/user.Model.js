@@ -48,13 +48,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'staff', 'user'],
-      default: 'user',
+      enum: ['admin', 'staff'],
+      default: 'staff',
     },
     status: {
       type: String,
-      enum: ['active', 'inactive', 'suspended'],
-      default: 'active',
+      enum: ['active', 'pending', 'suspended'],
+      default: 'pending',
     },
     provider: {
       type: String,

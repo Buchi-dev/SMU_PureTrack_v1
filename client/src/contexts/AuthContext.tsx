@@ -9,8 +9,8 @@ import type { ReactNode } from "react";
 import { authService, type AuthUser } from "../services/auth.Service";
 
 // User status types (mapped from MongoDB model)
-export type UserStatus = "active" | "inactive" | "suspended";
-export type UserRole = "admin" | "staff" | "user";
+export type UserStatus = "active" | "pending" | "suspended";
+export type UserRole = "admin" | "staff";
 
 // Auth context state
 interface AuthContextType {
@@ -18,7 +18,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   isActive: boolean;
-  isInactive: boolean;
+  isPending: boolean;
   isSuspended: boolean;
   isAdmin: boolean;
   isStaff: boolean;
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Computed values
   const isAuthenticated = !!user;
   const isActive = user?.status === "active";
-  const isInactive = user?.status === "inactive";
+  const isPending = user?.status === "pending";
   const isSuspended = user?.status === "suspended";
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     isAuthenticated,
     isActive,
-    isInactive,
+    isPending,
     isSuspended,
     isAdmin,
     isStaff,
