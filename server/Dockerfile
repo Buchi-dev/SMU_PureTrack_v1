@@ -5,11 +5,11 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package metadata and install only production deps
-COPY package.json package-lock.json ./
+COPY server/package.json server/package-lock.json ./
 RUN npm ci --omit=dev
 
 # Bundle app source
-COPY . .
+COPY server/ .
 
 # Use environment variables where appropriate
 ENV NODE_ENV=production
