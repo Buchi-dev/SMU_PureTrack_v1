@@ -4,221 +4,159 @@ const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
 const { SENSOR_THRESHOLDS, ALERT_SEVERITY, ALERT_DEDUP_WINDOW, HTTP_STATUS } = require('../utils/constants');
 const CacheService = require('../utils/cache.service');
+const { NotFoundError, ValidationError, AppError } = require('../errors');
+const ResponseHelper = require('../utils/responses');
+const asyncHandler = require('../middleware/asyncHandler');
 
 /**
  * Get all devices
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getAllDevices = async (req, res) => {
-  try {
-    const { status, registrationStatus, page = 1, limit = 50 } = req.query;
+const getAllDevices = asyncHandler(async (req, res) => {
+  const { status, registrationStatus, page = 1, limit = 50 } = req.query;
 
-    const filter = {};
-    if (status) filter.status = status;
-    if (registrationStatus) filter.registrationStatus = registrationStatus;
+  const filter = {};
+  if (status) filter.status = status;
+  if (registrationStatus) filter.registrationStatus = registrationStatus;
 
-    // Use aggregation to fix N+1 query problem
-    const devicesAggregation = await Device.aggregate([
-      { $match: filter },
-      { $sort: { createdAt: -1 } },
-      { $skip: (page - 1) * limit * 1 },
-      { $limit: limit * 1 },
-      {
-        $lookup: {
-          from: 'sensorreadings',
-          let: { deviceId: '$deviceId' },
-          pipeline: [
-            { $match: { $expr: { $eq: ['$deviceId', '$$deviceId'] } } },
-            { $sort: { timestamp: -1 } },
-            { $limit: 1 },
-          ],
-          as: 'readings',
-        },
+  // Use aggregation to fix N+1 query problem
+  const devicesAggregation = await Device.aggregate([
+    { $match: filter },
+    { $sort: { createdAt: -1 } },
+    { $skip: (page - 1) * limit * 1 },
+    { $limit: limit * 1 },
+    {
+      $lookup: {
+        from: 'sensorreadings',
+        let: { deviceId: '$deviceId' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$deviceId', '$$deviceId'] } } },
+          { $sort: { timestamp: -1 } },
+          { $limit: 1 },
+        ],
+        as: 'readings',
       },
-      {
-        $addFields: {
-          latestReading: { $arrayElemAt: ['$readings', 0] },
-        },
+    },
+    {
+      $addFields: {
+        latestReading: { $arrayElemAt: ['$readings', 0] },
       },
-      {
-        $project: {
-          readings: 0, // Remove temporary array
-        },
+    },
+    {
+      $project: {
+        readings: 0, // Remove temporary array
       },
-    ]);
+    },
+  ]);
 
-    const count = await Device.countDocuments(filter);
+  const count = await Device.countDocuments(filter);
 
-    res.json({
-      success: true,
-      data: devicesAggregation,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        pages: Math.ceil(count / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error fetching devices:', {
-      error: error.message,
-      correlationId: req.correlationId,
-    });
-    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: 'Error fetching devices',
-      error: error.message,
-    });
-  }
-};
+  ResponseHelper.paginated(res, devicesAggregation, {
+    total: count,
+    page: parseInt(page),
+    pages: Math.ceil(count / limit),
+    limit: parseInt(limit),
+  });
+});
 
 /**
  * Get device by ID
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getDeviceById = async (req, res) => {
-  try {
-    const device = await Device.findById(req.params.id);
+const getDeviceById = asyncHandler(async (req, res) => {
+  const device = await Device.findById(req.params.id);
 
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found',
-      });
-    }
-
-    // Get latest reading
-    const latestReading = await SensorReading.findOne({ deviceId: device.deviceId })
-      .sort({ timestamp: -1 })
-      .limit(1);
-
-    res.json({
-      success: true,
-      data: {
-        ...device.toPublicProfile(),
-        latestReading: latestReading || null,
-      },
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error fetching device:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching device',
-      error: error.message,
-    });
+  if (!device) {
+    throw new NotFoundError('Device', req.params.id);
   }
-};
+
+  // Get latest reading
+  const latestReading = await SensorReading.findOne({ deviceId: device.deviceId })
+    .sort({ timestamp: -1 })
+    .limit(1);
+
+  ResponseHelper.success(res, {
+    ...device.toPublicProfile(),
+    latestReading: latestReading || null,
+  });
+});
 
 /**
  * Get device sensor readings
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getDeviceReadings = async (req, res) => {
-  try {
-    const device = await Device.findById(req.params.id);
+const getDeviceReadings = asyncHandler(async (req, res) => {
+  const device = await Device.findById(req.params.id);
 
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found',
-      });
-    }
-
-    const { startDate, endDate, page = 1, limit = 100 } = req.query;
-
-    // Build filter
-    const filter = { deviceId: device.deviceId };
-
-    if (startDate || endDate) {
-      filter.timestamp = {};
-      if (startDate) filter.timestamp.$gte = new Date(startDate);
-      if (endDate) filter.timestamp.$lte = new Date(endDate);
-    }
-
-    const readings = await SensorReading.find(filter)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ timestamp: -1 });
-
-    const count = await SensorReading.countDocuments(filter);
-
-    res.json({
-      success: true,
-      data: readings,
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        pages: Math.ceil(count / limit),
-      },
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error fetching device readings:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching device readings',
-      error: error.message,
-    });
+  if (!device) {
+    throw new NotFoundError('Device', req.params.id);
   }
-};
+
+  const { startDate, endDate, page = 1, limit = 100 } = req.query;
+
+  // Build filter
+  const filter = { deviceId: device.deviceId };
+
+  if (startDate || endDate) {
+    filter.timestamp = {};
+    if (startDate) filter.timestamp.$gte = new Date(startDate);
+    if (endDate) filter.timestamp.$lte = new Date(endDate);
+  }
+
+  const readings = await SensorReading.find(filter)
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ timestamp: -1 });
+
+  const count = await SensorReading.countDocuments(filter);
+
+  ResponseHelper.paginated(res, readings, {
+    total: count,
+    page: parseInt(page),
+    pages: Math.ceil(count / limit),
+    limit: parseInt(limit),
+  });
+});
 
 /**
  * Update device
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const updateDevice = async (req, res) => {
-  try {
-    const { location, registrationStatus, metadata } = req.body;
+const updateDevice = asyncHandler(async (req, res) => {
+  const { location, registrationStatus, metadata } = req.body;
 
-    const updates = {};
-    if (location !== undefined) updates.location = location;
-    if (registrationStatus !== undefined) updates.registrationStatus = registrationStatus;
-    if (metadata !== undefined) updates.metadata = metadata;
+  const updates = {};
+  if (location !== undefined) updates.location = location;
+  if (registrationStatus !== undefined) updates.registrationStatus = registrationStatus;
+  if (metadata !== undefined) updates.metadata = metadata;
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'No valid fields to update',
-      });
-    }
-
-    const device = await Device.findByIdAndUpdate(
-      req.params.id,
-      updates,
-      { new: true, runValidators: true }
-    );
-
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        message: 'Device not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Device updated successfully',
-      data: device.toPublicProfile(),
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error updating device:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating device',
-      error: error.message,
-    });
+  if (Object.keys(updates).length === 0) {
+    throw new ValidationError('No valid fields to update');
   }
-};
+
+  const device = await Device.findByIdAndUpdate(
+    req.params.id,
+    updates,
+    { new: true, runValidators: true }
+  );
+
+  if (!device) {
+    throw new NotFoundError('Device', req.params.id);
+  }
+
+  ResponseHelper.success(res, device.toPublicProfile(), 'Device updated successfully');
+});
 
 /**
  * Delete device
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const deleteDevice = async (req, res) => {
-  try {
+const deleteDevice = asyncHandler(async (req, res) => {
     const device = await Device.findById(req.params.id);
 
     if (!device) {
@@ -235,88 +173,57 @@ const deleteDevice = async (req, res) => {
       Alert.deleteMany({ deviceId: device.deviceId }),
     ]);
 
-    res.json({
-      success: true,
-      message: 'Device and all associated data deleted successfully',
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error deleting device:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting device',
-      error: error.message,
-    });
-  }
-};
+  ResponseHelper.success(res, null, 'Device and all associated data deleted successfully');
+});
 
 /**
  * Process sensor data (called by IoT devices via HTTP POST)
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const processSensorData = async (req, res) => {
-  try {
-    const { deviceId, pH, turbidity, tds, timestamp } = req.body;
+const processSensorData = asyncHandler(async (req, res) => {
+  const { deviceId, pH, turbidity, tds, timestamp } = req.body;
 
-    // Validate required fields
-    if (!deviceId || pH === undefined || turbidity === undefined || tds === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required sensor fields',
-      });
-    }
+  // Check if device exists, create if not (auto-registration)
+  let device = await Device.findOne({ deviceId });
 
-    // Check if device exists, create if not (auto-registration)
-    let device = await Device.findOne({ deviceId });
-
-    if (!device) {
-      console.log(`[Device Controller] Auto-registering new device: ${deviceId}`);
-      device = new Device({
-        deviceId,
-        status: 'online',
-        registrationStatus: 'pending',
-        lastSeen: new Date(),
-      });
-      await device.save();
-    } else {
-      // Update device status and last seen
-      device.status = 'online';
-      device.lastSeen = new Date();
-      await device.save();
-    }
-
-    // Save sensor reading
-    const reading = new SensorReading({
+  if (!device) {
+    logger.info('[Device Controller] Auto-registering new device', { deviceId });
+    device = new Device({
       deviceId,
-      pH,
-      turbidity,
-      tds,
-      timestamp: timestamp ? new Date(timestamp) : new Date(),
+      status: 'online',
+      registrationStatus: 'pending',
+      lastSeen: new Date(),
     });
-
-    await reading.save();
-
-    // Check thresholds and create alerts if needed
-    const alerts = await checkThresholdsAndCreateAlerts(device, reading);
-
-    res.json({
-      success: true,
-      message: 'Sensor data processed successfully',
-      data: {
-        reading,
-        device: device.toPublicProfile(),
-        alertsCreated: alerts.length,
-      },
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error processing sensor data:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing sensor data',
-      error: error.message,
-    });
+    await device.save();
+  } else {
+    // Update device status and last seen
+    device.status = 'online';
+    device.lastSeen = new Date();
+    await device.save();
   }
-};
+
+  // Save sensor reading
+  const reading = new SensorReading({
+    deviceId,
+    pH,
+    turbidity,
+    tds,
+    timestamp: timestamp ? new Date(timestamp) : new Date(),
+  });
+
+  await reading.save();
+
+  // Check thresholds and create alerts if needed
+  const alerts = await checkThresholdsAndCreateAlerts(device, reading);
+
+  ResponseHelper.success(res, {
+    reading,
+    device: device.toPublicProfile(),
+    alertsCreated: alerts.length,
+    alerts,
+  }, 'Sensor data processed successfully');
+});
 
 /**
  * Check sensor thresholds and create alerts
@@ -384,7 +291,10 @@ async function createAlert(device, parameter, value, threshold, severity, timest
     });
 
     if (recentAlert) {
-      console.log(`[Device Controller] Skipping duplicate alert for ${device.deviceId} - ${parameter}`);
+      logger.info('[Device Controller] Skipping duplicate alert', {
+        deviceId: device.deviceId,
+        parameter,
+      });
       return null;
     }
 
@@ -401,10 +311,20 @@ async function createAlert(device, parameter, value, threshold, severity, timest
     });
 
     await alert.save();
-    console.log(`[Device Controller] Created ${severity} alert for ${device.deviceId} - ${parameter}: ${value}`);
+    logger.info('[Device Controller] Created alert', {
+      alertId,
+      severity,
+      deviceId: device.deviceId,
+      parameter,
+      value,
+    });
     return alert;
   } catch (error) {
-    console.error('[Device Controller] Error creating alert:', error);
+    logger.error('[Device Controller] Error creating alert', {
+      error: error.message,
+      deviceId: device.deviceId,
+      parameter,
+    });
     return null;
   }
 }
@@ -414,33 +334,21 @@ async function createAlert(device, parameter, value, threshold, severity, timest
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getDeviceStats = async (req, res) => {
-  try {
-    const totalDevices = await Device.countDocuments();
-    const onlineDevices = await Device.countDocuments({ status: 'online' });
-    const offlineDevices = await Device.countDocuments({ status: 'offline' });
-    const pendingDevices = await Device.countDocuments({ registrationStatus: 'pending' });
-    const registeredDevices = await Device.countDocuments({ registrationStatus: 'registered' });
+const getDeviceStats = asyncHandler(async (req, res) => {
+  const totalDevices = await Device.countDocuments();
+  const onlineDevices = await Device.countDocuments({ status: 'online' });
+  const offlineDevices = await Device.countDocuments({ status: 'offline' });
+  const pendingDevices = await Device.countDocuments({ registrationStatus: 'pending' });
+  const registeredDevices = await Device.countDocuments({ registrationStatus: 'registered' });
 
-    res.json({
-      success: true,
-      data: {
-        total: totalDevices,
-        online: onlineDevices,
-        offline: offlineDevices,
-        pending: pendingDevices,
-        registered: registeredDevices,
-      },
-    });
-  } catch (error) {
-    console.error('[Device Controller] Error fetching device stats:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching device statistics',
-      error: error.message,
-    });
-  }
-};
+  ResponseHelper.success(res, {
+    total: totalDevices,
+    online: onlineDevices,
+    offline: offlineDevices,
+    pending: pendingDevices,
+    registered: registeredDevices,
+  });
+});
 
 module.exports = {
   getAllDevices,

@@ -23,6 +23,7 @@ const { initializeEmailQueue, closeEmailQueue } = require('./utils/email.queue')
 const { API_VERSION, SESSION } = require('./utils/constants');
 const { setupSocketIO } = require('./utils/socketConfig');
 const { initializeChangeStreams, closeChangeStreams } = require('./utils/changeStreams');
+const { errorHandler, notFoundHandler } = require('./errors/errorHandler');
 
 // Import middleware
 const { addCorrelationId, addUserContext } = require('./middleware/correlation.middleware');
@@ -141,38 +142,11 @@ async function initializeApp() {
   // ERROR HANDLING
   // ============================================
 
-  // 404 Handler
-  app.use((req, res) => {
-    logger.warn('Route not found', {
-      method: req.method,
-      path: req.path,
-      correlationId: req.correlationId,
-    });
-    
-    res.status(404).json({
-      success: false,
-      message: 'Route not found',
-      path: req.path,
-    });
-  });
+  // 404 Handler - Must be after all routes
+  app.use(notFoundHandler);
 
-  // Global error handler
-  app.use((err, req, res, next) => {
-    logger.error('Server error:', {
-      error: err.message,
-      stack: err.stack,
-      correlationId: req.correlationId,
-      path: req.path,
-      method: req.method,
-    });
-    
-    res.status(err.status || 500).json({
-      success: false,
-      message: err.message || 'Internal server error',
-      correlationId: req.correlationId,
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-    });
-  });
+  // Global error handler - Must be last
+  app.use(errorHandler);
 
   return redisClient;
 }
@@ -277,22 +251,9 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', {
-    error: error.message,
-    stack: error.stack,
-  });
-  gracefulShutdown('UNCAUGHT_EXCEPTION');
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection:', {
-    reason,
-    promise,
-  });
-  gracefulShutdown('UNHANDLED_REJECTION');
-});
+// Handle uncaught exceptions and unhandled rejections
+const { uncaughtExceptionHandler, unhandledRejectionHandler } = require('./errors/errorHandler');
+process.on('uncaughtException', uncaughtExceptionHandler);
+process.on('unhandledRejection', unhandledRejectionHandler);
 
 module.exports = app;

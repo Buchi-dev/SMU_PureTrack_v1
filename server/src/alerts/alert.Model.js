@@ -79,12 +79,14 @@ const alertSchema = new mongoose.Schema(
 
 /**
  * Compound indexes for optimized queries
- * Note: Individual field indexes (deviceId, status, severity) are created from schema definitions
+ * Note: Individual field indexes (deviceId, status, severity, alertId) are created from schema definitions
  * These compound indexes improve multi-field query performance
  */
 alertSchema.index({ deviceId: 1, timestamp: -1 });
 alertSchema.index({ status: 1, timestamp: -1 });
 alertSchema.index({ severity: 1, status: 1 });
+alertSchema.index({ deviceId: 1, parameter: 1, status: 1, timestamp: -1 }); // For duplicate check and filtering
+alertSchema.index({ deviceId: 1, status: 1, timestamp: -1 }); // For device-specific alert queries
 
 /**
  * Instance method to get public alert data

@@ -1,203 +1,139 @@
 const Alert = require('./alert.Model');
+const logger = require('../utils/logger');
+const { NotFoundError, ConflictError } = require('../errors');
+const ResponseHelper = require('../utils/responses');
+const asyncHandler = require('../middleware/asyncHandler');
 
 /**
  * Get all alerts with filters
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getAllAlerts = async (req, res) => {
-  try {
-    const { 
-      deviceId, 
-      severity, 
-      status, 
-      startDate, 
-      endDate, 
-      page = 1, 
-      limit = 50 
-    } = req.query;
+const getAllAlerts = asyncHandler(async (req, res) => {
+  const { 
+    deviceId, 
+    severity, 
+    status, 
+    startDate, 
+    endDate, 
+    page = 1, 
+    limit = 50 
+  } = req.query;
 
-    // Build filter object
-    const filter = {};
-    if (deviceId) filter.deviceId = deviceId;
-    if (severity) filter.severity = severity;
-    if (status) filter.status = status;
+  // Build filter object
+  const filter = {};
+  if (deviceId) filter.deviceId = deviceId;
+  if (severity) filter.severity = severity;
+  if (status) filter.status = status;
 
-    // Date range filter
-    if (startDate || endDate) {
-      filter.timestamp = {};
-      if (startDate) filter.timestamp.$gte = new Date(startDate);
-      if (endDate) filter.timestamp.$lte = new Date(endDate);
-    }
-
-    const alerts = await Alert.find(filter)
-      .populate('acknowledgedBy', 'displayName email')
-      .populate('resolvedBy', 'displayName email')
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ timestamp: -1 });
-
-    const count = await Alert.countDocuments(filter);
-
-    res.json({
-      success: true,
-      data: alerts.map(alert => alert.toPublicProfile()),
-      pagination: {
-        total: count,
-        page: parseInt(page),
-        pages: Math.ceil(count / limit),
-      },
-    });
-  } catch (error) {
-    console.error('[Alert Controller] Error fetching alerts:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching alerts',
-      error: error.message,
-    });
+  // Date range filter
+  if (startDate || endDate) {
+    filter.timestamp = {};
+    if (startDate) filter.timestamp.$gte = new Date(startDate);
+    if (endDate) filter.timestamp.$lte = new Date(endDate);
   }
-};
+
+  const alerts = await Alert.find(filter)
+    .populate('acknowledgedBy', 'displayName email')
+    .populate('resolvedBy', 'displayName email')
+    .limit(limit * 1)
+    .skip((page - 1) * limit)
+    .sort({ timestamp: -1 });
+
+  const count = await Alert.countDocuments(filter);
+
+  ResponseHelper.paginated(res, alerts.map(alert => alert.toPublicProfile()), {
+    total: count,
+    page: parseInt(page),
+    pages: Math.ceil(count / limit),
+    limit: parseInt(limit),
+  });
+});
 
 /**
  * Get alert by ID
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const getAlertById = async (req, res) => {
-  try {
-    const alert = await Alert.findById(req.params.id)
-      .populate('acknowledgedBy', 'displayName email')
-      .populate('resolvedBy', 'displayName email');
+const getAlertById = asyncHandler(async (req, res) => {
+  const alert = await Alert.findById(req.params.id)
+    .populate('acknowledgedBy', 'displayName email')
+    .populate('resolvedBy', 'displayName email');
 
-    if (!alert) {
-      return res.status(404).json({
-        success: false,
-        message: 'Alert not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      data: alert.toPublicProfile(),
-    });
-  } catch (error) {
-    console.error('[Alert Controller] Error fetching alert:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching alert',
-      error: error.message,
-    });
+  if (!alert) {
+    throw new NotFoundError('Alert', req.params.id);
   }
-};
+
+  ResponseHelper.success(res, alert.toPublicProfile());
+});
 
 /**
  * Acknowledge alert
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const acknowledgeAlert = async (req, res) => {
-  try {
-    const alert = await Alert.findById(req.params.id);
+const acknowledgeAlert = asyncHandler(async (req, res) => {
+  const alert = await Alert.findById(req.params.id);
 
-    if (!alert) {
-      return res.status(404).json({
-        success: false,
-        message: 'Alert not found',
-      });
-    }
-
-    // Check if already acknowledged or resolved
-    if (alert.status === 'Acknowledged') {
-      return res.status(400).json({
-        success: false,
-        message: 'Alert is already acknowledged',
-      });
-    }
-
-    if (alert.status === 'Resolved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Alert is already resolved',
-      });
-    }
-
-    // Update alert
-    alert.status = 'Acknowledged';
-    alert.acknowledgedAt = new Date();
-    alert.acknowledgedBy = req.user._id;
-    await alert.save();
-
-    // Populate user data
-    await alert.populate('acknowledgedBy', 'displayName email');
-
-    res.json({
-      success: true,
-      message: 'Alert acknowledged successfully',
-      data: alert.toPublicProfile(),
-    });
-  } catch (error) {
-    console.error('[Alert Controller] Error acknowledging alert:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error acknowledging alert',
-      error: error.message,
-    });
+  if (!alert) {
+    throw new NotFoundError('Alert', req.params.id);
   }
-};
+
+  // Check if already acknowledged or resolved
+  if (alert.status === 'Acknowledged') {
+    throw ConflictError.alertAlreadyAcknowledged();
+  }
+
+  if (alert.status === 'Resolved') {
+    throw ConflictError.alertAlreadyResolved();
+  }
+
+  // Update alert
+  alert.status = 'Acknowledged';
+  alert.acknowledgedAt = new Date();
+  alert.acknowledgedBy = req.user._id;
+  await alert.save();
+
+  // Populate user data
+  await alert.populate('acknowledgedBy', 'displayName email');
+
+  ResponseHelper.success(res, alert.toPublicProfile(), 'Alert acknowledged successfully');
+});
 
 /**
  * Resolve alert
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const resolveAlert = async (req, res) => {
-  try {
-    const { resolutionNotes } = req.body;
+const resolveAlert = asyncHandler(async (req, res) => {
+  const { resolutionNotes } = req.body;
 
-    const alert = await Alert.findById(req.params.id);
+  const alert = await Alert.findById(req.params.id);
 
-    if (!alert) {
-      return res.status(404).json({
-        success: false,
-        message: 'Alert not found',
-      });
-    }
-
-    // Check if already resolved
-    if (alert.status === 'Resolved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Alert is already resolved',
-      });
-    }
-
-    // Update alert
-    alert.status = 'Resolved';
-    alert.resolvedAt = new Date();
-    alert.resolvedBy = req.user._id;
-    if (resolutionNotes) {
-      alert.resolutionNotes = resolutionNotes;
-    }
-    await alert.save();
-
-    // Populate user data
-    await alert.populate('acknowledgedBy', 'displayName email');
-    await alert.populate('resolvedBy', 'displayName email');
-
-    res.json({
-      success: true,
-      message: 'Alert resolved successfully',
-      data: alert.toPublicProfile(),
-    });
-  } catch (error) {
-    console.error('[Alert Controller] Error resolving alert:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error resolving alert',
-      error: error.message,
-    });
+  if (!alert) {
+    throw new NotFoundError('Alert', req.params.id);
   }
-};
+
+  // Check if already resolved
+  if (alert.status === 'Resolved') {
+    throw ConflictError.alertAlreadyResolved();
+  }
+
+  // Update alert
+  alert.status = 'Resolved';
+  alert.resolvedAt = new Date();
+  alert.resolvedBy = req.user._id;
+  if (resolutionNotes) {
+    alert.resolutionNotes = resolutionNotes;
+  }
+  await alert.save();
+
+  // Populate user data
+  await alert.populate('acknowledgedBy', 'displayName email');
+  await alert.populate('resolvedBy', 'displayName email');
+
+  ResponseHelper.success(res, alert.toPublicProfile(), 'Alert resolved successfully');
+});
 
 /**
  * Create alert (called by sensor data processor)

@@ -1,6 +1,9 @@
 /**
  * Environment Variable Validator
  * Ensures all required environment variables are set before starting the server
+ * 
+ * NOTE: This file intentionally uses console.log/error/warn instead of logger
+ * because it runs BEFORE the logger is initialized during application startup.
  */
 
 const requiredEnvVars = [

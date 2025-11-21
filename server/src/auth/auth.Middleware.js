@@ -1,153 +1,115 @@
 const { verifyIdToken } = require('../configs/firebase.Config');
 const User = require('../users/user.Model');
 const logger = require('../utils/logger');
+const { AuthenticationError, NotFoundError } = require('../errors');
+const asyncHandler = require('../middleware/asyncHandler');
 
 /**
  * Firebase Authentication Middleware
  * Verifies Firebase ID token and attaches user to request
  */
-const authenticateFirebase = async (req, res, next) => {
+const authenticateFirebase = asyncHandler(async (req, res, next) => {
+  // Get token from Authorization header
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.warn('[Auth Middleware] No authorization header', {
+      path: req.path,
+      hasHeader: !!authHeader,
+    });
+    throw AuthenticationError.missingToken();
+  }
+
+  const idToken = authHeader.split('Bearer ')[1];
+
+  if (!idToken || idToken.trim() === '') {
+    logger.warn('[Auth Middleware] Empty token', { path: req.path });
+    throw AuthenticationError.missingToken();
+  }
+
+  // Verify Firebase token
+  let decodedToken;
   try {
-    // Get token from Authorization header
-    const authHeader = req.headers.authorization;
+    logger.info('[Auth Middleware] Attempting to verify token', {
+      tokenPrefix: idToken.substring(0, 20) + '...',
+      tokenLength: idToken.length,
+      path: req.path,
+    });
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      logger.warn('[Auth Middleware] No authorization header', {
-        path: req.path,
-        hasHeader: !!authHeader,
-      });
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required',
-      });
-    }
-
-    const idToken = authHeader.split('Bearer ')[1];
-
-    if (!idToken || idToken.trim() === '') {
-      logger.warn('[Auth Middleware] Empty token', { path: req.path });
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required',
-      });
-    }
-
-    // Verify Firebase token
-    let decodedToken;
-    try {
-      // Log token info for debugging (first 20 chars only for security)
-      logger.info('[Auth Middleware] Attempting to verify token', {
-        tokenPrefix: idToken.substring(0, 20) + '...',
-        tokenLength: idToken.length,
-        path: req.path,
-      });
-      
-      decodedToken = await verifyIdToken(idToken);
-      
-      logger.info('[Auth Middleware] Token verified successfully', {
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        path: req.path,
-      });
-    } catch (tokenError) {
-      logger.error('[Auth Middleware] Firebase token verification failed', {
-        error: tokenError.message,
-        errorCode: tokenError.code,
-        errorStack: tokenError.stack,
-        tokenPrefix: idToken.substring(0, 20) + '...',
-        path: req.path,
-      });
-      
-      // Provide more specific error messages
-      if (tokenError.code === 'auth/id-token-expired') {
-        return res.status(401).json({
-          success: false,
-          message: 'Token expired',
-        });
-      }
-      
-      if (tokenError.code === 'auth/argument-error') {
-        return res.status(401).json({
-          success: false,
-          message: 'Invalid token format',
-          details: process.env.NODE_ENV === 'development' ? tokenError.message : undefined,
-        });
-      }
-      
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token',
-        details: process.env.NODE_ENV === 'development' ? tokenError.message : undefined,
-      });
+    decodedToken = await verifyIdToken(idToken);
+    
+    logger.info('[Auth Middleware] Token verified successfully', {
+      uid: decodedToken.uid,
+      email: decodedToken.email,
+      path: req.path,
+    });
+  } catch (tokenError) {
+    logger.error('[Auth Middleware] Firebase token verification failed', {
+      error: tokenError.message,
+      errorCode: tokenError.code,
+      tokenPrefix: idToken.substring(0, 20) + '...',
+      path: req.path,
+    });
+    
+    // Provide more specific error messages
+    if (tokenError.code === 'auth/id-token-expired') {
+      throw AuthenticationError.expiredToken();
     }
     
-    // Get user from database using Firebase UID
-    const user = await User.findOne({ firebaseUid: decodedToken.uid });
-
-    if (!user) {
-      logger.warn('[Auth Middleware] User not found in database', {
-        firebaseUid: decodedToken.uid,
-        email: decodedToken.email,
-        path: req.path,
-      });
-      return res.status(401).json({
-        success: false,
-        message: 'User not found',
-      });
+    if (tokenError.code === 'auth/argument-error') {
+      throw AuthenticationError.invalidToken('Invalid token format');
     }
-
-    // Check user status
-    if (user.status === 'suspended') {
-      logger.warn('[Auth Middleware] Suspended user access attempt', {
-        userId: user._id,
-        email: user.email,
-        path: req.path,
-      });
-      return res.status(403).json({
-        success: false,
-        message: 'Account suspended',
-      });
-    }
-
-    if (user.status === 'pending') {
-      logger.warn('[Auth Middleware] Pending user access attempt', {
-        userId: user._id,
-        email: user.email,
-        path: req.path,
-      });
-      return res.status(403).json({
-        success: false,
-        message: 'Account pending approval',
-      });
-    }
-
-    // Attach user and Firebase token to request
-    req.user = user;
-    req.firebaseUser = decodedToken;
     
-    logger.info('[Auth Middleware] Authentication successful', {
+    throw AuthenticationError.invalidToken(
+      process.env.NODE_ENV === 'development' ? tokenError.message : undefined
+    );
+  }
+  
+  // Get user from database using Firebase UID
+  const user = await User.findOne({ firebaseUid: decodedToken.uid });
+
+  if (!user) {
+    logger.warn('[Auth Middleware] User not found in database', {
+      firebaseUid: decodedToken.uid,
+      email: decodedToken.email,
+      path: req.path,
+    });
+    throw new NotFoundError('User', decodedToken.uid);
+  }
+
+  // Check user status
+  if (user.status === 'suspended') {
+    logger.warn('[Auth Middleware] Suspended user access attempt', {
       userId: user._id,
       email: user.email,
-      role: user.role,
-      status: user.status,
       path: req.path,
     });
-    
-    next();
-  } catch (error) {
-    logger.error('[Auth Middleware] Unexpected authentication error', {
-      error: error.message,
-      stack: error.stack,
-      path: req.path,
-    });
-
-    return res.status(401).json({
-      success: false,
-      message: 'Authentication failed',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-    });
+    throw AuthenticationError.accountSuspended();
   }
-};
+
+  if (user.status === 'pending') {
+    logger.warn('[Auth Middleware] Pending user access attempt', {
+      userId: user._id,
+      email: user.email,
+      path: req.path,
+    });
+    throw AuthenticationError.accountPending();
+  }
+
+  // Attach user and Firebase token to request
+  req.user = user;
+  req.firebaseUser = decodedToken;
+  
+  logger.info('[Auth Middleware] Authentication successful', {
+    userId: user._id,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    path: req.path,
+  });
+  
+  next();
+});
 
 /**
  * Middleware to check if user is authenticated
