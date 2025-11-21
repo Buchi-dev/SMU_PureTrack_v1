@@ -73,10 +73,10 @@ export interface MemoryCheck {
 }
 
 /**
- * OAuth configuration check
+ * Firebase Auth configuration check
  */
-export interface OAuthCheck {
-  status: 'OK' | 'NOT_CONFIGURED';
+export interface FirebaseAuthCheck {
+  status: 'OK' | 'NOT_CONFIGURED' | 'ERROR';
   message: string;
 }
 
@@ -103,7 +103,7 @@ export interface SystemHealth {
     emailQueue: EmailQueueCheck;
     emailService: EmailServiceCheck;
     memory: MemoryCheck;
-    oauth: OAuthCheck;
+    firebaseAuth: FirebaseAuthCheck;
     apiKey: ApiKeyCheck;
     // Optional monitoring features (not currently implemented in server)
     buffers?: Record<string, {

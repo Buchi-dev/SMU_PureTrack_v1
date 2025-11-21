@@ -13,7 +13,10 @@ import {
 } from '../../../hooks';
 import { useDashboardStats } from './hooks';
 import {
-  DashboardSummary,
+  OverallHealthCard,
+  QuickStatsCard,
+  SystemHealthCard,
+  RecentAlertsList,
 } from './components';
 
 const { Content } = Layout;
@@ -112,13 +115,32 @@ export const AdminDashboard = memo(() => {
             />
           )}
 
-          {/* Comprehensive Dashboard Summary */}
-          <DashboardSummary
+          {/* PRIORITY 1: Overall System Health + Key Metrics (TOP) */}
+          <OverallHealthCard
             deviceStats={deviceStats}
             alertStats={alertStats}
             alerts={alerts}
             systemHealth={systemHealth}
             loading={isLoading}
+          />
+
+          {/* PRIORITY 2: Quick Stats - Devices & Alerts */}
+          <QuickStatsCard
+            deviceStats={deviceStats}
+            alertStats={alertStats}
+          />
+
+          {/* PRIORITY 3: System Health Monitor - Detailed Service Status */}
+          <SystemHealthCard
+            systemHealth={systemHealth}
+            loading={healthLoading}
+          />
+
+          {/* PRIORITY 4: Recent Alerts List */}
+          <RecentAlertsList
+            alerts={alerts}
+            loading={alertsLoading}
+            maxItems={10}
           />
         </Space>
       ),
