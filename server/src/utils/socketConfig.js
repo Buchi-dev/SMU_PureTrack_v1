@@ -244,7 +244,12 @@ function setupSocketIO(httpServer) {
   // Store globally for access in other modules
   global.io = io;
 
-  logger.info('[Socket.IO] Server initialized successfully');
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction) {
+    logger.info('[Socket.IO] Real-time connections active ✓');
+  } else {
+    logger.info('[Socket.IO] Server initialized successfully');
+  }
 
   return io;
 }

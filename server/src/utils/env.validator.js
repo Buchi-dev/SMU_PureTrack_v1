@@ -36,8 +36,6 @@ const optionalEnvVars = [
 const validateEnv = () => {
   const isProduction = process.env.NODE_ENV === 'production';
   
-  console.log('\n[VALIDATION] Validating environment variables...\n');
-
   const missing = [];
   const warnings = [];
 
@@ -45,20 +43,15 @@ const validateEnv = () => {
   requiredEnvVars.forEach(varName => {
     if (!process.env[varName]) {
       missing.push(varName);
-    } else {
-      if (isProduction) {
-        // In production, only show that variable is set (no values)
-        console.log(`  [OK] ${varName}: [CONFIGURED]`);
-      } else {
-        // In development, show values with masking for sensitive data
-        const isSensitive = ['SECRET', 'KEY', 'PASSWORD', 'URI'].some(keyword => 
-          varName.includes(keyword)
-        );
-        const displayValue = isSensitive 
-          ? '***' + process.env[varName].slice(-4)
-          : process.env[varName];
-        console.log(`  [OK] ${varName}: ${displayValue}`);
-      }
+    } else if (!isProduction) {
+      // Only show details in development
+      const isSensitive = ['SECRET', 'KEY', 'PASSWORD', 'URI'].some(keyword => 
+        varName.includes(keyword)
+      );
+      const displayValue = isSensitive 
+        ? '***' + process.env[varName].slice(-4)
+        : process.env[varName];
+      console.log(`  [OK] ${varName}: ${displayValue}`);
     }
   });
 
@@ -66,20 +59,15 @@ const validateEnv = () => {
   optionalEnvVars.forEach(varName => {
     if (!process.env[varName]) {
       warnings.push(varName);
-    } else {
-      if (isProduction) {
-        // In production, only show that variable is set (no values)
-        console.log(`  [OK] ${varName}: [CONFIGURED]`);
-      } else {
-        // In development, show values with masking for sensitive data
-        const isSensitive = ['SECRET', 'KEY', 'PASSWORD', 'URI'].some(keyword => 
-          varName.includes(keyword)
-        );
-        const displayValue = isSensitive 
-          ? '***' + process.env[varName].slice(-4)
-          : process.env[varName];
-        console.log(`  [OK] ${varName}: ${displayValue}`);
-      }
+    } else if (!isProduction) {
+      // Only show details in development
+      const isSensitive = ['SECRET', 'KEY', 'PASSWORD', 'URI'].some(keyword => 
+        varName.includes(keyword)
+      );
+      const displayValue = isSensitive 
+        ? '***' + process.env[varName].slice(-4)
+        : process.env[varName];
+      console.log(`  [OK] ${varName}: ${displayValue}`);
     }
   });
 
@@ -93,15 +81,20 @@ const validateEnv = () => {
     process.exit(1);
   }
 
-  // Report missing optional variables
-  if (warnings.length > 0) {
-    console.warn('\n[WARNING] Optional environment variables not set (using defaults):\n');
-    warnings.forEach(varName => {
-      console.warn(`   - ${varName}`);
-    });
+  // In production, show simple validation success
+  if (isProduction) {
+    console.log('[OK] Environment validation passed');
+  } else {
+    // In development, show detailed validation
+    console.log('\n[VALIDATION] Validating environment variables...\n');
+    if (warnings.length > 0) {
+      console.warn('\n[WARNING] Optional environment variables not set (using defaults):\n');
+      warnings.forEach(varName => {
+        console.warn(`   - ${varName}`);
+      });
+    }
+    console.log('\n[OK] Environment validation complete!\n');
   }
-
-  console.log('\n[OK] Environment validation complete!\n');
 };
 
 /**
@@ -138,17 +131,13 @@ const validateEnvironmentSettings = () => {
     process.exit(1);
   }
 
-  // Production-specific validations
+  // Production-specific validations (suppress non-critical warnings in production)
   if (nodeEnv === 'production') {
-    // Warn if using default ports
-    if (!process.env.PORT || process.env.PORT === '5000') {
-      console.warn('[WARNING] Using default PORT 5000 in production. Consider setting a custom port.');
-    }
-
-    // Ensure Firebase service account is set via environment variable (not file path)
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_SERVICE_ACCOUNT) {
-      console.warn('[WARNING] In production, consider using FIREBASE_SERVICE_ACCOUNT environment variable instead of file path');
-    }
+    // Only show critical warnings in production
+    // Optional: Uncomment if you want to see these warnings
+    // if (!process.env.PORT || process.env.PORT === '5000') {
+    //   console.warn('[WARNING] Using default PORT 5000 in production.');
+    // }
   }
 };
 

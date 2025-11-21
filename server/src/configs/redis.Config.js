@@ -39,12 +39,20 @@ const connectRedis = async () => {
       logger.error('Redis Client Error:', { error: err.message });
     });
 
+    const isProduction = process.env.NODE_ENV === 'production';
+
     redisClient.on('connect', () => {
-      logger.info('Redis client connecting...');
+      if (!isProduction) {
+        logger.info('Redis client connecting...');
+      }
     });
 
     redisClient.on('ready', () => {
-      logger.info('[OK] Redis client ready');
+      if (isProduction) {
+        logger.info('[OK] Redis connected');
+      } else {
+        logger.info('[OK] Redis client ready');
+      }
     });
 
     redisClient.on('reconnecting', () => {

@@ -313,7 +313,10 @@ const setupSwagger = (app) => {
     res.send(swaggerSpec);
   });
 
-  console.log(`[DOCS] API Documentation available at: http://localhost:${process.env.PORT || 5000}/api-docs`);
+  // Only show docs URL in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[DOCS] API Documentation available at: http://localhost:${process.env.PORT || 5000}/api-docs`);
+  }
 };
 
 module.exports = {

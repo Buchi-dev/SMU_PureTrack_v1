@@ -495,16 +495,22 @@ function calculateHealthScore(uptimePercentage, criticalAlerts) {
  * Start all background jobs
  */
 function startBackgroundJobs() {
-  logger.info('[JOBS] Starting background jobs...');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isProduction) {
+    // Condensed production log
+    logger.info('[JOBS] Background jobs started ✓');
+  } else {
+    // Detailed development logs
+    logger.info('[JOBS] Starting background jobs...');
+    logger.info('[OK] Offline device checker started (runs every 5 minutes)');
+    logger.info('[OK] Old readings cleanup started (runs daily at 2:00 AM UTC)');
+    logger.info('[OK] Weekly reports generator started (runs every Monday at 8:00 AM UTC)');
+  }
   
   checkOfflineDevices.start();
-  logger.info('[OK] Offline device checker started (runs every 5 minutes)');
-  
   cleanupOldReadings.start();
-  logger.info('[OK] Old readings cleanup started (runs daily at 2:00 AM UTC)');
-  
   generateWeeklyReports.start();
-  logger.info('[OK] Weekly reports generator started (runs every Monday at 8:00 AM UTC)');
 }
 
 /**

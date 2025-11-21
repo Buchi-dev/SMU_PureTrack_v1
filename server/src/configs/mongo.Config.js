@@ -23,9 +23,14 @@ const connectDB = async () => {
 
     const conn = await mongoose.connect(process.env.MONGO_URI, options);
 
-    logger.info(`[OK] MongoDB Connected: ${conn.connection.host}`);
-    logger.info(`   Database: ${conn.connection.name}`);
-    logger.info(`   Pool Size: ${MONGO_POOL.MIN_POOL_SIZE}-${MONGO_POOL.MAX_POOL_SIZE}`);
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.info(`[OK] MongoDB Connected: ${conn.connection.name}`);
+    } else {
+      logger.info(`[OK] MongoDB Connected: ${conn.connection.host}`);
+      logger.info(`   Database: ${conn.connection.name}`);
+      logger.info(`   Pool Size: ${MONGO_POOL.MIN_POOL_SIZE}-${MONGO_POOL.MAX_POOL_SIZE}`);
+    }
 
     // Connection event handlers
     mongoose.connection.on('error', (err) => {

@@ -40,7 +40,7 @@ async function initializeChangeStreams() {
     return;
   }
 
-  logger.info('[Change Streams] Initializing MongoDB change streams...');
+  const isProduction = process.env.NODE_ENV === 'production';
 
   try {
     // ========================================
@@ -58,10 +58,14 @@ async function initializeChangeStreams() {
 
     alertChangeStream.on('change', async (change) => {
       try {
-        logger.info('[Change Streams] Alert change detected:', {
-          operation: change.operationType,
-          alertId: change.documentKey?._id,
-        });
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        if (!isProduction) {
+          logger.info('[Change Streams] Alert change detected:', {
+            operation: change.operationType,
+            alertId: change.documentKey?._id,
+          });
+        }
 
         if (change.operationType === 'insert') {
           // New alert created
@@ -81,11 +85,13 @@ async function initializeChangeStreams() {
             });
           }
 
-          logger.info('[Change Streams] Broadcast new alert:', {
-            alertId: newAlert._id,
-            severity: newAlert.severity,
-            deviceId: newAlert.deviceId,
-          });
+          if (!isProduction) {
+            logger.info('[Change Streams] Broadcast new alert:', {
+              alertId: newAlert._id,
+              severity: newAlert.severity,
+              deviceId: newAlert.deviceId,
+            });
+          }
 
         } else if (change.operationType === 'update') {
           // Alert updated (acknowledged, resolved, etc.)
@@ -99,10 +105,12 @@ async function initializeChangeStreams() {
             timestamp: new Date(),
           });
 
-          logger.info('[Change Streams] Broadcast alert update:', {
-            alertId: change.documentKey._id,
-            updates: Object.keys(updatedFields),
-          });
+          if (!isProduction) {
+            logger.info('[Change Streams] Broadcast alert update:', {
+              alertId: change.documentKey._id,
+              updates: Object.keys(updatedFields),
+            });
+          }
         }
       } catch (error) {
         logger.error('[Change Streams] Error processing alert change:', {
@@ -131,10 +139,14 @@ async function initializeChangeStreams() {
 
     deviceChangeStream.on('change', async (change) => {
       try {
-        logger.info('[Change Streams] Device change detected:', {
-          operation: change.operationType,
-          deviceId: change.documentKey?._id,
-        });
+        const isProduction = process.env.NODE_ENV === 'production';
+        
+        if (!isProduction) {
+          logger.info('[Change Streams] Device change detected:', {
+            operation: change.operationType,
+            deviceId: change.documentKey?._id,
+          });
+        }
 
         const device = change.fullDocument;
 
@@ -145,10 +157,12 @@ async function initializeChangeStreams() {
             timestamp: new Date(),
           });
 
-          logger.info('[Change Streams] Broadcast new device:', {
-            deviceId: device.deviceId,
-            name: device.deviceName,
-          });
+          if (!isProduction) {
+            logger.info('[Change Streams] Broadcast new device:', {
+              deviceId: device.deviceId,
+              name: device.deviceName,
+            });
+          }
 
         } else if (change.operationType === 'update') {
           // Device updated (status, location, etc.)
@@ -169,10 +183,12 @@ async function initializeChangeStreams() {
             timestamp: new Date(),
           });
 
-          logger.info('[Change Streams] Broadcast device update:', {
-            deviceId: device.deviceId,
-            updates: Object.keys(updatedFields),
-          });
+          if (!isProduction) {
+            logger.info('[Change Streams] Broadcast device update:', {
+              deviceId: device.deviceId,
+              updates: Object.keys(updatedFields),
+            });
+          }
         }
       } catch (error) {
         logger.error('[Change Streams] Error processing device change:', {
@@ -275,10 +291,13 @@ async function initializeChangeStreams() {
               timestamp: new Date(),
             });
 
-            logger.info('[Change Streams] Broadcast user update:', {
-              userId: user.uid,
-              updates: Object.keys(updatedFields),
-            });
+            const isProduction = process.env.NODE_ENV === 'production';
+            if (!isProduction) {
+              logger.info('[Change Streams] Broadcast user update:', {
+                userId: user.uid,
+                updates: Object.keys(updatedFields),
+              });
+            }
           }
         }
       } catch (error) {
@@ -293,7 +312,12 @@ async function initializeChangeStreams() {
       logger.error('[Change Streams] User change stream error:', error);
     });
 
-    logger.info('[Change Streams] All change streams initialized successfully');
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.info('[Change Streams] Real-time monitoring active ✓');
+    } else {
+      logger.info('[Change Streams] All change streams initialized successfully');
+    }
 
   } catch (error) {
     logger.error('[Change Streams] Failed to initialize change streams:', {

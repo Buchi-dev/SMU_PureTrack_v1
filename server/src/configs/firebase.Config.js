@@ -28,7 +28,12 @@ const configureFirebase = () => {
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
 
-    logger.info('[Firebase] Admin SDK initialized successfully');
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.info('[Firebase] Initialized ✓');
+    } else {
+      logger.info('[Firebase] Admin SDK initialized successfully');
+    }
   } catch (error) {
     logger.error('[Firebase] Failed to initialize Admin SDK', {
       error: error.message,

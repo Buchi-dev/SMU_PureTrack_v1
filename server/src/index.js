@@ -170,26 +170,39 @@ initializeApp().then(() => {
   // Start server
   server.listen(PORT, () => {
     const envSummary = getEnvironmentSummary();
+    const isProduction = process.env.NODE_ENV === 'production';
     
-    logger.info('\n[STARTUP] ========================================');
-    logger.info(`   Water Quality Monitoring API Server`);
-    logger.info('========================================\n');
-    logger.info(`   Port:        ${PORT}`);
-    logger.info(`   Environment: ${envSummary.nodeEnv}`);
-    logger.info(`   API Version: ${API_VERSION.CURRENT}`);
-    logger.info(`   Client URL:  ${process.env.CLIENT_URL}`);
-    logger.info('');
-    logger.info('[SERVICES] Status:');
-    logger.info(`   MongoDB:     ${envSummary.mongoConfigured ? '[OK]' : '[FAIL]'}`);
-    logger.info(`   Redis:       ${envSummary.redisConfigured ? '[OK]' : '[WARN] Not configured'}`);
-    logger.info(`   SMTP:        ${envSummary.smtpConfigured ? '[OK]' : '[WARN] Not configured'}`);
-    logger.info(`   Firebase:    ${envSummary.firebaseConfigured ? '[OK]' : '[FAIL]'}`);
-    logger.info(`   API Key:     ${envSummary.apiKeyConfigured ? '[OK]' : '[FAIL]'}`);
-    logger.info(`   Socket.IO:   [OK]`);
-    logger.info('');
-    logger.info('[DOCS] Documentation: http://localhost:' + PORT + '/api-docs');
-    logger.info('[HEALTH] Health Check:  http://localhost:' + PORT + '/health');
-    logger.info('========================================\n');
+    if (isProduction) {
+      // Condensed production startup log
+      logger.info('========================================');
+      logger.info('Water Quality Monitoring API - PRODUCTION');
+      logger.info('========================================');
+      logger.info(`Port: ${PORT} | Environment: ${envSummary.nodeEnv} | API: ${API_VERSION.CURRENT}`);
+      logger.info(`Services: MongoDB ✓ | Redis ✓ | SMTP ✓ | Firebase ✓ | Socket.IO ✓`);
+      logger.info(`Health: http://localhost:${PORT}/health`);
+      logger.info('========================================');
+    } else {
+      // Detailed development startup log
+      logger.info('\n[STARTUP] ========================================');
+      logger.info(`   Water Quality Monitoring API Server`);
+      logger.info('========================================\n');
+      logger.info(`   Port:        ${PORT}`);
+      logger.info(`   Environment: ${envSummary.nodeEnv}`);
+      logger.info(`   API Version: ${API_VERSION.CURRENT}`);
+      logger.info(`   Client URL:  ${process.env.CLIENT_URL}`);
+      logger.info('');
+      logger.info('[SERVICES] Status:');
+      logger.info(`   MongoDB:     ${envSummary.mongoConfigured ? '[OK]' : '[FAIL]'}`);
+      logger.info(`   Redis:       ${envSummary.redisConfigured ? '[OK]' : '[WARN] Not configured'}`);
+      logger.info(`   SMTP:        ${envSummary.smtpConfigured ? '[OK]' : '[WARN] Not configured'}`);
+      logger.info(`   Firebase:    ${envSummary.firebaseConfigured ? '[OK]' : '[FAIL]'}`);
+      logger.info(`   API Key:     ${envSummary.apiKeyConfigured ? '[OK]' : '[FAIL]'}`);
+      logger.info(`   Socket.IO:   [OK]`);
+      logger.info('');
+      logger.info('[DOCS] Documentation: http://localhost:' + PORT + '/api-docs');
+      logger.info('[HEALTH] Health Check:  http://localhost:' + PORT + '/health');
+      logger.info('========================================\n');
+    }
     
     // Start background jobs
     startBackgroundJobs();

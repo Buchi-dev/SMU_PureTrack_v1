@@ -63,7 +63,12 @@ const initializeEmailQueue = (redisUrl) => {
       return await processEmailJob(job);
     });
 
-    logger.info('[OK] Email queue initialized');
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.info('[OK] Email queue ready');
+    } else {
+      logger.info('[OK] Email queue initialized');
+    }
     return emailQueue;
   } catch (error) {
     logger.error('Failed to initialize email queue:', { error: error.message });
