@@ -9,6 +9,10 @@ services:
       - "5000:5000"
     env_file:
       - .env
-      - .firebase-service-account.json
-    # Using cloud-based MongoDB and Redis services
-    # No local database containers needed
+    secrets:
+      - firebase_credentials
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/firebase_credentials
+secrets:
+  firebase_credentials:
+    file: ./firebase-service-account.json
