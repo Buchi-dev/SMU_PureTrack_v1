@@ -74,7 +74,7 @@ export interface DeviceStats {
   online: number;
   offline: number;
   registered: number;
-  unregistered: number;
+  pending: number;
 }
 
 export interface DeviceStatsResponse {

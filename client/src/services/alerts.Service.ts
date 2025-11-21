@@ -43,12 +43,14 @@ export interface AlertFilters {
 }
 
 export interface AlertStats {
-  total: number;
-  acknowledged: number;
-  resolved: number;
-  unacknowledged: number;
-  bySeverity: Record<string, number>;
-  byDevice: Record<string, number>;
+  byStatus: Array<{
+    _id: string;
+    count: number;
+  }>;
+  bySeverity: Array<{
+    _id: string;
+    count: number;
+  }>;
 }
 
 export interface AlertListResponse {

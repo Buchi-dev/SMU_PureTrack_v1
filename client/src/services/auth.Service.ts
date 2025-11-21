@@ -1,22 +1,18 @@
 /**
  * Authentication Service Layer
- * Handles all authentication operations via Express/Passport.js backend
+ * Handles all authentication operations via Firebase Authentication + Express backend
+ * 
+ * Authentication Flow:
+ * 1. Client authenticates with Firebase (Google OAuth, Email/Password, etc.)
+ * 2. Client sends Firebase ID token to backend for verification
+ * 3. Backend verifies token, syncs user to MongoDB, and returns user profile
+ * 4. All subsequent API calls include Firebase ID token in Authorization header
  * 
  * @module services/auth.Service
  */
 
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
-// Configure axios instance with credentials support
-const authAPI = axios.create({
-  baseURL: `${API_BASE_URL}/auth`,
-  withCredentials: true, // Important: send cookies with requests
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+import { apiClient, getErrorMessage } from '../config/api.config';
+import { AUTH_ENDPOINTS } from '../config/endpoints';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -35,6 +31,10 @@ export interface AuthUser {
   profilePicture?: string;
   role: 'admin' | 'staff';
   status: 'active' | 'pending' | 'suspended';
+  profileComplete?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+  lastLogin?: Date;
 }
 
 export interface AuthStatusResponse {
@@ -42,78 +42,121 @@ export interface AuthStatusResponse {
   user: AuthUser | null;
 }
 
+export interface VerifyTokenResponse {
+  success: boolean;
+  user: AuthUser;
+  message: string;
+}
+
 export interface CurrentUserResponse {
   success: boolean;
   user: AuthUser;
-  message?: string;
+}
+
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
 }
 
 // ============================================================================
-// AUTH SERVICE FUNCTIONS
+// AUTH SERVICE CLASS
 // ============================================================================
 
-/**
- * Check current authentication status
- * @returns Promise with authentication status and user data
- * @example
- * const { authenticated, user } = await authService.checkAuthStatus();
- */
-export const checkAuthStatus = async (): Promise<AuthStatusResponse> => {
-  try {
-    const response = await authAPI.get<AuthStatusResponse>('/status');
-    return response.data;
-  } catch (error) {
-    console.error('Error checking auth status:', error);
-    return { authenticated: false, user: null };
+export class AuthService {
+  
+  /**
+   * Verify Firebase ID token and sync user to database
+   * This is called after successful Firebase authentication
+   * 
+   * @param idToken - Firebase ID token from client-side authentication
+   * @returns Promise with user data
+   * @throws {Error} If token verification fails
+   * @example
+   * const firebaseUser = await signInWithPopup(auth, googleProvider);
+   * const idToken = await firebaseUser.user.getIdToken();
+   * const response = await authService.verifyToken(idToken);
+   */
+  async verifyToken(idToken: string): Promise<VerifyTokenResponse> {
+    try {
+      const response = await apiClient.post<VerifyTokenResponse>(
+        AUTH_ENDPOINTS.VERIFY_TOKEN,
+        { idToken }
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AuthService] Token verification error:', message);
+      throw new Error(message);
+    }
   }
-};
 
-/**
- * Get current authenticated user details
- * @returns Promise with user data
- * @throws {Error} If user is not authenticated
- * @example
- * const { user } = await authService.getCurrentUser();
- */
-export const getCurrentUser = async (): Promise<CurrentUserResponse> => {
-  const response = await authAPI.get<CurrentUserResponse>('/current-user');
-  return response.data;
-};
-
-/**
- * Initiate Google OAuth login
- * Redirects to backend Google OAuth flow
- * @example
- * authService.loginWithGoogle();
- */
-export const loginWithGoogle = (): void => {
-  // Redirect to backend Google OAuth endpoint
-  window.location.href = `${API_BASE_URL}/auth/google`;
-};
-
-/**
- * Logout current user and destroy session
- * @returns Promise that resolves when logout is complete
- * @example
- * await authService.logout();
- */
-export const logout = async (): Promise<void> => {
-  try {
-    // Backend will handle session destruction and redirect
-    window.location.href = `${API_BASE_URL}/auth/logout`;
-  } catch (error) {
-    console.error('Error during logout:', error);
-    throw error;
+  /**
+   * Get current authenticated user from backend
+   * Requires valid Firebase ID token in Authorization header
+   * 
+   * @returns Promise with user data
+   * @throws {Error} If user is not authenticated
+   * @example
+   * const { user } = await authService.getCurrentUser();
+   */
+  async getCurrentUser(): Promise<CurrentUserResponse> {
+    try {
+      const response = await apiClient.get<CurrentUserResponse>(
+        AUTH_ENDPOINTS.CURRENT_USER
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AuthService] Get current user error:', message);
+      throw new Error(message);
+    }
   }
-};
+
+  /**
+   * Check authentication status
+   * Does not require authentication - returns status
+   * 
+   * @returns Promise with authentication status
+   * @example
+   * const { authenticated, user } = await authService.checkStatus();
+   */
+  async checkStatus(): Promise<AuthStatusResponse> {
+    try {
+      const response = await apiClient.get<AuthStatusResponse>(
+        AUTH_ENDPOINTS.STATUS
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('[AuthService] Check status error:', error);
+      return { authenticated: false, user: null };
+    }
+  }
+
+  /**
+   * Logout user
+   * Client should also sign out from Firebase after calling this
+   * 
+   * @returns Promise that resolves when logout is complete
+   * @example
+   * await authService.logout();
+   * await signOut(auth); // Firebase client-side logout
+   */
+  async logout(): Promise<LogoutResponse> {
+    try {
+      const response = await apiClient.post<LogoutResponse>(
+        AUTH_ENDPOINTS.LOGOUT
+      );
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[AuthService] Logout error:', message);
+      throw new Error(message);
+    }
+  }
+}
 
 // ============================================================================
-// EXPORT SERVICE
+// EXPORT SERVICE INSTANCE
 // ============================================================================
 
-export const authService = {
-  checkAuthStatus,
-  getCurrentUser,
-  loginWithGoogle,
-  logout,
-};
+export const authService = new AuthService();

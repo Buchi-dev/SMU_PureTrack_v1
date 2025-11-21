@@ -1,63 +1,72 @@
 /**
  * API Endpoints Configuration
  * Centralized endpoint definitions for Express REST API
+ * 
+ * Server API Structure:
+ * - Authentication: /auth/*
+ * - Versioned API: /api/v1/*
+ * - Health Check: /health
  */
+
+// ==================== API VERSION ====================
+const API_VERSION = '/api/v1';
 
 // ==================== AUTHENTICATION ====================
 export const AUTH_ENDPOINTS = {
-  GOOGLE_LOGIN: '/auth/google',
-  GOOGLE_CALLBACK: '/auth/google/callback',
-  LOGOUT: '/auth/logout',
+  VERIFY_TOKEN: '/auth/verify-token',
+  CURRENT_USER: '/auth/current-user',
   STATUS: '/auth/status',
+  LOGOUT: '/auth/logout',
 } as const;
 
 // ==================== USERS ====================
 export const USER_ENDPOINTS = {
-  LIST: '/api/users',
-  BY_ID: (userId: string) => `/api/users/${userId}`,
-  UPDATE_ROLE: (userId: string) => `/api/users/${userId}/role`,
-  UPDATE_STATUS: (userId: string) => `/api/users/${userId}/status`,
-  UPDATE_PROFILE: (userId: string) => `/api/users/${userId}/profile`,
-  DELETE: (userId: string) => `/api/users/${userId}`,
-  PREFERENCES: (userId: string) => `/api/users/${userId}/preferences`,
+  LIST: `${API_VERSION}/users`,
+  BY_ID: (userId: string) => `${API_VERSION}/users/${userId}`,
+  UPDATE_ROLE: (userId: string) => `${API_VERSION}/users/${userId}/role`,
+  UPDATE_STATUS: (userId: string) => `${API_VERSION}/users/${userId}/status`,
+  UPDATE_PROFILE: (userId: string) => `${API_VERSION}/users/${userId}/profile`,
+  COMPLETE_PROFILE: (userId: string) => `${API_VERSION}/users/${userId}/complete-profile`,
+  DELETE: (userId: string) => `${API_VERSION}/users/${userId}`,
+  PREFERENCES: (userId: string) => `${API_VERSION}/users/${userId}/preferences`,
 } as const;
 
 // ==================== ALERTS ====================
 export const ALERT_ENDPOINTS = {
-  LIST: '/api/alerts',
-  STATS: '/api/alerts/stats',
-  BY_ID: (alertId: string) => `/api/alerts/${alertId}`,
-  ACKNOWLEDGE: (alertId: string) => `/api/alerts/${alertId}/acknowledge`,
-  RESOLVE: (alertId: string) => `/api/alerts/${alertId}/resolve`,
-  CREATE: '/api/alerts',
-  DELETE: (alertId: string) => `/api/alerts/${alertId}`,
+  LIST: `${API_VERSION}/alerts`,
+  STATS: `${API_VERSION}/alerts/stats`,
+  BY_ID: (alertId: string) => `${API_VERSION}/alerts/${alertId}`,
+  ACKNOWLEDGE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/acknowledge`,
+  RESOLVE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/resolve`,
+  CREATE: `${API_VERSION}/alerts`,
+  DELETE: (alertId: string) => `${API_VERSION}/alerts/${alertId}`,
 } as const;
 
 // ==================== DEVICES ====================
 export const DEVICE_ENDPOINTS = {
-  LIST: '/api/devices',
-  STATS: '/api/devices/stats',
-  BY_ID: (deviceId: string) => `/api/devices/${deviceId}`,
-  READINGS: (deviceId: string) => `/api/devices/${deviceId}/readings`,
-  UPDATE: (deviceId: string) => `/api/devices/${deviceId}`,
-  DELETE: (deviceId: string) => `/api/devices/${deviceId}`,
-  PROCESS_READING: '/api/devices/readings',
+  LIST: `${API_VERSION}/devices`,
+  STATS: `${API_VERSION}/devices/stats`,
+  BY_ID: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
+  READINGS: (deviceId: string) => `${API_VERSION}/devices/${deviceId}/readings`,
+  UPDATE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
+  DELETE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
+  PROCESS_READING: `${API_VERSION}/devices/readings`,
 } as const;
 
 // ==================== REPORTS ====================
 export const REPORT_ENDPOINTS = {
-  WATER_QUALITY: '/api/reports/water-quality',
-  DEVICE_STATUS: '/api/reports/device-status',
-  LIST: '/api/reports',
-  BY_ID: (reportId: string) => `/api/reports/${reportId}`,
-  DELETE: (reportId: string) => `/api/reports/${reportId}`,
+  WATER_QUALITY: `${API_VERSION}/reports/water-quality`,
+  DEVICE_STATUS: `${API_VERSION}/reports/device-status`,
+  LIST: `${API_VERSION}/reports`,
+  BY_ID: (reportId: string) => `${API_VERSION}/reports/${reportId}`,
+  DELETE: (reportId: string) => `${API_VERSION}/reports/${reportId}`,
 } as const;
 
 // ==================== ANALYTICS ====================
 export const ANALYTICS_ENDPOINTS = {
-  SUMMARY: '/api/analytics/summary',
-  TRENDS: '/api/analytics/trends',
-  PARAMETERS: '/api/analytics/parameters',
+  SUMMARY: `${API_VERSION}/analytics/summary`,
+  TRENDS: `${API_VERSION}/analytics/trends`,
+  PARAMETERS: `${API_VERSION}/analytics/parameters`,
 } as const;
 
 // ==================== QUERY BUILDERS ====================

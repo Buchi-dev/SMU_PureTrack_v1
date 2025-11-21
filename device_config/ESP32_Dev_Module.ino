@@ -36,6 +36,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 
 // ===========================
@@ -47,9 +48,9 @@
 #define WIFI_PASSWORD "Pldtadmin@2024"
 
 // API Server Configuration
-#define API_SERVER "http://your-server-ip:5000"  // Update with your server IP/domain
+#define API_SERVER "localhost:5000"  // Production server
 #define API_ENDPOINT "/api/v1/devices/readings"
-#define API_KEY "your_device_api_key_here"  // Must match DEVICE_API_KEY in server .env
+#define API_KEY "6a8d48a00823c869ad23c27cc34a3d446493cf35d6924d8f9d54e17c4565737a"  // Must match DEVICE_API_KEY in server .env
 
 // Device Configuration
 #define DEVICE_ID "esp32_dev_002"
@@ -70,6 +71,7 @@
 // GLOBAL OBJECTS
 // ===========================
 
+WiFiClientSecure wifiClient;
 HTTPClient http;
 
 // ===========================
@@ -116,6 +118,10 @@ void setup() {
   for (int i = 0; i < TURBIDITY_NUM_READINGS; i++) {
     turbidityReadings[i] = 0;
   }
+  
+  // Configure HTTPS client (insecure mode for simplicity)
+  // For production, use proper certificate validation
+  wifiClient.setInsecure();
   
   connectWiFi();
   testServerConnection();
@@ -168,7 +174,7 @@ void connectWiFi() {
 // ===========================
 
 void testServerConnection() {
-  http.begin(String(API_SERVER) + "/health");
+  http.begin(wifiClient, String(API_SERVER) + "/health");
   int httpCode = http.GET();
   
   if (httpCode > 0) {
@@ -262,15 +268,15 @@ void publishSensorData() {
   StaticJsonDocument<256> doc;
   doc["deviceId"] = DEVICE_ID;
   doc["tds"] = tds;                    // TDS in ppm
-  doc["ph"] = ph;                      // pH value (0-14)
+  doc["pH"] = ph;                      // pH value (0-14) - Capital H for scientific notation
   doc["turbidity"] = turbidity;        // Turbidity in NTU
   doc["timestamp"] = millis();         // Device uptime
   
   String payload;
   serializeJson(doc, payload);
   
-  // Send HTTP POST request
-  http.begin(String(API_SERVER) + API_ENDPOINT);
+  // Send HTTP POST request with secure client
+  http.begin(wifiClient, String(API_SERVER) + API_ENDPOINT);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("x-api-key", API_KEY);
   

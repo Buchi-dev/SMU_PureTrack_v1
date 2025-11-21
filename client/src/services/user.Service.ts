@@ -1,54 +1,40 @@
-/**
+﻿/**
  * Users Service
  * 
  * Manages user accounts, roles, permissions via Express REST API.
  * 
- * Write Operations: Express REST API
- * Read Operations: Express REST API (polling-based)
- * 
- * Features:
- * - User CRUD operations
- * - Role and status management
- * - Profile updates
- * - User list with pagination/filters
+ * Server Endpoints:
+ * - GET    /api/v1/users              - Get all users (admin only, with pagination)
+ * - GET    /api/v1/users/:id          - Get user by ID (authenticated)
+ * - PATCH  /api/v1/users/:id/role     - Update user role (admin only)
+ * - PATCH  /api/v1/users/:id/status   - Update user status (admin only)
+ * - PATCH  /api/v1/users/:id/profile  - Update user profile (admin only)
+ * - PATCH  /api/v1/users/:id/complete-profile - Complete profile (self-service)
+ * - DELETE /api/v1/users/:id          - Delete user (admin only)
+ * - GET    /api/v1/users/:id/preferences - Get notification preferences
+ * - PUT    /api/v1/users/:id/preferences - Update notification preferences
+ * - DELETE /api/v1/users/:id/preferences - Reset notification preferences
  * 
  * @module services/users
  */
 
-import axios from 'axios';
+import { apiClient, getErrorMessage } from '../config/api.config';
+import { USER_ENDPOINTS, buildUsersUrl } from '../config/endpoints';
 import type { UserStatus, UserRole, UserListData } from '../schemas';
-
-// ============================================================================
-// AXIOS INSTANCE CONFIGURATION
-// ============================================================================
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  withCredentials: true, // Include session cookies
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
+export interface UpdateUserRoleRequest {
+  role: UserRole;
+}
+
 export interface UpdateUserStatusRequest {
-  userId: string;
   status: UserStatus;
 }
 
-export interface UpdateUserRequest {
-  userId: string;
-  status?: UserStatus;
-  role?: UserRole;
-}
-
 export interface UpdateUserProfileRequest {
-  userId: string;
   displayName?: string;
   firstName?: string;
   lastName?: string;
@@ -57,40 +43,36 @@ export interface UpdateUserProfileRequest {
   phoneNumber?: string;
 }
 
-export interface UpdateStatusResponse {
+export interface CompleteUserProfileRequest {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  department?: string;
+  phoneNumber?: string;
+}
+
+export interface UserFilters {
+  role?: UserRole;
+  status?: UserStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface UserResponse {
   success: boolean;
-  message: string;
   data: UserListData;
+  message?: string;
   requiresLogout?: boolean;
 }
 
-export interface UpdateUserResponse {
-  success: boolean;
-  message: string;
-  data: UserListData;
-  requiresLogout?: boolean;
-}
-
-export interface UpdateProfileResponse {
-  success: boolean;
-  message: string;
-  data: UserListData;
-  updates: {
-    displayName?: string;
-    firstName?: string;
-    lastName?: string;
-    middleName?: string;
-    department?: string;
-    phoneNumber?: string;
-  };
-}
-
-export interface ListUsersResponse {
+export interface UserListResponse {
   success: boolean;
   data: UserListData[];
   pagination: {
     total: number;
     page: number;
+    limit: number;
     pages: number;
   };
 }
@@ -101,290 +83,161 @@ export interface DeleteUserResponse {
   userId: string;
 }
 
-export interface GetUserParams {
-  role?: UserRole;
-  status?: UserStatus;
-  page?: number;
-  limit?: number;
-  error?: string;
+export interface UserPreferences {
+  email: {
+    alerts: boolean;
+    reports: boolean;
+    systemUpdates: boolean;
+  };
+  alertThresholds?: {
+    ph?: { min: number; max: number };
+    turbidity?: number;
+    tds?: number;
+  };
 }
 
-export interface ErrorResponse {
-  code: string;
-  message: string;
-  details?: any;
+export interface UserPreferencesResponse {
+  success: boolean;
+  data: UserPreferences;
 }
 
 // ============================================================================
 // USER MANAGEMENT SERVICE
 // ============================================================================
 
-class UserService {
-  /**
-   * Get all users with optional filters
-   * @param params - Query parameters for filtering and pagination
-   * @returns Promise resolving to list of users
-   */
-  async getAllUsers(params?: GetUserParams): Promise<ListUsersResponse> {
+export class UserService {
+  async getAllUsers(filters?: UserFilters): Promise<UserListResponse> {
     try {
-      const response = await apiClient.get<ListUsersResponse>('/api/users', { params });
-      
-      // Convert ISO string dates back to Date objects
+      const url = buildUsersUrl(filters);
+      const response = await apiClient.get<UserListResponse>(url);
       const users = response.data.data.map((user) => ({
         ...user,
         createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),
         updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
         lastLogin: user.lastLogin ? new Date(user.lastLogin) : undefined,
       }));
+      return { ...response.data, data: users };
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[UserService] Get all users error:', message);
+      throw new Error(message);
+    }
+  }
 
+  async getUserById(userId: string): Promise<UserResponse> {
+    try {
+      const response = await apiClient.get<UserResponse>(USER_ENDPOINTS.BY_ID(userId));
+      const user = response.data.data;
       return {
         ...response.data,
-        data: users,
+        data: {
+          ...user,
+          createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),
+          updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
+          lastLogin: user.lastLogin ? new Date(user.lastLogin) : undefined,
+        },
       };
     } catch (error: any) {
-      console.error('[UserService] Error fetching users:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch users');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Get user error:', message);
+      throw new Error(message);
     }
   }
 
-  /**
-   * Get user by ID
-   * @param userId - User ID
-   * @returns Promise resolving to user data
-   */
-  async getUserById(userId: string): Promise<UserListData> {
+  async getUserPreferences(userId: string): Promise<UserPreferencesResponse> {
     try {
-      const response = await apiClient.get<{ success: boolean; data: UserListData }>(`/api/users/${userId}`);
-      const user = response.data.data;
-      
-      // Convert ISO string dates back to Date objects
-      return {
-        ...user,
-        createdAt: user.createdAt ? new Date(user.createdAt) : new Date(),
-        updatedAt: user.updatedAt ? new Date(user.updatedAt) : undefined,
-        lastLogin: user.lastLogin ? new Date(user.lastLogin) : undefined,
-      };
-    } catch (error: any) {
-      console.error('[UserService] Error fetching user:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch user');
-    }
-  }
-
-  /**
-   * Update user status (active/pending/suspended)
-   * @param userId - User ID
-   * @param status - New status
-   * @returns Promise resolving to update result
-   */
-  async updateUserStatus(userId: string, status: UserStatus): Promise<UpdateStatusResponse> {
-    try {
-      const response = await apiClient.patch<UpdateStatusResponse>(`/api/users/${userId}/status`, { status });
-      console.log('[UserService] User status updated:', { userId, status });
+      const response = await apiClient.get<UserPreferencesResponse>(USER_ENDPOINTS.PREFERENCES(userId));
       return response.data;
     } catch (error: any) {
-      console.error('[UserService] Error updating user status:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update user status');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Get preferences error:', message);
+      throw new Error(message);
     }
   }
 
-  /**
-   * Update user role (admin/staff)
-   * @param userId - User ID
-   * @param role - New role
-   * @returns Promise resolving to update result
-   */
-  async updateUserRole(userId: string, role: UserRole): Promise<UpdateUserResponse> {
+  async updateUserRole(userId: string, role: UserRole): Promise<UserResponse> {
     try {
-      const response = await apiClient.patch<UpdateUserResponse>(`/api/users/${userId}/role`, { role });
+      const response = await apiClient.patch<UserResponse>(USER_ENDPOINTS.UPDATE_ROLE(userId), { role });
       console.log('[UserService] User role updated:', { userId, role });
       return response.data;
     } catch (error: any) {
-      console.error('[UserService] Error updating user role:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update user role');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Update role error:', message);
+      throw new Error(message);
     }
   }
 
-  /**
-   * Update user profile (name, department, phone)
-   * @param userId - User ID
-   * @param profileData - Profile fields to update
-   * @returns Promise resolving to update result
-   */
-  async updateUserProfile(userId: string, profileData: Omit<UpdateUserProfileRequest, 'userId'>): Promise<UpdateProfileResponse> {
+  async updateUserStatus(userId: string, status: UserStatus): Promise<UserResponse> {
     try {
-      const response = await apiClient.patch<UpdateProfileResponse>(`/api/users/${userId}/profile`, profileData);
-      console.log('[UserService] User profile updated:', { userId, updates: profileData });
+      const response = await apiClient.patch<UserResponse>(USER_ENDPOINTS.UPDATE_STATUS(userId), { status });
+      console.log('[UserService] User status updated:', { userId, status });
       return response.data;
     } catch (error: any) {
-      console.error('[UserService] Error updating user profile:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update user profile');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Update status error:', message);
+      throw new Error(message);
     }
   }
 
-  /**
-   * Update user (role and/or status) - Convenience method
-   * Handles both role and status updates by calling appropriate endpoints
-   * @param userId - User ID
-   * @param status - New status (optional)
-   * @param role - New role (optional)
-   * @returns Promise resolving to update result
-   */
-  async updateUser(userId: string, status?: UserStatus, role?: UserRole): Promise<any> {
+  async updateUserProfile(userId: string, data: UpdateUserProfileRequest): Promise<UserResponse> {
     try {
-      const updates: any = {};
-      let response: any;
-
-      // Update role if provided
-      if (role) {
-        response = await this.updateUserRole(userId, role);
-        updates.role = role;
-      }
-
-      // Update status if provided
-      if (status) {
-        response = await this.updateUserStatus(userId, status);
-        updates.status = status;
-      }
-
-      console.log('[UserService] User updated:', { userId, updates });
-      
-      return {
-        success: true,
-        message: 'User updated successfully',
-        userId,
-        updates,
-        requiresLogout: response?.requiresLogout || false,
-      };
-    } catch (error: any) {
-      console.error('[UserService] Error updating user:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update user');
-    }
-  }
-
-  /**
-   * Complete user profile (self-service for new users)
-   * @param userId - User ID
-   * @param profileData - Department and phone number
-   * @returns Promise resolving to update result
-   */
-  async completeUserProfile(userId: string, profileData: { department?: string; phoneNumber?: string }): Promise<UpdateProfileResponse> {
-    try {
-      const response = await apiClient.patch<UpdateProfileResponse>(`/api/users/${userId}/complete-profile`, profileData);
-      console.log('[UserService] User profile completed:', { userId, updates: profileData });
+      const response = await apiClient.patch<UserResponse>(USER_ENDPOINTS.UPDATE_PROFILE(userId), data);
+      console.log('[UserService] User profile updated:', { userId });
       return response.data;
     } catch (error: any) {
-      console.error('[UserService] Error completing user profile:', error);
-      throw new Error(error.response?.data?.message || 'Failed to complete user profile');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Update profile error:', message);
+      throw new Error(message);
     }
   }
 
-  /**
-   * Delete user account
-   * @param userId - User ID
-   * @returns Promise resolving to deletion result
-   */
+  async completeUserProfile(userId: string, data: CompleteUserProfileRequest): Promise<UserResponse> {
+    try {
+      const response = await apiClient.patch<UserResponse>(USER_ENDPOINTS.COMPLETE_PROFILE(userId), data);
+      console.log('[UserService] Profile completed:', { userId });
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[UserService] Complete profile error:', message);
+      throw new Error(message);
+    }
+  }
+
+  async updateUserPreferences(userId: string, preferences: Partial<UserPreferences>): Promise<UserPreferencesResponse> {
+    try {
+      const response = await apiClient.put<UserPreferencesResponse>(USER_ENDPOINTS.PREFERENCES(userId), preferences);
+      console.log('[UserService] Preferences updated:', { userId });
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[UserService] Update preferences error:', message);
+      throw new Error(message);
+    }
+  }
+
+  async resetUserPreferences(userId: string): Promise<UserPreferencesResponse> {
+    try {
+      const response = await apiClient.delete<UserPreferencesResponse>(USER_ENDPOINTS.PREFERENCES(userId));
+      console.log('[UserService] Preferences reset:', { userId });
+      return response.data;
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      console.error('[UserService] Reset preferences error:', message);
+      throw new Error(message);
+    }
+  }
+
   async deleteUser(userId: string): Promise<DeleteUserResponse> {
     try {
-      const response = await apiClient.delete<DeleteUserResponse>(`/api/users/${userId}`);
+      const response = await apiClient.delete<DeleteUserResponse>(USER_ENDPOINTS.DELETE(userId));
       console.log('[UserService] User deleted:', { userId });
       return response.data;
     } catch (error: any) {
-      console.error('[UserService] Error deleting user:', error);
-      throw new Error(error.response?.data?.message || 'Failed to delete user');
-    }
-  }
-
-  // ============================================================================
-  // CONVENIENCE METHODS (Quick Actions)
-  // ============================================================================
-
-  /**
-   * Approve user (set status to active)
-   * @param userId - User ID
-   */
-  async approveUser(userId: string): Promise<UpdateStatusResponse> {
-    return this.updateUserStatus(userId, 'active');
-  }
-
-  /**
-   * Suspend user (set status to suspended)
-   * @param userId - User ID
-   */
-  async suspendUser(userId: string): Promise<UpdateStatusResponse> {
-    return this.updateUserStatus(userId, 'suspended');
-  }
-
-  /**
-   * Reactivate user (set status to active)
-   * @param userId - User ID
-   */
-  async reactivateUser(userId: string): Promise<UpdateStatusResponse> {
-    return this.updateUserStatus(userId, 'active');
-  }
-
-  /**
-   * Promote user to admin
-   * @param userId - User ID
-   */
-  async promoteToAdmin(userId: string): Promise<UpdateUserResponse> {
-    return this.updateUserRole(userId, 'admin');
-  }
-
-  /**
-   * Demote user to staff
-   * @param userId - User ID
-   */
-  async demoteToStaff(userId: string): Promise<UpdateUserResponse> {
-    return this.updateUserRole(userId, 'staff');
-  }
-
-  // ============================================================================
-  // USER PREFERENCES
-  // ============================================================================
-
-  /**
-   * Get user notification preferences
-   * @param userId - User ID
-   * @returns Promise resolving to user preferences
-   */
-  async getUserPreferences(userId: string): Promise<any> {
-    try {
-      const response = await apiClient.get(`/api/users/${userId}/preferences`);
-      console.log('[UserService] User preferences fetched:', { userId });
-      return response.data.data;
-    } catch (error: any) {
-      console.error('[UserService] Error fetching user preferences:', error);
-      throw new Error(error.response?.data?.message || 'Failed to fetch user preferences');
-    }
-  }
-
-  /**
-   * Update user notification preferences
-   * @param userId - User ID
-   * @param preferences - Notification preferences
-   * @returns Promise resolving to updated preferences
-   */
-  async setupPreferences(preferences: any): Promise<any> {
-    try {
-      // Assuming the preferences object contains userId
-      const userId = preferences.userId;
-      if (!userId) {
-        throw new Error('User ID is required in preferences');
-      }
-      
-      const response = await apiClient.put(`/api/users/${userId}/preferences`, preferences);
-      console.log('[UserService] User preferences updated:', { userId });
-      return response.data.data;
-    } catch (error: any) {
-      console.error('[UserService] Error updating user preferences:', error);
-      throw new Error(error.response?.data?.message || 'Failed to update user preferences');
+      const message = getErrorMessage(error);
+      console.error('[UserService] Delete user error:', message);
+      throw new Error(message);
     }
   }
 }
 
-// ============================================================================
-// EXPORT SINGLETON INSTANCE
-// ============================================================================
-
-export const usersService = new UserService();
-export default usersService;
+export const userService = new UserService();

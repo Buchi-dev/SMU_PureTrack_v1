@@ -25,55 +25,83 @@ import {
 
 /**
  * Dashboard summary statistics
+ * Matches server response from /api/v1/analytics/summary
  */
 export interface AnalyticsSummary {
   devices: {
     total: number;
     online: number;
     offline: number;
-    critical: number;
+    registered: number;
+    pending: number;
   };
   alerts: {
-    total: number;
-    active: number;
+    last24Hours: number;
+    unacknowledged: number;
     critical: number;
-    resolved: number;
+    warning: number;
   };
   readings: {
-    totalToday: number;
-    avgCompliance: number;
+    lastHour: number;
   };
-  lastUpdated: string;
+  waterQuality: {
+    pH: number;
+    turbidity: number;
+    tds: number;
+  } | null;
+  timestamp: Date;
 }
 
 /**
  * Time-series trend data point
+ * Matches server getTrends response structure
  */
 export interface TrendPoint {
-  date: string;
-  avgPH?: number;
-  avgTurbidity?: number;
-  avgTDS?: number;
+  period: string;
+  deviceId?: string;
+  parameter: string;
+  avg: number;
+  min: number;
+  max: number;
   readingCount: number;
 }
 
 /**
- * Parameter-specific analytics
+ * Trends data wrapper from server
+ */
+export interface TrendsData {
+  parameter: string;
+  granularity: string;
+  startDate: Date;
+  endDate: Date;
+  trends: TrendPoint[];
+}
+
+/**
+ * Parameter-specific analytics from server
  */
 export interface ParameterAnalytics {
-  distribution: {
+  parameter: string;
+  startDate: Date;
+  endDate: Date;
+  statistics: {
+    avg: number;
     min: number;
     max: number;
-    avg: number;
-    median: number;
     stdDev: number;
-  };
-  histogram: Array<{
-    range: string;
+    totalReadings: number;
+    exceedingThreshold: number;
+    complianceRate: number;
+  } | null;
+  distribution: Array<{
+    _id: number | string;
     count: number;
   }>;
-  complianceRate: number;
-  trendDirection: 'up' | 'down' | 'stable';
+  thresholds: {
+    min: number;
+    max: number;
+    unit: string;
+  };
 }
 
 /**
@@ -106,10 +134,11 @@ export interface SummaryResponse {
 
 /**
  * Analytics trends response
+ * Server returns nested structure with metadata
  */
 export interface TrendsResponse {
   success: boolean;
-  data: TrendPoint[];
+  data: TrendsData;
 }
 
 /**
