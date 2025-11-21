@@ -5,8 +5,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copy package metadata and install only production deps
-COPY package*.json ./
-RUN npm ci --only=production
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 # Bundle app source
 COPY . .
