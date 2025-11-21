@@ -6,9 +6,6 @@ validateEnv();
 validateEnvironmentSettings();
 
 const express = require('express');
-const session = require('express-session');
-const RedisStore = require('connect-redis').default;
-const passport = require('passport');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -16,7 +13,7 @@ const compression = require('compression');
 // Import configurations
 const { connectDB, closeDB } = require('./configs/mongo.Config');
 const { connectRedis, getRedisClient, closeRedis } = require('./configs/redis.Config');
-const configurePassport = require('./configs/passport.Config');
+const { configureFirebase } = require('./configs/firebase.Config');
 const { setupSwagger } = require('./configs/swagger.config');
 
 // Import utilities
@@ -46,8 +43,8 @@ const app = express();
 // Connect to MongoDB
 connectDB();
 
-// Configure Passport
-configurePassport();
+// Configure Firebase Admin SDK
+configureFirebase();
 
 // Store Redis client at module level
 let redisClient;
@@ -96,40 +93,7 @@ async function initializeApp() {
     initializeEmailQueue(process.env.REDIS_URL);
   }
 
-  // ============================================
-  // SESSION CONFIGURATION
-  // ============================================
-
-  const sessionConfig = {
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: SESSION.MAX_AGE,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    },
-  };
-
-  // Use Redis session store if available
-  if (redisClient) {
-    sessionConfig.store = new RedisStore({
-      client: redisClient,
-      prefix: 'sess:',
-    });
-    logger.info('[OK] Using Redis session store');
-  } else {
-    logger.warn('[WARNING] Using memory session store (not recommended for production)');
-  }
-
-  app.use(session(sessionConfig));
-
-  // Initialize Passport and session handling
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  // Add user context for logging
+  // Add user context for logging (Firebase token-based)
   app.use(addUserContext);
 
   // ============================================
@@ -151,7 +115,7 @@ async function initializeApp() {
       apiVersion: API_VERSION.CURRENT,
       documentation: '/api-docs',
       health: '/health',
-      authenticated: req.isAuthenticated(),
+      authenticated: !!req.user,
     });
   });
 
@@ -234,7 +198,7 @@ initializeApp().then(() => {
     logger.info(`   MongoDB:     ${envSummary.mongoConfigured ? '[OK]' : '[FAIL]'}`);
     logger.info(`   Redis:       ${envSummary.redisConfigured ? '[OK]' : '[WARN] Not configured'}`);
     logger.info(`   SMTP:        ${envSummary.smtpConfigured ? '[OK]' : '[WARN] Not configured'}`);
-    logger.info(`   OAuth:       ${envSummary.oauthConfigured ? '[OK]' : '[FAIL]'}`);
+    logger.info(`   Firebase:    ${envSummary.firebaseConfigured ? '[OK]' : '[FAIL]'}`);
     logger.info(`   API Key:     ${envSummary.apiKeyConfigured ? '[OK]' : '[FAIL]'}`);
     logger.info('');
     logger.info('[DOCS] Documentation: http://localhost:' + PORT + '/api-docs');

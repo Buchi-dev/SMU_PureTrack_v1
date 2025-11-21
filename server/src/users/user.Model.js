@@ -6,10 +6,16 @@ const mongoose = require('mongoose');
  */
 const userSchema = new mongoose.Schema(
   {
-    googleId: {
+    firebaseUid: {
       type: String,
       unique: true,
       sparse: true, // Allows null values but enforces uniqueness when present
+      index: true,
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null values but enforces uniqueness when present (legacy)
     },
     email: {
       type: String,
@@ -58,8 +64,8 @@ const userSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ['google', 'local'],
-      default: 'google',
+      enum: ['google', 'firebase', 'local'],
+      default: 'firebase',
     },
     lastLogin: {
       type: Date,

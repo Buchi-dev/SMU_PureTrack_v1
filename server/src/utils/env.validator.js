@@ -5,10 +5,7 @@
 
 const requiredEnvVars = [
   'MONGO_URI',
-  'SESSION_SECRET',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
-  'GOOGLE_CALLBACK_URL',
+  'FIREBASE_PROJECT_ID',
   'CLIENT_URL',
   'DEVICE_API_KEY', // Required for securing sensor data endpoints
 ];
@@ -24,6 +21,9 @@ const optionalEnvVars = [
   'SMTP_FROM_NAME',
   'SMTP_SECURE',
   'REDIS_URL',
+  'SESSION_SECRET', // Optional - only if using sessions for other features
+  'FIREBASE_SERVICE_ACCOUNT_PATH', // Optional if using FIREBASE_SERVICE_ACCOUNT env var
+  'FIREBASE_SERVICE_ACCOUNT', // Optional if using file path
 ];
 
 /**
@@ -128,23 +128,23 @@ const validateEnvironmentSettings = () => {
     process.env.NODE_ENV = 'development';
   }
 
+  // Validate Firebase configuration
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.error('[ERROR] Either FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT must be set');
+    console.error('       See QUICKSTART-FIREBASE.md for setup instructions');
+    process.exit(1);
+  }
+
   // Production-specific validations
   if (nodeEnv === 'production') {
-    // Ensure secure session settings
-    if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32) {
-      console.error('[ERROR] SESSION_SECRET must be at least 32 characters in production');
-      process.exit(1);
-    }
-
-    // Ensure HTTPS callback URL
-    if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
-      console.error('[ERROR] GOOGLE_CALLBACK_URL must use HTTPS in production');
-      process.exit(1);
-    }
-
     // Warn if using default ports
     if (!process.env.PORT || process.env.PORT === '5000') {
       console.warn('[WARNING] Using default PORT 5000 in production. Consider setting a custom port.');
+    }
+
+    // Ensure Firebase service account is set via environment variable (not file path)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_SERVICE_ACCOUNT) {
+      console.warn('[WARNING] In production, consider using FIREBASE_SERVICE_ACCOUNT environment variable instead of file path');
     }
   }
 };
@@ -159,7 +159,7 @@ const getEnvironmentSummary = () => {
     mongoConfigured: !!process.env.MONGO_URI,
     redisConfigured: !!process.env.REDIS_URL,
     smtpConfigured: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
-    oauthConfigured: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    firebaseConfigured: !!(process.env.FIREBASE_PROJECT_ID && (process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.FIREBASE_SERVICE_ACCOUNT)),
     apiKeyConfigured: !!process.env.DEVICE_API_KEY,
   };
 };

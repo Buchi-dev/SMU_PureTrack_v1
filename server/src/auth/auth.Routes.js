@@ -1,79 +1,83 @@
 const express = require('express');
-const passport = require('passport');
+const { verifyIdToken, getFirebaseUser } = require('../configs/firebase.Config');
+const { authenticateFirebase, optionalAuth } = require('./auth.Middleware');
+const User = require('../users/user.Model');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
 /**
- * @route   GET /auth/google
- * @desc    Initiate Google OAuth authentication
+ * @route   POST /auth/verify-token
+ * @desc    Verify Firebase ID token and sync user to database
  * @access  Public
  */
-router.get(
-  '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  })
-);
+router.post('/verify-token', async (req, res) => {
+  try {
+    const { idToken } = req.body;
 
-/**
- * @route   GET /auth/google/callback
- * @desc    Google OAuth callback route
- * @access  Public
- */
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: `${process.env.CLIENT_URL}/login?error=auth_failed`,
-  }),
-  (req, res) => {
-    // Successful authentication, redirect based on user status
-    const user = req.user;
-    
-    if (user.status === 'pending') {
-      // Check if profile is complete
-      if (!user.department || !user.phoneNumber) {
-        // New user needs to complete profile
-        return res.redirect(`${process.env.CLIENT_URL}/auth/account-completion`);
-      } else {
-        // Profile complete, show pending approval
-        return res.redirect(`${process.env.CLIENT_URL}/auth/pending-approval`);
-      }
-    } else if (user.status === 'suspended') {
-      return res.redirect(`${process.env.CLIENT_URL}/auth/account-suspended`);
-    } else if (user.status === 'active') {
-      // Active user - redirect to appropriate dashboard
-      if (user.role === 'admin') {
-        return res.redirect(`${process.env.CLIENT_URL}/admin/dashboard`);
-      } else if (user.role === 'staff') {
-        return res.redirect(`${process.env.CLIENT_URL}/staff/dashboard`);
-      } else {
-        return res.redirect(`${process.env.CLIENT_URL}/dashboard`);
-      }
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID token is required',
+      });
     }
-    
-    // Default fallback
-    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
-  }
-);
 
-/**
- * @route   GET /auth/logout
- * @desc    Logout user and destroy session
- * @access  Private
- */
-router.get('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      return res.status(500).json({ success: false, message: 'Logout failed' });
+    // Verify Firebase token
+    const decodedToken = await verifyIdToken(idToken);
+    
+    // Get Firebase user data
+    const firebaseUser = await getFirebaseUser(decodedToken.uid);
+
+    // Check if user exists in database
+    let user = await User.findOne({ firebaseUid: decodedToken.uid });
+
+    if (!user) {
+      // Create new user
+      user = new User({
+        firebaseUid: decodedToken.uid,
+        email: decodedToken.email || firebaseUser.email,
+        displayName: decodedToken.name || firebaseUser.displayName || 'User',
+        firstName: decodedToken.name?.split(' ')[0] || '',
+        lastName: decodedToken.name?.split(' ').slice(1).join(' ') || '',
+        profilePicture: decodedToken.picture || firebaseUser.photoURL || '',
+        provider: 'firebase',
+        role: 'staff', // Default role
+        status: 'pending',
+        lastLogin: new Date(),
+      });
+
+      await user.save();
+
+      logger.info('[Auth] New user created', {
+        userId: user._id,
+        email: user.email,
+      });
+    } else {
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
+
+      logger.info('[Auth] User logged in', {
+        userId: user._id,
+        email: user.email,
+      });
     }
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ success: false, message: 'Session destruction failed' });
-      }
-      res.clearCookie('connect.sid');
-      res.redirect(process.env.CLIENT_URL);
+
+    res.json({
+      success: true,
+      user: user.toPublicProfile(),
+      message: 'Token verified successfully',
     });
-  });
+  } catch (error) {
+    logger.error('[Auth] Token verification failed', {
+      error: error.message,
+    });
+
+    res.status(401).json({
+      success: false,
+      message: 'Invalid or expired token',
+    });
+  }
 });
 
 /**
@@ -81,18 +85,11 @@ router.get('/logout', (req, res) => {
  * @desc    Get current authenticated user
  * @access  Private
  */
-router.get('/current-user', (req, res) => {
-  if (req.isAuthenticated()) {
-    res.json({
-      success: true,
-      user: req.user.toPublicProfile(),
-    });
-  } else {
-    res.status(401).json({
-      success: false,
-      message: 'Not authenticated',
-    });
-  }
+router.get('/current-user', authenticateFirebase, (req, res) => {
+  res.json({
+    success: true,
+    user: req.user.toPublicProfile(),
+  });
 });
 
 /**
@@ -100,10 +97,22 @@ router.get('/current-user', (req, res) => {
  * @desc    Check authentication status
  * @access  Public
  */
-router.get('/status', (req, res) => {
+router.get('/status', optionalAuth, (req, res) => {
   res.json({
-    authenticated: req.isAuthenticated(),
-    user: req.isAuthenticated() ? req.user.toPublicProfile() : null,
+    authenticated: !!req.user,
+    user: req.user ? req.user.toPublicProfile() : null,
+  });
+});
+
+/**
+ * @route   POST /auth/logout
+ * @desc    Logout user (client-side handles Firebase signOut)
+ * @access  Public
+ */
+router.post('/logout', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Logout successful. Clear Firebase session on client.',
   });
 });
 
