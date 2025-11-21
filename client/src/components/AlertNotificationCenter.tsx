@@ -32,8 +32,10 @@ export default function AlertNotificationCenter() {
   const navigate = useNavigate();
 
   // Use the SWR-based hook for real-time alerts
+  // Poll every 30 seconds for global notifications (less aggressive than page-level polling)
   const { alerts: allAlerts, isLoading } = useRealtime_Alerts({
     limit: 50,
+    refreshInterval: 30000, // 30 seconds - less frequent for background notifications
   });
 
   // Filter for active/acknowledged alerts and limit to 10

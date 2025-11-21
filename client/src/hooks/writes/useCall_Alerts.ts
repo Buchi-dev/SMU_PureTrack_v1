@@ -3,6 +3,7 @@
  * 
  * Handles alert write operations (acknowledge, resolve).
  * Wraps alertsService functions with React-friendly state management.
+ * Automatically invalidates SWR cache after successful operations.
  * 
  * ⚠️ WRITE ONLY - Does not handle real-time subscriptions
  * 
@@ -10,6 +11,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useSWRConfig } from 'swr';
 import { alertsService } from '../../services/alerts.Service';
 
 /**
@@ -65,6 +67,9 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
   const [error, setError] = useState<Error | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [operationType, setOperationType] = useState<AlertOperation | null>(null);
+  
+  // Get SWR mutate function for cache invalidation
+  const { mutate } = useSWRConfig();
 
   const reset = useCallback(() => {
     setError(null);
@@ -81,6 +86,9 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
 
       await alertsService.acknowledgeAlert(alertId);
 
+      // Invalidate alerts cache to trigger refetch
+      mutate((key: string) => typeof key === 'string' && key.includes('/alerts'));
+
       setIsSuccess(true);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to acknowledge alert');
@@ -91,7 +99,7 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [mutate]);
 
   const resolveAlert = useCallback(async (alertId: string, notes?: string): Promise<void> => {
     try {
@@ -101,6 +109,9 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
       setOperationType('resolve');
 
       await alertsService.resolveAlert(alertId, notes);
+
+      // Invalidate alerts cache to trigger refetch
+      mutate((key: string) => typeof key === 'string' && key.includes('/alerts'));
 
       setIsSuccess(true);
     } catch (err) {
@@ -112,7 +123,7 @@ export const useCall_Alerts = (): UseCallAlertsReturn => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [mutate]);
 
   return {
     acknowledgeAlert,

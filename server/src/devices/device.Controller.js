@@ -1,6 +1,9 @@
 const { Device, SensorReading } = require('./device.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger');
+const { SENSOR_THRESHOLDS, ALERT_SEVERITY, ALERT_DEDUP_WINDOW, HTTP_STATUS } = require('../utils/constants');
+const CacheService = require('../utils/cache.service');
 
 /**
  * Get all devices
@@ -15,30 +18,41 @@ const getAllDevices = async (req, res) => {
     if (status) filter.status = status;
     if (registrationStatus) filter.registrationStatus = registrationStatus;
 
-    const devices = await Device.find(filter)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .sort({ createdAt: -1 });
+    // Use aggregation to fix N+1 query problem
+    const devicesAggregation = await Device.aggregate([
+      { $match: filter },
+      { $sort: { createdAt: -1 } },
+      { $skip: (page - 1) * limit * 1 },
+      { $limit: limit * 1 },
+      {
+        $lookup: {
+          from: 'sensorreadings',
+          let: { deviceId: '$deviceId' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$deviceId', '$$deviceId'] } } },
+            { $sort: { timestamp: -1 } },
+            { $limit: 1 },
+          ],
+          as: 'readings',
+        },
+      },
+      {
+        $addFields: {
+          latestReading: { $arrayElemAt: ['$readings', 0] },
+        },
+      },
+      {
+        $project: {
+          readings: 0, // Remove temporary array
+        },
+      },
+    ]);
 
     const count = await Device.countDocuments(filter);
 
-    // Get latest reading for each device
-    const devicesWithReadings = await Promise.all(
-      devices.map(async (device) => {
-        const latestReading = await SensorReading.findOne({ deviceId: device.deviceId })
-          .sort({ timestamp: -1 })
-          .limit(1);
-
-        return {
-          ...device.toPublicProfile(),
-          latestReading: latestReading || null,
-        };
-      })
-    );
-
     res.json({
       success: true,
-      data: devicesWithReadings,
+      data: devicesAggregation,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -46,8 +60,11 @@ const getAllDevices = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Device Controller] Error fetching devices:', error);
-    res.status(500).json({
+    logger.error('Error fetching devices:', {
+      error: error.message,
+      correlationId: req.correlationId,
+    });
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: 'Error fetching devices',
       error: error.message,
@@ -311,13 +328,8 @@ const processSensorData = async (req, res) => {
 async function checkThresholdsAndCreateAlerts(device, reading) {
   const alerts = [];
 
-  // WHO/EPA Thresholds
-  const thresholds = {
-    pH: { min: 6.5, max: 8.5, critical: { min: 6.0, max: 9.0 } },
-    turbidity: { warning: 5, critical: 10 },
-    tds: { warning: 500, critical: 1000 },
-    temperature: { min: 10, max: 30, critical: { min: 5, max: 35 } },
-  };
+  // Use centralized thresholds from constants
+  const thresholds = SENSOR_THRESHOLDS;
 
   // Check pH
   if (reading.pH < thresholds.pH.critical.min || reading.pH > thresholds.pH.critical.max) {

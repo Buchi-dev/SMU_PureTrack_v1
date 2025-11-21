@@ -30,7 +30,7 @@ import {
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { useRealtime_Devices, type DeviceWithSensorData } from '@/hooks';
+import { useRealtime_Devices, useRouteContext } from '@/hooks';
 import { calculateReadingStatus } from '../../../utils/waterQualityUtils';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -58,14 +58,17 @@ export const StaffReadings = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<any>(null);
   
-  // Use global hook for real-time device data
-  const { devices: realtimeDevices, isLoading } = useRealtime_Devices();
+  // Get route context to enable conditional fetching
+  const { needsDevices } = useRouteContext();
+  
+  // Use global hook for real-time device data - only fetch when on readings page
+  const { devices: realtimeDevices, isLoading } = useRealtime_Devices({ enabled: needsDevices });
 
   // Transform devices to readings format using utility function
   const readings: Reading[] = useMemo(() => {
     const allReadings: Reading[] = [];
     
-    realtimeDevices.forEach((device: DeviceWithSensorData) => {
+    realtimeDevices.forEach((device: any) => {
       const reading = device.latestReading;
       if (!reading) return;
       
@@ -77,8 +80,10 @@ export const StaffReadings = () => {
         timestamp: reading.timestamp 
           ? dayjs(reading.timestamp).format('YYYY-MM-DD HH:mm:ss')
           : dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        device: device.deviceName || device.deviceId,
-        location: device.location || 'Unknown',
+        device: device.name || device.deviceId,
+        location: device.metadata?.location 
+          ? `${device.metadata.location.building}, ${device.metadata.location.floor}`
+          : 'Unknown',
         ph: reading.ph || 0,
         tds: reading.tds || 0,
         turbidity: reading.turbidity || 0,

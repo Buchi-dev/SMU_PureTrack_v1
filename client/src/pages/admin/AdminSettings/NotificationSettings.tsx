@@ -17,7 +17,7 @@ import {
 } from 'antd';
 import { ThunderboltOutlined } from '@ant-design/icons';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useRealtime_Devices, useCall_Users } from '../../../hooks';
+import { useRealtime_Devices, useCall_Users, useRouteContext } from '../../../hooks';
 import dayjs from 'dayjs';
 
 // Extracted components
@@ -58,16 +58,21 @@ const NotificationSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
 
-  // Global hooks
-  const { devices: devicesWithReadings } = useRealtime_Devices();
+  // Get route context to enable conditional fetching
+  const { needsDevices } = useRouteContext();
+
+  // Global hooks - only fetch when on settings page
+  const { devices: devicesWithReadings } = useRealtime_Devices({ enabled: needsDevices });
   const { getUserPreferences, setupPreferences, isLoading: saving } = useCall_Users();
 
-  // Transform devices for select component
-  const devices = devicesWithReadings.map(d => ({
+  // Transform devices for select component (using any to avoid type conflicts)
+  const devices = devicesWithReadings.map((d: any) => ({
     deviceId: d.deviceId,
-    name: d.deviceName,
+    name: d.name,
     status: d.status,
-    metadata: d.metadata
+    location: d.metadata?.location 
+      ? `${d.metadata.location.building}, ${d.metadata.location.floor}`
+      : 'Unknown'
   }));
 
   useEffect(() => {
@@ -80,9 +85,9 @@ const NotificationSettings: React.FC = () => {
     try {
       setLoading(true);
       
-      console.log('[NotificationSettings] Loading preferences for user:', user.uid);
+      console.log('[NotificationSettings] Loading preferences for user:', user.id);
       
-      const userPrefs = await getUserPreferences(user.uid);
+      const userPrefs = await getUserPreferences(user.id);
 
       console.log('[NotificationSettings] Loaded preferences:', userPrefs);
 
@@ -137,7 +142,7 @@ const NotificationSettings: React.FC = () => {
         : undefined;
 
       const preferencesPayload = {
-        userId: user.uid,
+        userId: user.id,
         email: user.email,
         emailNotifications: values.emailNotifications ?? false,
         pushNotifications: values.pushNotifications ?? false,

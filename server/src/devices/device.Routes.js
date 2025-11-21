@@ -9,56 +9,66 @@ const {
   getDeviceStats,
 } = require('./device.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
+const { ensureApiKey } = require('../middleware/apiKey.middleware');
+const { sensorDataLimiter } = require('../middleware/rate-limit.middleware');
+const {
+  validateSensorData,
+  validateDeviceUpdate,
+  validateMongoId,
+  validateDateRange,
+  validatePagination,
+} = require('../middleware/validation.middleware');
 
 const router = express.Router();
 
 /**
- * @route   GET /api/devices
+ * @route   GET /api/v1/devices
  * @desc    Get all devices (with filters)
  * @access  Authenticated users
  */
-router.get('/', ensureAuthenticated, getAllDevices);
+router.get('/', ensureAuthenticated, validatePagination, getAllDevices);
 
 /**
- * @route   GET /api/devices/stats
+ * @route   GET /api/v1/devices/stats
  * @desc    Get device statistics
  * @access  Authenticated users
  */
 router.get('/stats', ensureAuthenticated, getDeviceStats);
 
 /**
- * @route   GET /api/devices/:id
+ * @route   GET /api/v1/devices/:id
  * @desc    Get device by ID
  * @access  Authenticated users
  */
-router.get('/:id', ensureAuthenticated, getDeviceById);
+router.get('/:id', ensureAuthenticated, validateMongoId, getDeviceById);
 
 /**
- * @route   GET /api/devices/:id/readings
+ * @route   GET /api/v1/devices/:id/readings
  * @desc    Get device sensor readings
  * @access  Authenticated users
  */
-router.get('/:id/readings', ensureAuthenticated, getDeviceReadings);
+router.get('/:id/readings', ensureAuthenticated, validateMongoId, validateDateRange, validatePagination, getDeviceReadings);
 
 /**
- * @route   PATCH /api/devices/:id
+ * @route   PATCH /api/v1/devices/:id
  * @desc    Update device
  * @access  Admin only
  */
-router.patch('/:id', ensureAdmin, updateDevice);
+router.patch('/:id', ensureAdmin, validateMongoId, validateDeviceUpdate, updateDevice);
 
 /**
- * @route   DELETE /api/devices/:id
+ * @route   DELETE /api/v1/devices/:id
  * @desc    Delete device
  * @access  Admin only
  */
-router.delete('/:id', ensureAdmin, deleteDevice);
+router.delete('/:id', ensureAdmin, validateMongoId, deleteDevice);
 
 /**
- * @route   POST /api/devices/readings
- * @desc    Process sensor data (internal - called by MQTT Bridge)
- * @access  Internal/System (should add API key middleware in production)
+ * @route   POST /api/v1/devices/readings
+ * @desc    Process sensor data from IoT devices
+ * @access  Requires API key authentication
+ * @security ApiKeyAuth
  */
-router.post('/readings', processSensorData);
+router.post('/readings', sensorDataLimiter, ensureApiKey, validateSensorData, processSensorData);
 
 module.exports = router;

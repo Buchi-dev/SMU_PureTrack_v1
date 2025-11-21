@@ -2,6 +2,7 @@ const Report = require('./report.Model');
 const { Device, SensorReading } = require('../devices/device.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger');
 
 /**
  * Generate Water Quality Report
@@ -190,7 +191,11 @@ const generateWaterQualityReport = async (req, res) => {
       data: report.toPublicProfile(),
     });
   } catch (error) {
-    console.error('[Report Controller] Error generating water quality report:', error);
+    logger.error('[Report Controller] Error generating water quality report', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+    });
     
     // Try to update report status to failed if it exists
     try {
@@ -201,7 +206,9 @@ const generateWaterQualityReport = async (req, res) => {
         await failedReport.save();
       }
     } catch (updateError) {
-      console.error('[Report Controller] Error updating failed report:', updateError);
+      logger.error('[Report Controller] Error updating failed report', {
+        error: updateError.message,
+      });
     }
 
     res.status(500).json({
@@ -365,7 +372,11 @@ const generateDeviceStatusReport = async (req, res) => {
       data: report.toPublicProfile(),
     });
   } catch (error) {
-    console.error('[Report Controller] Error generating device status report:', error);
+    logger.error('[Report Controller] Error generating device status report', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?._id,
+    });
     
     res.status(500).json({
       success: false,
@@ -406,7 +417,10 @@ const getAllReports = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Report Controller] Error fetching reports:', error);
+    logger.error('[Report Controller] Error fetching reports', {
+      error: error.message,
+      userId: req.user?._id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error fetching reports',
@@ -437,7 +451,10 @@ const getReportById = async (req, res) => {
       data: report.toPublicProfile(),
     });
   } catch (error) {
-    console.error('[Report Controller] Error fetching report:', error);
+    logger.error('[Report Controller] Error fetching report', {
+      error: error.message,
+      reportId: req.params.id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error fetching report',
@@ -467,7 +484,10 @@ const deleteReport = async (req, res) => {
       message: 'Report deleted successfully',
     });
   } catch (error) {
-    console.error('[Report Controller] Error deleting report:', error);
+    logger.error('[Report Controller] Error deleting report', {
+      error: error.message,
+      reportId: req.params.id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error deleting report',

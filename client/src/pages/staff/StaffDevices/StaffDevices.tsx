@@ -31,7 +31,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { useRealtime_Devices, type DeviceWithSensorData } from '@/hooks';
+import { useRealtime_Devices, useRouteContext } from '@/hooks';
 import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -58,12 +58,15 @@ export const StaffDevices = () => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  // Use global hook for real-time device data
-  const { devices: realtimeDevices, isLoading } = useRealtime_Devices();
+  // Get route context to enable conditional fetching
+  const { needsDevices } = useRouteContext();
+  
+  // Use global hook for real-time device data - only fetch when on devices page
+  const { devices: realtimeDevices, isLoading } = useRealtime_Devices({ enabled: needsDevices });
 
   // Transform devices for display using utility function
   const devices: Device[] = useMemo(() => {
-    return realtimeDevices.map((device: DeviceWithSensorData) => {
+    return realtimeDevices.map((device: any) => {
       const reading = device.latestReading;
       const status = calculateDeviceStatus(device.status, reading);
       
@@ -72,8 +75,10 @@ export const StaffDevices = () => {
       return {
         key: device.deviceId,
         id: device.deviceId,
-        name: device.deviceName || device.deviceId,
-        location: device.location || 'Unknown',
+        name: device.name || device.deviceId,
+        location: device.metadata?.location 
+          ? `${device.metadata.location.building}, ${device.metadata.location.floor}`
+          : 'Unknown',
         status,
         lastUpdate: reading?.timestamp 
           ? new Date(reading.timestamp).toLocaleString() 

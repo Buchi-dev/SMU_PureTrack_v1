@@ -1,4 +1,5 @@
 const User = require('./user.Model');
+const logger = require('../utils/logger');
 
 /**
  * Get user by ID
@@ -333,7 +334,10 @@ const getUserPreferences = async (req, res) => {
       data: user.notificationPreferences || {},
     });
   } catch (error) {
-    console.error('[User Controller] Error fetching preferences:', error);
+    logger.error('[User Controller] Error fetching preferences', {
+      error: error.message,
+      userId: req.params.id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error fetching notification preferences',
@@ -406,7 +410,10 @@ const updateUserPreferences = async (req, res) => {
       data: user.notificationPreferences,
     });
   } catch (error) {
-    console.error('[User Controller] Error updating preferences:', error);
+    logger.error('[User Controller] Error updating preferences', {
+      error: error.message,
+      userId: req.params.id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error updating notification preferences',
@@ -461,7 +468,10 @@ const resetUserPreferences = async (req, res) => {
       data: user.notificationPreferences,
     });
   } catch (error) {
-    console.error('[User Controller] Error resetting preferences:', error);
+    logger.error('[User Controller] Error resetting preferences', {
+      error: error.message,
+      userId: req.params.id,
+    });
     res.status(500).json({
       success: false,
       message: 'Error resetting notification preferences',

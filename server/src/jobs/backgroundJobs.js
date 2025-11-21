@@ -4,7 +4,9 @@ const Report = require('../reports/report.Model');
 const User = require('../users/user.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
-const { sendWeeklyReportEmail } = require('../utils/email.service');
+const { queueWeeklyReportEmail } = require('../utils/email.queue');
+const logger = require('../utils/logger');
+const { TIME } = require('../utils/constants');
 
 /**
  * Background Jobs Service
@@ -18,9 +20,9 @@ const { sendWeeklyReportEmail } = require('../utils/email.service');
  */
 const checkOfflineDevices = cron.schedule('*/5 * * * *', async () => {
   try {
-    console.log('[Background Job] Checking for offline devices...');
+    logger.info('[Background Job] Checking for offline devices...');
     
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const fiveMinutesAgo = new Date(Date.now() - TIME.FIVE_MINUTES);
     
     // Find devices that haven't been seen in 5 minutes and mark them offline
     const result = await Device.updateMany(
@@ -34,10 +36,15 @@ const checkOfflineDevices = cron.schedule('*/5 * * * *', async () => {
     );
 
     if (result.modifiedCount > 0) {
-      console.log(`[Background Job] Marked ${result.modifiedCount} devices as offline`);
+      logger.info('[Background Job] Marked devices as offline', {
+        count: result.modifiedCount,
+      });
     }
   } catch (error) {
-    console.error('[Background Job] Error checking offline devices:', error);
+    logger.error('[Background Job] Error checking offline devices:', {
+      error: error.message,
+      stack: error.stack,
+    });
   }
 }, {
   scheduled: false, // Don't start immediately, will be started manually
@@ -50,17 +57,22 @@ const checkOfflineDevices = cron.schedule('*/5 * * * *', async () => {
  */
 const cleanupOldReadings = cron.schedule('0 2 * * *', async () => {
   try {
-    console.log('[Background Job] Cleaning up old sensor readings...');
+    logger.info('[Background Job] Cleaning up old sensor readings...');
     
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = new Date(Date.now() - TIME.NINETY_DAYS);
     
     const result = await SensorReading.deleteMany({
       timestamp: { $lt: ninetyDaysAgo },
     });
 
-    console.log(`[Background Job] Deleted ${result.deletedCount} old sensor readings`);
+    logger.info('[Background Job] Deleted old sensor readings', {
+      count: result.deletedCount,
+    });
   } catch (error) {
-    console.error('[Background Job] Error cleaning up old readings:', error);
+    logger.error('[Background Job] Error cleaning up old readings:', {
+      error: error.message,
+      stack: error.stack,
+    });
   }
 }, {
   scheduled: false,
@@ -74,7 +86,7 @@ const cleanupOldReadings = cron.schedule('0 2 * * *', async () => {
  */
 const generateWeeklyReports = cron.schedule('0 8 * * 1', async () => {
   try {
-    console.log('[Background Job] Generating weekly reports...');
+    logger.info('[Background Job] Generating weekly reports...');
     
     // Calculate last week's date range (Monday to Sunday)
     const now = new Date();
@@ -86,13 +98,16 @@ const generateWeeklyReports = cron.schedule('0 8 * * 1', async () => {
     lastSunday.setDate(lastMonday.getDate() + 6); // End on Sunday
     lastSunday.setHours(23, 59, 59, 999);
 
-    console.log(`[Background Job] Report period: ${lastMonday.toISOString()} to ${lastSunday.toISOString()}`);
+    logger.info('[Background Job] Report period', {
+      startDate: lastMonday.toISOString(),
+      endDate: lastSunday.toISOString(),
+    });
 
     // Get system admin user for report generation
     const systemAdmin = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 });
     
     if (!systemAdmin) {
-      console.warn('[Background Job] No admin user found. Skipping weekly report generation.');
+      logger.warn('[Background Job] No admin user found. Skipping weekly report generation.');
       return;
     }
 
@@ -101,7 +116,7 @@ const generateWeeklyReports = cron.schedule('0 8 * * 1', async () => {
     const deviceIds = devices.map(d => d.deviceId);
 
     if (deviceIds.length === 0) {
-      console.log('[Background Job] No registered devices found. Skipping report generation.');
+      logger.info('[Background Job] No registered devices found. Skipping report generation.');
       return;
     }
 
@@ -121,9 +136,10 @@ const generateWeeklyReports = cron.schedule('0 8 * * 1', async () => {
       systemAdmin._id
     );
 
-    console.log('[Background Job] Weekly reports generated successfully');
-    console.log(`  - Water Quality Report: ${waterQualityReport?.reportId || 'Failed'}`);
-    console.log(`  - Device Status Report: ${deviceStatusReport?.reportId || 'Failed'}`);
+    logger.info('[Background Job] Weekly reports generated successfully', {
+      waterQualityReport: waterQualityReport?.reportId || 'Failed',
+      deviceStatusReport: deviceStatusReport?.reportId || 'Failed',
+    });
 
     // Send email notifications to subscribed users
     if (waterQualityReport && deviceStatusReport) {
@@ -135,34 +151,39 @@ const generateWeeklyReports = cron.schedule('0 8 * * 1', async () => {
         });
 
         if (subscribedUsers.length > 0) {
-          console.log(`[Background Job] Sending weekly reports to ${subscribedUsers.length} subscribed users...`);
+          logger.info(`Queuing weekly reports for ${subscribedUsers.length} subscribed users...`);
           
-          let successCount = 0;
+          let queuedCount = 0;
           let failCount = 0;
 
+          // Queue emails asynchronously instead of sending synchronously
           for (const user of subscribedUsers) {
-            const success = await sendWeeklyReportEmail(user, [waterQualityReport, deviceStatusReport]);
-            if (success) {
-              successCount++;
-            } else {
+            try {
+              await queueWeeklyReportEmail(user, [waterQualityReport, deviceStatusReport]);
+              queuedCount++;
+            } catch (error) {
+              logger.error(`Failed to queue email for ${user.email}:`, { error: error.message });
               failCount++;
             }
           }
 
-          console.log(`[Background Job] Email notifications completed: ${successCount} sent, ${failCount} failed`);
+          logger.info(`Email notifications queued: ${queuedCount} queued, ${failCount} failed`);
         } else {
-          console.log('[Background Job] No subscribed users found for email notifications');
+          logger.info('No subscribed users found for email notifications');
         }
       } catch (emailError) {
-        console.error('[Background Job] Error sending email notifications:', emailError.message);
+        logger.error('Error queuing email notifications:', { error: emailError.message });
         // Don't throw - report generation succeeded even if emails failed
       }
     } else {
-      console.warn('[Background Job] Skipping email notifications - one or more reports failed to generate');
+      logger.warn('[Background Job] Skipping email notifications - one or more reports failed to generate');
     }
 
   } catch (error) {
-    console.error('[Background Job] Error generating weekly reports:', error);
+    logger.error('[Background Job] Error generating weekly reports:', {
+      error: error.message,
+      stack: error.stack,
+    });
   }
 }, {
   scheduled: false,
@@ -314,14 +335,19 @@ async function generateWaterQualityReportJob(startDate, endDate, deviceIds, gene
 
     return report;
   } catch (error) {
-    console.error('[Background Job] Error generating water quality report:', error);
+    logger.error('[Background Job] Error generating water quality report:', {
+      error: error.message,
+      stack: error.stack,
+    });
     try {
       await Report.findOneAndUpdate(
         { reportId },
         { status: 'failed', error: error.message }
       );
     } catch (updateError) {
-      console.error('[Background Job] Error updating failed report:', updateError);
+      logger.error('[Background Job] Error updating failed report:', {
+        error: updateError.message,
+      });
     }
     return null;
   }
@@ -446,14 +472,19 @@ async function generateDeviceStatusReportJob(startDate, endDate, deviceIds, gene
 
     return report;
   } catch (error) {
-    console.error('[Background Job] Error generating device status report:', error);
+    logger.error('[Background Job] Error generating device status report:', {
+      error: error.message,
+      stack: error.stack,
+    });
     try {
       await Report.findOneAndUpdate(
         { reportId },
         { status: 'failed', error: error.message }
       );
     } catch (updateError) {
-      console.error('[Background Job] Error updating failed report:', updateError);
+      logger.error('[Background Job] Error updating failed report:', {
+        error: updateError.message,
+      });
     }
     return null;
   }
@@ -472,31 +503,29 @@ function calculateHealthScore(uptimePercentage, criticalAlerts) {
  * Start all background jobs
  */
 function startBackgroundJobs() {
-  console.log('\n🔄 Starting background jobs...');
+  logger.info('[JOBS] Starting background jobs...');
   
   checkOfflineDevices.start();
-  console.log('✓ Offline device checker started (runs every 5 minutes)');
+  logger.info('[OK] Offline device checker started (runs every 5 minutes)');
   
   cleanupOldReadings.start();
-  console.log('✓ Old readings cleanup started (runs daily at 2:00 AM UTC)');
+  logger.info('[OK] Old readings cleanup started (runs daily at 2:00 AM UTC)');
   
   generateWeeklyReports.start();
-  console.log('✓ Weekly reports generator started (runs every Monday at 8:00 AM UTC)');
-  
-  console.log('');
+  logger.info('[OK] Weekly reports generator started (runs every Monday at 8:00 AM UTC)');
 }
 
 /**
  * Stop all background jobs
  */
 function stopBackgroundJobs() {
-  console.log('\n🛑 Stopping background jobs...');
+  logger.info('[JOBS] Stopping background jobs...');
   
   checkOfflineDevices.stop();
   cleanupOldReadings.stop();
   generateWeeklyReports.stop();
   
-  console.log('✓ All background jobs stopped\n');
+  logger.info('[OK] All background jobs stopped');
 }
 
 module.exports = {

@@ -16,7 +16,7 @@ import {
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { useRealtime_Devices, type DeviceWithSensorData } from '@/hooks';
+import { useRealtime_Devices, useRouteContext } from '@/hooks';
 import { PageHeader, StatsCard, PageContainer, DataCard } from '../../../components/staff';
 import { Typography } from 'antd';
 import {
@@ -38,8 +38,11 @@ const { Text } = Typography;
 export const StaffAnalytics = () => {
   const token = useThemeToken();
   
-  // Use global hook for real-time device data
-  const { devices: realtimeDevices, isLoading, refetch } = useRealtime_Devices();
+  // Get route context to enable conditional fetching
+  const { needsDevices } = useRouteContext();
+  
+  // Use global hook for real-time device data - only fetch when on analytics page
+  const { devices: realtimeDevices, isLoading, refetch } = useRealtime_Devices({ enabled: needsDevices });
 
   const handleRefresh = () => {
     refetch();
@@ -48,7 +51,7 @@ export const StaffAnalytics = () => {
   // Calculate analytics data from real-time devices
   const analyticsData = useMemo(() => {
     const devicesWithReadings = realtimeDevices.filter(
-      (d: DeviceWithSensorData) => d.latestReading !== null
+      (d: any) => d.latestReading !== null
     );
 
     if (devicesWithReadings.length === 0) {
@@ -64,12 +67,12 @@ export const StaffAnalytics = () => {
     let totalPh = 0, totalTurbidity = 0, totalTds = 0;
     let count = 0;
 
-    devicesWithReadings.forEach((device: DeviceWithSensorData) => {
+    devicesWithReadings.forEach((device: any) => {
       const reading = device.latestReading;
       if (!reading) return;
 
       deviceStats.push({
-        device: device.deviceName || device.deviceId,
+        device: device.name || device.deviceId,
         ph: reading.ph ? Number(reading.ph.toFixed(2)) : 0,
         turbidity: reading.turbidity ? Number(reading.turbidity.toFixed(2)) : 0,
         tds: reading.tds ? Number(reading.tds.toFixed(2)) : 0,

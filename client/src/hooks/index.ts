@@ -15,6 +15,13 @@
  */
 
 // ============================================================================
+// UTILITY HOOKS - Route context and helpers
+// ============================================================================
+
+export { useRouteContext } from './useRouteContext';
+export type { RouteContext } from './useRouteContext';
+
+// ============================================================================
 // READ HOOKS - Real-time data subscriptions
 // ============================================================================
 
@@ -24,8 +31,8 @@ export { useRealtime_MQTTMetrics } from './reads/useRealtime_MQTTMetrics';
 export { useRealtime_Users } from './reads/useRealtime_Users';
 export { useRealtime_AnalyticsData } from './reads/useRealtime_AnalyticsData';
 
-// Export types from read hooks
-export type { DeviceWithSensorData } from './reads/useRealtime_Devices';
+// Export types from Device schema (used in pages)
+export type { DeviceWithReadings as DeviceWithSensorData } from '../schemas/deviceManagement.schema';
 
 // ============================================================================
 // WRITE HOOKS - CRUD operations and mutations

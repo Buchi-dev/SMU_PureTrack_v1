@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useThemeToken } from '../../../theme';
-import { useRealtime_Devices, useRealtime_Alerts, type DeviceWithSensorData } from '@/hooks';
+import { useRealtime_Devices, useRealtime_Alerts, useRouteContext } from '@/hooks';
 import type { WaterQualityAlert } from '@/schemas';
 import { RealtimeAlertMonitor } from '../../../components/RealtimeAlertMonitor';
 import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
@@ -37,12 +37,15 @@ import {
  */
 export const StaffDashboard = () => {
   const navigate = useNavigate();
-  const { userProfile } = useAuth();
+  const { user } = useAuth();
   const token = useThemeToken();
   
-  // Global hooks for real-time data
-  const { devices, isLoading: devicesLoading, refetch: refetchDevices } = useRealtime_Devices();
-  const { alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useRealtime_Alerts({ maxAlerts: 20 });
+  // Get route context to determine which data to fetch
+  const { needsDevices, needsAlerts } = useRouteContext();
+  
+  // Global hooks for real-time data - only fetch when on dashboard
+  const { devices, isLoading: devicesLoading, refetch: refetchDevices } = useRealtime_Devices({ enabled: needsDevices });
+  const { alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useRealtime_Alerts({ limit: 20, enabled: needsAlerts });
   
   // Local UI state
   const [refreshing, setRefreshing] = useState(false);
@@ -65,7 +68,7 @@ export const StaffDashboard = () => {
 
   // Calculate device statistics using utility function
   const deviceStats = useMemo(() => {
-    const devicesWithReadings = devices.map((device: DeviceWithSensorData) => {
+    const devicesWithReadings = devices.map((device: any) => {
       const status = calculateDeviceStatus(device.status, device.latestReading);
       return { ...device, computedStatus: status };
     });
@@ -80,7 +83,7 @@ export const StaffDashboard = () => {
 
   // Transform devices for table display using utility function
   const deviceStatusData: DeviceStatus[] = useMemo(() => {
-    return devices.map((device: DeviceWithSensorData) => {
+    return devices.map((device: any) => {
       const reading = device.latestReading;
       const status = calculateDeviceStatus(device.status, reading);
 
@@ -90,8 +93,10 @@ export const StaffDashboard = () => {
 
       return {
         id: device.deviceId,
-        name: device.deviceName || device.deviceId,
-        location: device.location || 'Unknown',
+        name: device.name || device.deviceId,
+        location: device.metadata?.location 
+          ? `${device.metadata.location.building}, ${device.metadata.location.floor}`
+          : 'Unknown',
         status,
         lastUpdate,
         ph: reading?.ph || 0,
@@ -158,7 +163,7 @@ export const StaffDashboard = () => {
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Dashboard Header */}
           <DashboardHeader
-            userName={userProfile?.firstname}
+            userName={user?.firstName || user?.displayName}
             lastUpdated={lastUpdated}
             onRefresh={handleRefresh}
             refreshing={refreshing}

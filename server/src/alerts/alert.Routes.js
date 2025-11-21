@@ -9,43 +9,50 @@ const {
   getAlertStats,
 } = require('./alert.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
+const {
+  validateAlertAcknowledgment,
+  validateAlertResolution,
+  validateMongoId,
+  validateDateRange,
+  validatePagination,
+} = require('../middleware/validation.middleware');
 
 const router = express.Router();
 
 /**
- * @route   GET /api/alerts
+ * @route   GET /api/v1/alerts
  * @desc    Get all alerts (with filters)
  * @access  Authenticated users
  */
-router.get('/', ensureAuthenticated, getAllAlerts);
+router.get('/', ensureAuthenticated, validateDateRange, validatePagination, getAllAlerts);
 
 /**
- * @route   GET /api/alerts/stats
+ * @route   GET /api/v1/alerts/stats
  * @desc    Get alert statistics
  * @access  Authenticated users
  */
 router.get('/stats', ensureAuthenticated, getAlertStats);
 
 /**
- * @route   GET /api/alerts/:id
+ * @route   GET /api/v1/alerts/:id
  * @desc    Get alert by ID
  * @access  Authenticated users
  */
-router.get('/:id', ensureAuthenticated, getAlertById);
+router.get('/:id', ensureAuthenticated, validateMongoId, getAlertById);
 
 /**
- * @route   PATCH /api/alerts/:id/acknowledge
+ * @route   PATCH /api/v1/alerts/:id/acknowledge
  * @desc    Acknowledge alert
  * @access  Authenticated users (Staff and Admin)
  */
-router.patch('/:id/acknowledge', ensureAuthenticated, acknowledgeAlert);
+router.patch('/:id/acknowledge', ensureAuthenticated, validateAlertAcknowledgment, acknowledgeAlert);
 
 /**
- * @route   PATCH /api/alerts/:id/resolve
+ * @route   PATCH /api/v1/alerts/:id/resolve
  * @desc    Resolve alert with notes
  * @access  Authenticated users (Staff and Admin)
  */
-router.patch('/:id/resolve', ensureAuthenticated, resolveAlert);
+router.patch('/:id/resolve', ensureAuthenticated, validateAlertResolution, resolveAlert);
 
 /**
  * @route   POST /api/alerts

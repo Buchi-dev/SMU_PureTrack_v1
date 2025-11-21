@@ -1,6 +1,7 @@
 const { SensorReading } = require('../devices/device.Model');
 const Alert = require('../alerts/alert.Model');
 const { Device } = require('../devices/device.Model');
+const logger = require('../utils/logger');
 
 /**
  * Get water quality trends over time
@@ -97,7 +98,11 @@ const getTrends = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Analytics Controller] Error fetching trends:', error);
+    logger.error('[Analytics Controller] Error fetching trends', {
+      error: error.message,
+      deviceId,
+      parameterType,
+    });
     res.status(500).json({
       success: false,
       message: 'Error fetching trends',

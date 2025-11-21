@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 /**
  * Email Service
@@ -32,7 +33,10 @@ function loadTemplate(templateName) {
     templates[templateName] = fs.readFileSync(templatePath, 'utf-8');
     return templates[templateName];
   } catch (error) {
-    console.error(`[Email Service] Error loading template ${templateName}:`, error.message);
+    logger.error('[Email Service] Error loading template', {
+      templateName,
+      error: error.message,
+    });
     throw new Error(`Email template '${templateName}' not found`);
   }
 }
@@ -61,7 +65,7 @@ function renderTemplate(template, data) {
 const createTransporter = () => {
   // Check if SMTP is configured
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('[Email Service] SMTP not configured. Email notifications disabled.');
+    logger.warn('[Email Service] SMTP not configured. Email notifications disabled.');
     return null;
   }
 
@@ -86,7 +90,9 @@ async function sendWeeklyReportEmail(user, reports) {
   const transporter = createTransporter();
   
   if (!transporter) {
-    console.log('[Email Service] Skipping email to', user.email, '- SMTP not configured');
+    logger.info('[Email Service] Skipping email - SMTP not configured', {
+      recipientEmail: user.email,
+    });
     return false;
   }
 
@@ -107,10 +113,16 @@ async function sendWeeklyReportEmail(user, reports) {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email Service] Weekly report sent to ${user.email} - Message ID: ${info.messageId}`);
+    logger.info('[Email Service] Weekly report sent successfully', {
+      recipientEmail: user.email,
+      messageId: info.messageId,
+    });
     return true;
   } catch (error) {
-    console.error(`[Email Service] Error sending email to ${user.email}:`, error.message);
+    logger.error('[Email Service] Error sending weekly report email', {
+      recipientEmail: user.email,
+      error: error.message,
+    });
     return false;
   }
 }
@@ -243,9 +255,9 @@ async function sendAlertEmail(user, alert) {
 
   try {
     const severityEmoji = {
-      Critical: '🚨',
-      Warning: '⚠️',
-      Advisory: 'ℹ️',
+      Critical: '[CRITICAL]',
+      Warning: '[WARNING]',
+      Advisory: '[INFO]',
     };
 
     const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -283,10 +295,17 @@ View alert details: ${appUrl}/admin/alerts
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log(`[Email Service] Alert email sent to ${user.email} - Message ID: ${info.messageId}`);
+    logger.info('[Email Service] Alert email sent successfully', {
+      recipientEmail: user.email,
+      messageId: info.messageId,
+      alertSeverity: alert.severity,
+    });
     return true;
   } catch (error) {
-    console.error(`[Email Service] Error sending alert email to ${user.email}:`, error.message);
+    logger.error('[Email Service] Error sending alert email', {
+      recipientEmail: user.email,
+      error: error.message,
+    });
     return false;
   }
 }
@@ -304,7 +323,7 @@ async function testEmailConfiguration(recipientEmail) {
 
   try {
     await transporter.verify();
-    console.log('[Email Service] SMTP connection verified successfully');
+    logger.info('[Email Service] SMTP connection verified successfully');
 
     if (recipientEmail) {
       // Load and render template
@@ -320,12 +339,17 @@ async function testEmailConfiguration(recipientEmail) {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      console.log(`[Email Service] Test email sent to ${recipientEmail} - Message ID: ${info.messageId}`);
+      logger.info('[Email Service] Test email sent successfully', {
+        recipientEmail,
+        messageId: info.messageId,
+      });
     }
 
     return true;
   } catch (error) {
-    console.error('[Email Service] Email configuration test failed:', error.message);
+    logger.error('[Email Service] Email configuration test failed', {
+      error: error.message,
+    });
     throw error;
   }
 }

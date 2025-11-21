@@ -12,36 +12,42 @@ const {
   resetUserPreferences,
 } = require('./user.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
+const {
+  validateUserRoleUpdate,
+  validateUserStatusUpdate,
+  validateMongoId,
+  validatePagination,
+} = require('../middleware/validation.middleware');
 
 const router = express.Router();
 
 /**
- * @route   GET /api/users
+ * @route   GET /api/v1/users
  * @desc    Get all users (with filters)
  * @access  Admin only
  */
-router.get('/', ensureAdmin, getAllUsers);
+router.get('/', ensureAdmin, validatePagination, getAllUsers);
 
 /**
- * @route   GET /api/users/:id
+ * @route   GET /api/v1/users/:id
  * @desc    Get user by ID
  * @access  Authenticated users
  */
-router.get('/:id', ensureAuthenticated, getUserById);
+router.get('/:id', ensureAuthenticated, validateMongoId, getUserById);
 
 /**
- * @route   PATCH /api/users/:id/role
+ * @route   PATCH /api/v1/users/:id/role
  * @desc    Update user role
  * @access  Admin only
  */
-router.patch('/:id/role', ensureAdmin, updateUserRole);
+router.patch('/:id/role', ensureAdmin, validateMongoId, validateUserRoleUpdate, updateUserRole);
 
 /**
- * @route   PATCH /api/users/:id/status
+ * @route   PATCH /api/v1/users/:id/status
  * @desc    Update user status
  * @access  Admin only
  */
-router.patch('/:id/status', ensureAdmin, updateUserStatus);
+router.patch('/:id/status', ensureAdmin, validateMongoId, validateUserStatusUpdate, updateUserStatus);
 
 /**
  * @route   PATCH /api/users/:id/profile

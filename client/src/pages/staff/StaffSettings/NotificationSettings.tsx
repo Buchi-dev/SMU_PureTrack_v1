@@ -27,7 +27,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../../contexts/AuthContext';
-import { useRealtime_Devices, useCall_Users } from '../../../hooks';
+import { useRealtime_Devices, useCall_Users, useRouteContext } from '../../../hooks';
 import dayjs from 'dayjs';
 
 const { Text, Paragraph } = Typography;
@@ -54,17 +54,22 @@ const NotificationSettings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
 
+  // Get route context to enable conditional fetching
+  const { needsDevices } = useRouteContext();
+
   // ✅ GLOBAL HOOKS - Following Service → Hooks → UI architecture
-  const { devices: devicesWithReadings } = useRealtime_Devices();
+  const { devices: devicesWithReadings } = useRealtime_Devices({ enabled: needsDevices });
   const { getUserPreferences, setupPreferences, isLoading: saving } = useCall_Users();
 
   // Transform devices for select component
-  // DeviceWithSensorData already has location as a formatted string
   const devices = devicesWithReadings.map(d => ({
     deviceId: d.deviceId,
-    name: d.deviceName,
+    name: d.name, // Use 'name' not 'deviceName'
     status: d.status,
-    location: d.location // location is already a formatted string from the hook
+    // Build location string from metadata
+    location: d.metadata?.location 
+      ? `${d.metadata.location.building}, ${d.metadata.location.floor}` 
+      : 'Unknown'
   }));
 
   useEffect(() => {
@@ -77,10 +82,10 @@ const NotificationSettings: React.FC = () => {
     try {
       setLoading(true);
       
-      console.log('📥 Loading preferences for user:', user.uid);
+      console.log('📥 Loading preferences for user:', user.id);
       
       // ✅ Use global hook instead of direct service call
-      const userPrefs = await getUserPreferences(user.uid);
+      const userPrefs = await getUserPreferences(user.id);
 
       console.log('📋 Loaded preferences from database:', userPrefs);
 
@@ -137,7 +142,7 @@ const NotificationSettings: React.FC = () => {
         : undefined;
 
       const preferencesPayload = {
-        userId: user.uid,
+        userId: user.id,
         email: user.email,
         emailNotifications: values.emailNotifications ?? false,
         pushNotifications: values.pushNotifications ?? false,

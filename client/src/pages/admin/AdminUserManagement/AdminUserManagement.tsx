@@ -35,11 +35,12 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../../../services/auth.Service";
-import { useRealtime_Users, useCall_Users } from "../../../hooks";
+import { useRealtime_Users, useCall_Users, useRouteContext } from "../../../hooks";
 import { UsersTable } from "./components/UsersTable";
 import { UserActionsDrawer } from "./components/UserActionsDrawer";
 import { UsersStatistics } from "./components/UsersStatistics";
 import type { UserListData, UserRole, UserStatus } from "../../../schemas";
+
 import { AdminLayout } from "../../../components/layouts/AdminLayout";
 import { useAuth } from "../../../contexts/AuthContext";
 
@@ -51,12 +52,15 @@ export const AdminUserManagement: React.FC = () => {
   const { user: userProfile } = useAuth();
   const navigate = useNavigate();
   
-  // Global READ hook - Real-time user data
+  // Get route context to enable conditional fetching
+  const { needsUsers } = useRouteContext();
+  
+  // Global READ hook - Real-time user data - only fetch when on user management page
   const { 
     users, 
     isLoading: loading, 
     error: realtimeError 
-  } = useRealtime_Users();
+  } = useRealtime_Users({ enabled: needsUsers });
 
   // Global WRITE hook - User operations
   const {
