@@ -7,7 +7,6 @@ const {
   deleteReport,
 } = require('./report.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
-const { reportLimiter } = require('../middleware/rate-limit.middleware');
 const {
   validateReportGeneration,
   validateMongoId,
@@ -21,14 +20,14 @@ const router = express.Router();
  * @desc    Generate water quality report
  * @access  Authenticated users (Staff and Admin)
  */
-router.post('/water-quality', ensureAuthenticated, reportLimiter, validateReportGeneration, generateWaterQualityReport);
+router.post('/water-quality', ensureAuthenticated, validateReportGeneration, generateWaterQualityReport);
 
 /**
  * @route   POST /api/v1/reports/device-status
  * @desc    Generate device status report
  * @access  Authenticated users (Staff and Admin)
  */
-router.post('/device-status', ensureAuthenticated, reportLimiter, validateReportGeneration, generateDeviceStatusReport);
+router.post('/device-status', ensureAuthenticated, validateReportGeneration, generateDeviceStatusReport);
 
 /**
  * @route   GET /api/v1/reports

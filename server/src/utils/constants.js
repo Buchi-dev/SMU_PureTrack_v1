@@ -105,26 +105,6 @@ const CACHE_TTL = {
   REPORTS: 3600, // 1 hour
 };
 
-// Rate limiting
-const RATE_LIMITS = {
-  API: {
-    windowMs: TIME.FIFTEEN_MINUTES,
-    max: 100,
-  },
-  AUTH: {
-    windowMs: TIME.FIFTEEN_MINUTES,
-    max: 5,
-  },
-  SENSOR_DATA: {
-    windowMs: TIME.FIFTEEN_MINUTES,
-    max: 1000,
-  },
-  REPORT: {
-    windowMs: TIME.ONE_HOUR,
-    max: 10,
-  },
-};
-
 // Session configuration
 const SESSION = {
   MAX_AGE: TIME.ONE_DAY,
@@ -215,7 +195,6 @@ module.exports = {
   REPORT_STATUS,
   PAGINATION,
   CACHE_TTL,
-  RATE_LIMITS,
   SESSION,
   CRON_SCHEDULES,
   DEVICE_OFFLINE_THRESHOLD,

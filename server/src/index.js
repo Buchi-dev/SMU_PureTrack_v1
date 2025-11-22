@@ -27,7 +27,6 @@ const { errorHandler, notFoundHandler } = require('./errors/errorHandler');
 
 // Import middleware
 const { addCorrelationId, addUserContext } = require('./middleware/correlation.middleware');
-const { apiLimiter } = require('./middleware/rate-limit.middleware');
 
 // Import background jobs
 const { startBackgroundJobs, stopBackgroundJobs } = require('./jobs/backgroundJobs');
@@ -96,7 +95,7 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Trust proxy (for rate limiting behind reverse proxy)
+// Trust proxy (for proper IP detection behind reverse proxy)
 app.set('trust proxy', 1);
 
 // ============================================
@@ -138,12 +137,8 @@ async function initializeApp() {
     });
   });
 
-  // Health check routes (no rate limiting)
+  // Health check routes
   app.use('/health', healthRoutes);
-
-  // Apply rate limiting to all API routes
-  app.use('/api', apiLimiter);
-  app.use('/auth', apiLimiter);
 
   // API Routes with versioning
   app.use('/auth', authRoutes);

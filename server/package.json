@@ -28,7 +28,6 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "express-rate-limit": "^7.1.5",
     "express-session": "^1.18.2",
     "express-validator": "^7.0.1",
     "firebase-admin": "^12.7.0",

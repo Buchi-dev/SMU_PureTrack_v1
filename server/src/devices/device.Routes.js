@@ -64,10 +64,10 @@ router.delete('/:id', ensureAdmin, validateMongoId, deleteDevice);
 
 /**
  * @route   POST /api/v1/devices/readings
- * @desc    Process sensor data from IoT devices (real-time, no rate limit)
+ * @desc    Process sensor data from IoT devices (real-time)
  * @access  Requires API key authentication
  * @security ApiKeyAuth
- * @note    No rate limiting - this endpoint receives real-time sensor data
+ * @note    This endpoint receives real-time sensor data from IoT devices
  */
 router.post('/readings', ensureApiKey, validateSensorData, processSensorData);
 
