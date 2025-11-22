@@ -64,13 +64,38 @@ export const AdminAnalytics = memo(() => {
 
   // Enrich devices with required properties for analytics
   const enrichedDevices = useMemo<DeviceWithReadings[]>(() => {
-    return devices.map(device => ({
-      ...device,
-      latestReading: null, // TODO: Fetch latest readings from RTDB
-      activeAlerts: alerts.filter(a => a.deviceId === device.deviceId && a.status === 'Active'),
-      severityScore: 0,
-      severityLevel: 'normal' as const,
-    }));
+    return devices.map(device => {
+      // Extract latestReading from device (populated by server aggregation)
+      // Server returns devices with latestReading via MongoDB lookup
+      const latestReading = (device as any).latestReading || null;
+      const activeDeviceAlerts = alerts.filter(a => a.deviceId === device.deviceId && a.status === 'Active');
+      
+      // Calculate severity based on alerts and reading values
+      let severityScore = 0;
+      let severityLevel: 'critical' | 'warning' | 'normal' | 'offline' = 'normal';
+      
+      if (device.status === 'offline') {
+        severityLevel = 'offline';
+        severityScore = 50;
+      } else if (activeDeviceAlerts.some(a => a.severity === 'Critical')) {
+        severityLevel = 'critical';
+        severityScore = 100;
+      } else if (activeDeviceAlerts.some(a => a.severity === 'Warning')) {
+        severityLevel = 'warning';
+        severityScore = 75;
+      } else if (activeDeviceAlerts.length > 0) {
+        severityLevel = 'warning';
+        severityScore = 60;
+      }
+      
+      return {
+        ...device,
+        latestReading,
+        activeAlerts: activeDeviceAlerts,
+        severityScore,
+        severityLevel,
+      };
+    });
   }, [devices, alerts]);
 
   // ✅ LOCAL HOOK - Calculate analytics statistics (UI logic only)
@@ -87,7 +112,6 @@ export const AdminAnalytics = memo(() => {
   // ✅ LOCAL HOOK - Process data for charts (UI logic only)
   const { 
     timeSeriesData, 
-    parameterDistribution, 
     parameterComparisonData 
   } = useAnalyticsProcessing(enrichedDevices);
 
@@ -159,7 +183,6 @@ export const AdminAnalytics = memo(() => {
           <TimeSeriesCharts 
             timeSeriesData={timeSeriesData}
             parameterComparisonData={parameterComparisonData}
-            parameterDistribution={parameterDistribution}
           />
 
           <HistoricalTrends 

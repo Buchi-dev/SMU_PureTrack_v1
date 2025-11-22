@@ -98,16 +98,6 @@ export const DevicePerformance = memo<DevicePerformanceProps>(({
       ),
     },
     {
-      title: 'Readings',
-      dataIndex: 'totalReadings',
-      key: 'totalReadings',
-      width: 100,
-      sorter: (a, b) => a.totalReadings - b.totalReadings,
-      render: (count: number) => (
-        <Text strong>{count.toLocaleString()}</Text>
-      ),
-    },
-    {
       title: 'Avg pH',
       dataIndex: 'avgPh',
       key: 'avgPh',

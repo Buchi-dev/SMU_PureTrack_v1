@@ -12,11 +12,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from 'recharts';
 import { useThemeToken } from '../../../../theme';
 
@@ -34,22 +29,14 @@ interface ParameterComparisonPoint {
   Minimum: number;
 }
 
-interface ParameterDistributionPoint {
-  name: string;
-  value: number;
-  max: number;
-}
-
 interface TimeSeriesChartsProps {
   timeSeriesData: TimeSeriesDataPoint[];
   parameterComparisonData: ParameterComparisonPoint[];
-  parameterDistribution: ParameterDistributionPoint[];
 }
 
 export const TimeSeriesCharts = ({ 
   timeSeriesData, 
   parameterComparisonData,
-  parameterDistribution 
 }: TimeSeriesChartsProps) => {
   const token = useThemeToken();
 
@@ -136,37 +123,6 @@ export const TimeSeriesCharts = ({
                 <Bar dataKey="Average" fill="#82ca9d" />
                 <Bar dataKey="Maximum" fill="#ffc658" />
               </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Radar Chart */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24}>
-          <Card title="Water Quality Parameters Overview">
-            <ResponsiveContainer width="100%" height={400}>
-              <RadarChart data={parameterDistribution}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="name" />
-                <PolarRadiusAxis />
-                <Radar 
-                  name="Current Values" 
-                  dataKey="value" 
-                  stroke={token.colorPrimary} 
-                  fill={token.colorPrimary} 
-                  fillOpacity={0.6} 
-                />
-                <Radar 
-                  name="Maximum Range" 
-                  dataKey="max" 
-                  stroke={token.colorError} 
-                  fill={token.colorError} 
-                  fillOpacity={0.2} 
-                />
-                <Legend />
-                <Tooltip />
-              </RadarChart>
             </ResponsiveContainer>
           </Card>
         </Col>
