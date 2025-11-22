@@ -40,6 +40,7 @@ const getAllDevices = asyncHandler(async (req, res) => {
     },
     {
       $addFields: {
+        id: '$_id', // Add id field mapping from _id
         latestReading: { $arrayElemAt: ['$readings', 0] },
       },
     },
