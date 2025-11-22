@@ -1,0 +1,186 @@
+.device-card {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s;
+}
+
+.device-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.device-card.running {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.device-card.running:hover {
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.device-card.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.device-info h3 {
+  margin: 0 0 0.5rem 0;
+  color: #f1f5f9;
+  font-size: 1.25rem;
+}
+
+.device-id {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  font-family: 'Courier New', monospace;
+}
+
+.status-indicator {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-indicator.running {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.status-indicator.stopped {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.device-details {
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.detail-row .label {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.detail-row .value {
+  color: #e2e8f0;
+}
+
+.detail-row .value.code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+}
+
+.sensor-readings {
+  margin-bottom: 1rem;
+}
+
+.sensor-readings h4 {
+  margin: 0 0 1rem 0;
+  color: #f1f5f9;
+  font-size: 1rem;
+}
+
+.sensors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.sensor-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sensor-icon {
+  font-size: 1.5rem;
+}
+
+.sensor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.sensor-name {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sensor-value {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #cbd5e1;
+  font-family: 'Courier New', monospace;
+}
+
+.sensor-value.active {
+  color: #6ee7b7;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.card-actions .btn {
+  flex: 1;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .sensors-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions .btn {
+    width: 100%;
+  }
+}
