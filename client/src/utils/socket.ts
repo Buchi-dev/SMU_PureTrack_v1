@@ -106,14 +106,23 @@ export async function initializeSocket(): Promise<Socket> {
     }
 
     // Create Socket.IO connection
+    // Production: Use polling first due to Render.com WebSocket limitations
+    // Development: Prefer WebSocket for better performance
+    const isProd = import.meta.env.PROD;
+    
     socket = io(serverUrl, {
       auth: { token },
-      transports: ['websocket', 'polling'], // Prefer WebSocket
+      // In production, start with polling (more reliable on Render.com)
+      // WebSocket upgrade will happen automatically if available
+      transports: isProd ? ['polling', 'websocket'] : ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       reconnectionAttempts: 5,
-      timeout: 10000,
+      timeout: 20000, // Increased to 20s for slower connections
+      // Add upgrade settings for production
+      upgrade: isProd, // Allow transport upgrade in production
+      rememberUpgrade: true, // Remember successful upgrades
     });
 
     // Setup event listeners
@@ -166,6 +175,13 @@ function setupEventListeners(socketInstance: Socket): void {
 
   socketInstance.on('connect_error', (error) => {
     console.error('[Socket.IO] ⚠️ Connection error:', error.message);
+    // Log additional details in production for debugging
+    if (import.meta.env.PROD) {
+      console.error('[Socket.IO] Error details:', {
+        transport: socketInstance.io.engine?.transport?.name,
+        serverUrl: import.meta.env.VITE_API_BASE_URL,
+      });
+    }
   });
 
   socketInstance.io.on('reconnect_attempt', (attemptNumber) => {
@@ -217,9 +233,10 @@ function waitForConnection(socketInstance: Socket): Promise<void> {
       return;
     }
 
+    // Increased timeout to 20s to match socket timeout
     const timeout = setTimeout(() => {
-      reject(new Error('Connection timeout after 10 seconds'));
-    }, 10000);
+      reject(new Error('Connection timeout after 20 seconds'));
+    }, 20000);
 
     socketInstance.once('connect', () => {
       clearTimeout(timeout);

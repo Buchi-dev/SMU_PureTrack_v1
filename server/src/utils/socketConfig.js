@@ -31,11 +31,18 @@ function setupSocketIO(httpServer) {
       credentials: true,
       methods: ['GET', 'POST'],
     },
-    transports: ['websocket', 'polling'], // Prefer WebSocket, fallback to polling
+    // Use polling first for better Render.com compatibility
+    transports: ['polling', 'websocket'],
+    // Longer timeouts for production environments with potential latency
     pingTimeout: 60000, // 60 seconds
     pingInterval: 25000, // 25 seconds
-    upgradeTimeout: 10000, // 10 seconds
+    upgradeTimeout: 30000, // Increased to 30 seconds for slow connections
     maxHttpBufferSize: 1e6, // 1 MB
+    // Allow clients to upgrade transport
+    allowUpgrades: true,
+    // More permissive connection settings for cloud deployments
+    connectTimeout: 45000, // 45 seconds for initial connection
+    path: '/socket.io/', // Explicit path
   });
 
   // ========================================
