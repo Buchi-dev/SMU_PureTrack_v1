@@ -279,56 +279,188 @@ export const generateWaterQualityReport = async (
     // Decorative underline
     doc.setDrawColor(COLORS.secondary.r, COLORS.secondary.g, COLORS.secondary.b);
     doc.setLineWidth(0.8);
-    doc.line(SPACING.page.left, yPos + 2, SPACING.page.left + 50, yPos + 2);
+    doc.line(SPACING.page.left, yPos + 2, SPACING.page.left + 70, yPos + 2);
     
-    yPos += 10;
+    yPos += 12;
 
     const summary = reportData.summary;
     const overallStatus = getOverallStatus(summary);
     const complianceMetrics = calculateComplianceMetrics(summary);
 
-    // Status badge with rounded corners - WIDER (full 180mm)
-    const badgeHeight = 35;
+    // Check if we have actual data
+    const hasData = summary.averageTurbidity !== undefined && 
+                    (summary.totalReadings || 0) > 0;
+
+    // Status badge with rounded corners and improved layout
+    const badgeHeight = 45;
     doc.setFillColor(overallStatus.color[0], overallStatus.color[1], overallStatus.color[2]);
     doc.roundedRect(SPACING.page.left, yPos, 180, badgeHeight, 3, 3, 'F');
     
     // Status title (larger, bolder)
     doc.setTextColor(COLORS.white.r, COLORS.white.g, COLORS.white.b);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text(`Overall Water Quality: ${overallStatus.status}`, SPACING.page.left + 5, yPos + 10);
+    doc.setFontSize(16);
+    doc.text(`Overall Water Quality: ${overallStatus.status}`, SPACING.page.left + 8, yPos + 12);
     
-    // Check if we have actual data
-    const hasData = summary.averageTurbidity !== undefined && 
-                    (summary.totalReadings || 0) > 0;
-
-    // Add summary stats in badge (smaller text, three rows)
+    // Add summary stats in badge with better formatting
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(FONTS.small.size);
+    doc.setFontSize(9);
     
     if (hasData) {
+      // Row 1: Water Quality Parameters
+      const turbidity = (summary.averageTurbidity || 0).toFixed(2);
+      const tds = (summary.averageTDS || 0).toFixed(0);
+      const ph = (summary.averagePH || 0).toFixed(2);
+      
       doc.text(
-        `Turbidity: ${(summary.averageTurbidity || 0).toFixed(2)} NTU | TDS: ${(summary.averageTDS || 0).toFixed(2)} ppm | pH: ${(summary.averagePH || 0).toFixed(2)} | Total Readings: ${summary.totalReadings || 0}`, 
-        SPACING.page.left + 5, 
-        yPos + 18
+        `Water Quality: Turbidity ${turbidity} NTU  •  TDS ${tds} ppm  •  pH ${ph}`,
+        SPACING.page.left + 8,
+        yPos + 21
       );
+      
+      // Row 2: Monitoring Information
+      let periodStart = 'N/A';
+      let periodEnd = 'N/A';
+      
+      if (reportData.period && typeof reportData.period !== 'string') {
+        periodStart = dayjs(reportData.period.start).format('MMM D, YYYY');
+        periodEnd = dayjs(reportData.period.end).format('MMM D, YYYY');
+      }
+      
+      const deviceCount = reportData.devices?.length || 0;
+      
       doc.text(
-        `Period: ${reportData.period || 'N/A'} | Devices Monitored: ${reportData.devices?.length || 0}`, 
-        SPACING.page.left + 5, 
-        yPos + 24
+        `Monitoring Period: ${periodStart} to ${periodEnd}  •  Devices: ${deviceCount}`,
+        SPACING.page.left + 8,
+        yPos + 28
       );
-      // Compliance metrics row
+      
+      // Row 3: Data & Compliance
+      const totalReadings = summary.totalReadings || 0;
+      const complianceRate = complianceMetrics.rate;
+      const compliantParams = complianceMetrics.compliantCount;
+      const totalParams = complianceMetrics.totalCount;
+      
       doc.setFont('helvetica', 'bold');
       doc.text(
-        `Compliance Rate: ${complianceMetrics.rate}% | Compliant Parameters: ${complianceMetrics.compliantCount}/${complianceMetrics.totalCount}`, 
-        SPACING.page.left + 5, 
-        yPos + 30
+        `Total Readings: ${totalReadings}  •  Compliance Rate: ${complianceRate}%  •  Compliant Parameters: ${compliantParams}/${totalParams}`,
+        SPACING.page.left + 8,
+        yPos + 35
       );
     } else {
-      doc.text('No sensor data available for the selected period', SPACING.page.left + 5, yPos + 18);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(
+        'No sensor data available for the selected period',
+        SPACING.page.left + 8,
+        yPos + 22
+      );
+      doc.setFontSize(8);
+      doc.text(
+        'Please ensure devices are online and transmitting data, then regenerate the report.',
+        SPACING.page.left + 8,
+        yPos + 30
+      );
     }
 
-    yPos += badgeHeight + 10;
+    yPos += badgeHeight + 12;
+    doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+
+    // Enhanced Summary Metrics Cards (only if we have data)
+    if (hasData) {
+      // Create three metric cards in a row
+      const cardWidth = 56;
+      const cardHeight = 32;
+      const cardSpacing = 6;
+      
+      // Card 1: Turbidity
+      const card1X = SPACING.page.left;
+      doc.setFillColor(245, 250, 255); // Light blue
+      doc.roundedRect(card1X, yPos, cardWidth, cardHeight, 2, 2, 'F');
+      doc.setDrawColor(COLORS.secondary.r, COLORS.secondary.g, COLORS.secondary.b);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(card1X, yPos, cardWidth, cardHeight, 2, 2, 'S');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(FONTS.small.size);
+      doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+      doc.text('TURBIDITY', card1X + 3, yPos + 6);
+      
+      const turbStatus = (summary.averageTurbidity || 0) <= 5 ? '✓ Compliant' : '✗ Non-Compliant';
+      const turbColor = (summary.averageTurbidity || 0) <= 5 ? COLORS.success : COLORS.danger;
+      doc.setTextColor(turbColor.r, turbColor.g, turbColor.b);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(`${(summary.averageTurbidity || 0).toFixed(2)}`, card1X + 3, yPos + 16);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.small.size);
+      doc.text('NTU', card1X + 25, yPos + 16);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.tiny.size);
+      doc.text(turbStatus, card1X + 3, yPos + 23);
+      doc.setTextColor(COLORS.textSecondary.r, COLORS.textSecondary.g, COLORS.textSecondary.b);
+      doc.text('WHO Limit: <5 NTU', card1X + 3, yPos + 28);
+      
+      // Card 2: TDS
+      const card2X = card1X + cardWidth + cardSpacing;
+      doc.setFillColor(245, 255, 245); // Light green
+      doc.roundedRect(card2X, yPos, cardWidth, cardHeight, 2, 2, 'F');
+      doc.setDrawColor(COLORS.success.r, COLORS.success.g, COLORS.success.b);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(card2X, yPos, cardWidth, cardHeight, 2, 2, 'S');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(FONTS.small.size);
+      doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+      doc.text('TDS', card2X + 3, yPos + 6);
+      
+      const tdsStatus = (summary.averageTDS || 0) <= 500 ? '✓ Compliant' : '✗ Non-Compliant';
+      const tdsColor = (summary.averageTDS || 0) <= 500 ? COLORS.success : COLORS.danger;
+      doc.setTextColor(tdsColor.r, tdsColor.g, tdsColor.b);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(`${(summary.averageTDS || 0).toFixed(0)}`, card2X + 3, yPos + 16);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.small.size);
+      doc.text('ppm', card2X + 25, yPos + 16);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.tiny.size);
+      doc.text(tdsStatus, card2X + 3, yPos + 23);
+      doc.setTextColor(COLORS.textSecondary.r, COLORS.textSecondary.g, COLORS.textSecondary.b);
+      doc.text('WHO Limit: <500 ppm', card2X + 3, yPos + 28);
+      
+      // Card 3: pH
+      const card3X = card2X + cardWidth + cardSpacing;
+      doc.setFillColor(255, 250, 245); // Light orange
+      doc.roundedRect(card3X, yPos, cardWidth, cardHeight, 2, 2, 'F');
+      doc.setDrawColor(COLORS.warning.r, COLORS.warning.g, COLORS.warning.b);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(card3X, yPos, cardWidth, cardHeight, 2, 2, 'S');
+      
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(FONTS.small.size);
+      doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+      doc.text('pH LEVEL', card3X + 3, yPos + 6);
+      
+      const phValue = summary.averagePH || 0;
+      const phStatus = (phValue >= 6.5 && phValue <= 8.5) ? '✓ Compliant' : '✗ Non-Compliant';
+      const phColor = (phValue >= 6.5 && phValue <= 8.5) ? COLORS.success : COLORS.danger;
+      doc.setTextColor(phColor.r, phColor.g, phColor.b);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(`${phValue.toFixed(2)}`, card3X + 3, yPos + 16);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.tiny.size);
+      doc.text(phStatus, card3X + 3, yPos + 23);
+      doc.setTextColor(COLORS.textSecondary.r, COLORS.textSecondary.g, COLORS.textSecondary.b);
+      doc.text('WHO Range: 6.5-8.5', card3X + 3, yPos + 28);
+      
+      yPos += cardHeight + 10;
+    }
+    
     doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
   }
 
@@ -761,6 +893,311 @@ export const generateWaterQualityReport = async (
       } else {
         yPos += 5;
       }
+    }
+  }
+
+  // ============================================================================
+  // STATISTICAL ANALYSIS SECTION (if enabled)
+  // ============================================================================
+  if (config.includeStatistics && reportData.summary && (reportData.summary.totalReadings || 0) > 0) {
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = SPACING.page.top;
+    }
+
+    // Section header
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+    doc.text('Statistical Analysis', SPACING.page.left, yPos);
+    
+    // Decorative underline
+    doc.setDrawColor(COLORS.secondary.r, COLORS.secondary.g, COLORS.secondary.b);
+    doc.setLineWidth(0.8);
+    doc.line(SPACING.page.left, yPos + 2, SPACING.page.left + 50, yPos + 2);
+    
+    yPos += 12;
+
+    // Calculate statistical metrics
+    const devices = reportData.devices || [];
+    const devicesWithData = devices.filter((d: any) => d.readingCount > 0);
+    
+    // Aggregate all metrics
+    let allTurbidity: number[] = [];
+    let allTDS: number[] = [];
+    let allPH: number[] = [];
+    
+    devicesWithData.forEach((device: any) => {
+      if (device.metrics) {
+        if (device.metrics.avgTurbidity) allTurbidity.push(device.metrics.avgTurbidity);
+        if (device.metrics.avgTDS) allTDS.push(device.metrics.avgTDS);
+        if (device.metrics.avgPH) allPH.push(device.metrics.avgPH);
+      }
+    });
+
+    // Calculate standard deviation
+    const calculateStdDev = (values: number[]) => {
+      if (values.length === 0) return 0;
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+      return Math.sqrt(variance);
+    };
+
+    const statsData = [
+      [
+        'Turbidity',
+        reportData.summary.averageTurbidity?.toFixed(2) || 'N/A',
+        allTurbidity.length > 0 ? Math.min(...allTurbidity).toFixed(2) : 'N/A',
+        allTurbidity.length > 0 ? Math.max(...allTurbidity).toFixed(2) : 'N/A',
+        calculateStdDev(allTurbidity).toFixed(2),
+        devicesWithData.length.toString()
+      ],
+      [
+        'TDS',
+        reportData.summary.averageTDS?.toFixed(2) || 'N/A',
+        allTDS.length > 0 ? Math.min(...allTDS).toFixed(2) : 'N/A',
+        allTDS.length > 0 ? Math.max(...allTDS).toFixed(2) : 'N/A',
+        calculateStdDev(allTDS).toFixed(2),
+        devicesWithData.length.toString()
+      ],
+      [
+        'pH',
+        reportData.summary.averagePH?.toFixed(2) || 'N/A',
+        allPH.length > 0 ? Math.min(...allPH).toFixed(2) : 'N/A',
+        allPH.length > 0 ? Math.max(...allPH).toFixed(2) : 'N/A',
+        calculateStdDev(allPH).toFixed(2),
+        devicesWithData.length.toString()
+      ],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Parameter', 'Mean', 'Min', 'Max', 'Std Dev', 'Devices']],
+      body: statsData,
+      styles: {
+        fontSize: FONTS.body.size,
+        cellPadding: 4,
+        lineColor: [COLORS.gray.r, COLORS.gray.g, COLORS.gray.b],
+        lineWidth: 0.15,
+        halign: 'center',
+      },
+      headStyles: {
+        fillColor: [COLORS.primary.r, COLORS.primary.g, COLORS.primary.b],
+        textColor: [COLORS.white.r, COLORS.white.g, COLORS.white.b],
+        fontSize: FONTS.body.size,
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [COLORS.lightGray.r, COLORS.lightGray.g, COLORS.lightGray.b]
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 35, halign: 'left' },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 25 },
+      },
+      margin: { left: SPACING.page.left, right: SPACING.page.right },
+    });
+
+    yPos = (doc as jsPDFWithAutoTable).lastAutoTable?.finalY ?? yPos + 10;
+    yPos += 10;
+
+    // Statistical insights
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(FONTS.subheading.size);
+    doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+    doc.text('Key Insights:', SPACING.page.left, yPos);
+    yPos += 6;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(FONTS.body.size);
+    doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+
+    const insights = [];
+    
+    // Variability insights
+    if (calculateStdDev(allTurbidity) > 2) {
+      insights.push(`High variability in turbidity (σ=${calculateStdDev(allTurbidity).toFixed(2)} NTU) across devices - indicates inconsistent water sources or filtration.`);
+    }
+    if (calculateStdDev(allPH) > 0.5) {
+      insights.push(`Significant pH variation (σ=${calculateStdDev(allPH).toFixed(2)}) detected - may require zone-specific treatment.`);
+    }
+    if (calculateStdDev(allTDS) > 50) {
+      insights.push(`TDS levels show high variance (σ=${calculateStdDev(allTDS).toFixed(2)} ppm) - suggests different mineral content across zones.`);
+    }
+
+    // Data coverage
+    const coveragePercent = (devicesWithData.length / devices.length) * 100;
+    insights.push(`Data coverage: ${devicesWithData.length}/${devices.length} devices (${coveragePercent.toFixed(0)}%) provided readings during this period.`);
+    
+    insights.push(`Total readings analyzed: ${reportData.summary.totalReadings} across ${devicesWithData.length} active monitoring points.`);
+
+    insights.forEach((insight) => {
+      if (yPos > 260) {
+        doc.addPage();
+        yPos = SPACING.page.top;
+      }
+      doc.setTextColor(COLORS.secondary.r, COLORS.secondary.g, COLORS.secondary.b);
+      doc.text('•', SPACING.page.left, yPos);
+      doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+      const lines = doc.splitTextToSize(insight, 170);
+      doc.text(lines, SPACING.page.left + 5, yPos);
+      yPos += (lines.length * 5) + 2;
+    });
+
+    yPos += 8;
+  }
+
+  // ============================================================================
+  // CHARTS & VISUALIZATIONS SECTION (if enabled)
+  // ============================================================================
+  if (config.includeCharts && reportData.devices && reportData.devices.length > 0) {
+    const devicesWithData = reportData.devices.filter((d: any) => d.readingCount > 0);
+    
+    if (devicesWithData.length > 0) {
+      if (yPos > 180) {
+        doc.addPage();
+        yPos = SPACING.page.top;
+      }
+
+      // Section header
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+      doc.text('Visual Analytics', SPACING.page.left, yPos);
+      
+      // Decorative underline
+      doc.setDrawColor(COLORS.secondary.r, COLORS.secondary.g, COLORS.secondary.b);
+      doc.setLineWidth(0.8);
+      doc.line(SPACING.page.left, yPos + 2, SPACING.page.left + 45, yPos + 2);
+      
+      yPos += 12;
+
+      // Chart 1: Parameter Comparison Bar Chart
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(FONTS.subheading.size);
+      doc.setTextColor(COLORS.primary.r, COLORS.primary.g, COLORS.primary.b);
+      doc.text('Average Water Quality Parameters by Device', SPACING.page.left, yPos);
+      yPos += 8;
+
+      // Draw simple bar chart for each parameter
+      const chartWidth = 170;
+      const barHeight = 12;
+      const maxDevicesToShow = 5;
+      const devicesToChart = devicesWithData.slice(0, maxDevicesToShow);
+
+      // Draw Turbidity chart
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(FONTS.small.size);
+      doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+      doc.text('Turbidity (NTU):', SPACING.page.left, yPos);
+      yPos += 5;
+
+      const maxTurbidity = Math.max(...devicesToChart.map((d: any) => d.metrics?.avgTurbidity || 0), 5);
+      devicesToChart.forEach((device: any) => {
+        const turbValue = device.metrics?.avgTurbidity || 0;
+        const barWidth = (turbValue / maxTurbidity) * (chartWidth - 60);
+        const isCompliant = turbValue <= 5;
+        
+        // Device name
+        const deviceLabel = (device.deviceName || device.deviceId).substring(0, 15);
+        doc.setFontSize(FONTS.tiny.size);
+        doc.text(deviceLabel, SPACING.page.left + 2, yPos + 4);
+        
+        // Bar
+        const barColor = isCompliant ? COLORS.success : COLORS.warning;
+        doc.setFillColor(barColor.r, barColor.g, barColor.b);
+        doc.rect(SPACING.page.left + 45, yPos, Math.max(barWidth, 2), barHeight - 2, 'F');
+        
+        // Value label
+        doc.setFontSize(FONTS.tiny.size);
+        doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+        doc.text(`${turbValue.toFixed(1)}`, SPACING.page.left + 48 + barWidth, yPos + 4);
+        
+        yPos += barHeight;
+      });
+
+      yPos += 5;
+
+      // Draw pH chart
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = SPACING.page.top;
+      }
+
+      doc.setFontSize(FONTS.small.size);
+      doc.text('pH Level:', SPACING.page.left, yPos);
+      yPos += 5;
+
+      devicesToChart.forEach((device: any) => {
+        const phValue = device.metrics?.avgPH || 0;
+        const normalizedPH = ((phValue - 6.0) / 2.5) * (chartWidth - 60); // Scale 6.0-8.5 to chart width
+        const isCompliant = phValue >= 6.5 && phValue <= 8.5;
+        
+        // Device name
+        const deviceLabel = (device.deviceName || device.deviceId).substring(0, 15);
+        doc.setFontSize(FONTS.tiny.size);
+        doc.text(deviceLabel, SPACING.page.left + 2, yPos + 4);
+        
+        // Bar
+        const barColor = isCompliant ? COLORS.success : COLORS.danger;
+        doc.setFillColor(barColor.r, barColor.g, barColor.b);
+        doc.rect(SPACING.page.left + 45, yPos, Math.max(normalizedPH, 2), barHeight - 2, 'F');
+        
+        // Value label
+        doc.setFontSize(FONTS.tiny.size);
+        doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+        doc.text(`${phValue.toFixed(2)}`, SPACING.page.left + 48 + normalizedPH, yPos + 4);
+        
+        yPos += barHeight;
+      });
+
+      yPos += 5;
+
+      // Draw TDS chart
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = SPACING.page.top;
+      }
+
+      doc.setFontSize(FONTS.small.size);
+      doc.text('TDS (ppm):', SPACING.page.left, yPos);
+      yPos += 5;
+
+      const maxTDS = Math.max(...devicesToChart.map((d: any) => d.metrics?.avgTDS || 0), 500);
+      devicesToChart.forEach((device: any) => {
+        const tdsValue = device.metrics?.avgTDS || 0;
+        const barWidth = (tdsValue / maxTDS) * (chartWidth - 60);
+        const isCompliant = tdsValue <= 500;
+        
+        // Device name
+        const deviceLabel = (device.deviceName || device.deviceId).substring(0, 15);
+        doc.setFontSize(FONTS.tiny.size);
+        doc.text(deviceLabel, SPACING.page.left + 2, yPos + 4);
+        
+        // Bar
+        const barColor = isCompliant ? COLORS.success : COLORS.warning;
+        doc.setFillColor(barColor.r, barColor.g, barColor.b);
+        doc.rect(SPACING.page.left + 45, yPos, Math.max(barWidth, 2), barHeight - 2, 'F');
+        
+        // Value label
+        doc.setFontSize(FONTS.tiny.size);
+        doc.setTextColor(COLORS.text.r, COLORS.text.g, COLORS.text.b);
+        doc.text(`${tdsValue.toFixed(0)}`, SPACING.page.left + 48 + barWidth, yPos + 4);
+        
+        yPos += barHeight;
+      });
+
+      yPos += 10;
+
+      // Chart legend
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(FONTS.tiny.size);
+      doc.setTextColor(COLORS.gray.r, COLORS.gray.g, COLORS.gray.b);
+      doc.text('Note: Green bars indicate compliant values, orange/red bars indicate non-compliant values.', SPACING.page.left, yPos);
+      yPos += 10;
     }
   }
 

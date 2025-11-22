@@ -6,13 +6,12 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Typography, Space, Button, Tag, Divider, theme, Spin } from "antd";
+import { Card, Typography, Space, Button, Tag, theme, Spin } from "antd";
 import { 
   StopOutlined, 
   LogoutOutlined, 
   MailOutlined,
-  WarningOutlined,
-  InfoCircleOutlined 
+  WarningOutlined
 } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
@@ -95,7 +94,7 @@ export const AuthAccountSuspended = () => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
@@ -115,194 +114,184 @@ export const AuthAccountSuspended = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        padding: token.paddingLG,
+        padding: "24px",
       }}
     >
-      <div style={{ maxWidth: 1000, width: "100%" }}>
-        {/* Header Section */}
-        <div style={{ textAlign: "center", marginBottom: token.marginXL }}>
-          <StopOutlined 
-            style={{ 
-              fontSize: 72, 
-              color: token.colorError,
-              marginBottom: token.marginMD,
-            }} 
-          />
-          <Title level={2} style={{ margin: 0, marginBottom: token.marginXS, color: token.colorError }}>
-            Account Suspended
-          </Title>
-          <Text type="secondary" style={{ fontSize: token.fontSizeLG }}>
-            Access to your account has been temporarily restricted
-          </Text>
-        </div>
-
-        {/* Main Content - Two Column Layout */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: token.margin, marginBottom: token.marginLG }}>
-          
-          {/* Left Column - Account Info */}
-          <Card
-            title={
-              <Space>
-                <StopOutlined style={{ color: token.colorError }} />
-                <Text strong>Account Status</Text>
-              </Space>
-            }
-            bordered={false}
-            style={{ boxShadow: token.boxShadow }}
-          >
-            <Space direction="vertical" size="large" style={{ width: "100%" }}>
-              {/* Status Badge */}
-              <div style={{ 
-                background: token.colorErrorBg, 
-                padding: token.padding,
-                borderRadius: token.borderRadiusLG,
-                border: `2px solid ${token.colorErrorBorder}`,
-                textAlign: "center",
-              }}>
-                <Tag 
-                  icon={<StopOutlined />} 
-                  color="error"
-                  style={{ 
-                    fontSize: token.fontSizeLG,
-                    padding: `${token.paddingXS}px ${token.padding}px`,
-                    margin: 0,
-                  }}
-                >
-                  SUSPENDED
-                </Tag>
-              </div>
-
-              <Divider style={{ margin: `${token.marginXS}px 0` }} />
-
-              {/* User Information */}
-              <div>
-                <Text type="secondary" style={{ fontSize: token.fontSizeSM, display: "block", marginBottom: token.marginXS }}>
-                  Account Details
-                </Text>
-                <Space direction="vertical" size="small" style={{ width: "100%" }}>
-                  {user?.displayName && (
-                    <div>
-                      <Text strong style={{ fontSize: token.fontSize }}>Name:</Text>
-                      <br />
-                      <Text style={{ fontSize: token.fontSize }}>{user.displayName}</Text>
-                    </div>
-                  )}
-                  <div>
-                    <Text strong style={{ fontSize: token.fontSize }}>Email:</Text>
-                    <br />
-                    <Text style={{ fontSize: token.fontSize }}>{user?.email}</Text>
-                  </div>
-                </Space>
-              </div>
-            </Space>
-          </Card>
-
-          {/* Right Column - Why & What to Do */}
-          <Card
-            title={
-              <Space>
-                <InfoCircleOutlined style={{ color: token.colorPrimary }} />
-                <Text strong>Information</Text>
-              </Space>
-            }
-            bordered={false}
-            style={{ boxShadow: token.boxShadow }}
-          >
-            <Space direction="vertical" size="large" style={{ width: "100%" }}>
-              {/* Why Suspended */}
-              <div>
-                <Space style={{ marginBottom: token.marginSM }}>
-                  <WarningOutlined style={{ color: token.colorWarning, fontSize: token.fontSizeLG }} />
-                  <Text strong style={{ fontSize: token.fontSize }}>
-                    Common Suspension Reasons
-                  </Text>
-                </Space>
-                <Space direction="vertical" size="small" style={{ paddingLeft: token.paddingLG }}>
-                  <Text style={{ fontSize: token.fontSize }}>• Violation of system policies</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Security concerns detected</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Administrative review in progress</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Account verification required</Text>
-                </Space>
-              </div>
-
-              <Divider style={{ margin: `${token.marginXS}px 0` }} />
-
-              {/* What to Do */}
-              <div>
-                <Space style={{ marginBottom: token.marginSM }}>
-                  <InfoCircleOutlined style={{ color: token.colorInfo, fontSize: token.fontSizeLG }} />
-                  <Text strong style={{ fontSize: token.fontSize }}>
-                    Next Steps
-                  </Text>
-                </Space>
-                <Space direction="vertical" size="small" style={{ paddingLeft: token.paddingLG }}>
-                  <Text style={{ fontSize: token.fontSize }}>• Contact the system administrator</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Request an account review</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Provide any necessary clarifications</Text>
-                  <Text style={{ fontSize: token.fontSize }}>• Wait for admin response</Text>
-                </Space>
-              </div>
-            </Space>
-          </Card>
-        </div>
-
-        {/* Actions Section */}
-        <Card
-          bordered={false}
-          style={{ 
-            boxShadow: token.boxShadow,
-            background: token.colorBgContainer,
-          }}
+      <Card
+        bordered={false}
+        style={{
+          maxWidth: 600,
+          width: "100%",
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          backgroundColor: "rgba(255, 255, 255, 0.98)",
+          backdropFilter: "blur(10px)",
+        }}
+      >
+        <Space 
+          direction="vertical" 
+          size={28} 
+          style={{ width: "100%", padding: "16px 0" }}
         >
+          {/* Header */}
+          <div style={{ textAlign: "center" }}>
+            <img 
+              src="/system_logo.svg" 
+              alt="SMU PureTrack Logo" 
+              style={{ 
+                width: 90, 
+                height: 90, 
+                marginBottom: 20,
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+                filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08))",
+              }} 
+            />
+            <StopOutlined 
+              style={{ 
+                fontSize: 52, 
+                color: token.colorError,
+                marginBottom: 16,
+                display: "block",
+              }} 
+            />
+            <Title 
+              level={3} 
+              style={{ 
+                margin: 0, 
+                marginBottom: 8, 
+                color: token.colorError,
+                fontSize: 24,
+                fontWeight: 600,
+              }}
+            >
+              Account Suspended
+            </Title>
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: 14,
+                display: "block",
+              }}
+            >
+              Access to your account has been temporarily restricted
+            </Text>
+          </div>
+
+          {/* Status Badge */}
           <div style={{ 
-            display: "flex", 
-            alignItems: "center", 
-            justifyContent: "space-between",
-            gap: token.margin,
-            flexWrap: "wrap",
+            background: token.colorErrorBg, 
+            padding: "20px",
+            borderRadius: 8,
+            border: `2px solid ${token.colorErrorBorder}`,
+            textAlign: "center",
           }}>
-            <div style={{ flex: 1, minWidth: 300 }}>
-              <Text strong style={{ fontSize: token.fontSizeLG, display: "block", marginBottom: token.marginXS }}>
-                Need Help?
-              </Text>
-              <Text type="secondary" style={{ fontSize: token.fontSize }}>
-                If you believe this is an error or need assistance, please contact our support team immediately.
-              </Text>
-            </div>
-            <Space size="middle">
-              <Button
-                type="primary"
-                size="large"
-                icon={<MailOutlined />}
-                onClick={handleContactAdmin}
-                style={{ minWidth: 180 }}
-              >
-                Contact Administrator
-              </Button>
-              <Button
-                size="large"
-                icon={<LogoutOutlined />}
-                onClick={handleSignOut}
-                danger
-                style={{ minWidth: 120 }}
-              >
-                Sign Out
-              </Button>
+            <Tag 
+              icon={<StopOutlined />} 
+              color="error"
+              style={{ 
+                fontSize: 15,
+                padding: "6px 16px",
+                margin: 0,
+              }}
+            >
+              SUSPENDED
+            </Tag>
+          </div>
+
+          {/* User Information */}
+          <div style={{ 
+            background: token.colorBgLayout, 
+            padding: "20px",
+            borderRadius: 8,
+          }}>
+            <Text type="secondary" style={{ fontSize: 13, display: "block", marginBottom: 12, fontWeight: 500 }}>
+              Account Details
+            </Text>
+            <Space direction="vertical" size={12} style={{ width: "100%" }}>
+              {user?.displayName && (
+                <div>
+                  <Text strong style={{ fontSize: 14 }}>Name:</Text>
+                  <br />
+                  <Text style={{ fontSize: 14 }}>{user.displayName}</Text>
+                </div>
+              )}
+              <div>
+                <Text strong style={{ fontSize: 14 }}>Email:</Text>
+                <br />
+                <Text style={{ fontSize: 14 }}>{user?.email}</Text>
+              </div>
             </Space>
           </div>
-        </Card>
 
-        {/* Footer Help Text */}
-        <div style={{ textAlign: "center", marginTop: token.marginLG }}>
-          <Text type="secondary" style={{ fontSize: token.fontSize }}>
+          {/* Common Reasons */}
+          <div style={{ 
+            background: token.colorWarningBg, 
+            padding: "20px",
+            borderRadius: 8,
+            border: `1px solid ${token.colorWarningBorder}`,
+          }}>
+            <Space style={{ marginBottom: 12 }}>
+              <WarningOutlined style={{ color: token.colorWarning, fontSize: 16 }} />
+              <Text strong style={{ fontSize: 15 }}>
+                Common Suspension Reasons
+              </Text>
+            </Space>
+            <Space direction="vertical" size={8} style={{ paddingLeft: 24 }}>
+              <Text style={{ fontSize: 14 }}>• Violation of system policies</Text>
+              <Text style={{ fontSize: 14 }}>• Security concerns detected</Text>
+              <Text style={{ fontSize: 14 }}>• Administrative review in progress</Text>
+              <Text style={{ fontSize: 14 }}>• Account verification required</Text>
+            </Space>
+          </div>
+
+          {/* Actions */}
+          <Space style={{ width: "100%", justifyContent: "center" }} size="middle">
+            <Button
+              type="primary"
+              size="large"
+              icon={<MailOutlined />}
+              onClick={handleContactAdmin}
+              style={{
+                minWidth: 180,
+                borderRadius: 8,
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+              }}
+            >
+              Contact Administrator
+            </Button>
+            <Button
+              size="large"
+              icon={<LogoutOutlined />}
+              onClick={handleSignOut}
+              danger
+              style={{
+                minWidth: 120,
+                borderRadius: 8,
+              }}
+            >
+              Sign Out
+            </Button>
+          </Space>
+
+          {/* Footer */}
+          <Text 
+            type="secondary" 
+            style={{ 
+              fontSize: 12,
+              textAlign: "center",
+              display: "block",
+            }}
+          >
             Response time: Usually within 24-48 hours
           </Text>
-        </div>
-      </div>
+        </Space>
+      </Card>
     </div>
   );
 }

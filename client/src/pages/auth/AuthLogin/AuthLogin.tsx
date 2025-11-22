@@ -6,8 +6,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Alert, Typography, Space, theme, Divider } from "antd";
-import { GoogleOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { Button, Card, Alert, Typography, Space, theme } from "antd";
+import { GoogleOutlined } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
 import { auth } from "../../../config/firebase.config";
@@ -149,18 +149,22 @@ export default function AuthLogin() {
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
-          backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
         }}
       >
         <Card
+          bordered={false}
           style={{
-            maxWidth: 480,
+            maxWidth: 420,
             width: "100%",
-            margin: "0 16px",
+            margin: "0 24px",
             textAlign: "center",
+            borderRadius: 16,
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+            backgroundColor: "rgba(255, 255, 255, 0.98)",
           }}
         >
           <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -180,76 +184,114 @@ export default function AuthLogin() {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        padding: "24px 16px",
+        padding: "24px",
       }}
     >
       <Card
+        bordered={false}
         style={{
-          maxWidth: 480,
+          maxWidth: 420,
           width: "100%",
-          boxShadow: token.boxShadowTertiary,
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          overflow: "hidden",
+          backgroundColor: "rgba(255, 255, 255, 0.98)",
+          backdropFilter: "blur(10px)",
         }}
       >
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+        <Space 
+          direction="vertical" 
+          size={32} 
+          style={{ width: "100%", padding: "24px 0" }}
+        >
           {/* Header */}
           <div style={{ textAlign: "center" }}>
-            <Title level={2} style={{ marginBottom: 8 }}>
-              Water Quality Monitoring
+            <img 
+              src="/system_logo.svg" 
+              alt="SMU PureTrack Logo" 
+              style={{ 
+                width: 100, 
+                height: 100, 
+                marginBottom: 24,
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+                filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08))",
+              }} 
+            />
+            <Title 
+              level={2} 
+              style={{ 
+                marginBottom: 8,
+                fontSize: 28,
+                fontWeight: 600,
+                letterSpacing: "-0.5px",
+              }}
+            >
+              SMU PureTrack
             </Title>
-            <Text type="secondary">
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: 15,
+                display: "block",
+                marginTop: 8,
+              }}
+            >
               Sign in to access your dashboard
             </Text>
           </div>
 
-          <Divider style={{ margin: "8px 0" }} />
-
           {/* Error Alert */}
           {error && (
             <Alert
-              message="Authentication Error"
-              description={error}
+              message={error}
               type="error"
               showIcon
               closable
               onClose={() => setError(null)}
+              style={{
+                borderRadius: 8,
+              }}
             />
           )}
-
-          {/* Info Alert */}
-          <Alert
-            message="Google Account Required"
-            description="You need a Google account to sign in. New users will need admin approval before accessing the system."
-            type="info"
-            icon={<InfoCircleOutlined />}
-            showIcon
-          />
 
           {/* Google Sign-In Button */}
           <Button
             type="primary"
             size="large"
-            icon={<GoogleOutlined />}
+            icon={<GoogleOutlined style={{ fontSize: 18 }} />}
             onClick={handleGoogleLogin}
             loading={isLoggingIn}
             disabled={isLoggingIn}
             block
             style={{
-              height: 48,
+              height: 52,
               fontSize: 16,
               fontWeight: 500,
+              borderRadius: 8,
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+              border: "none",
             }}
           >
             {isLoggingIn ? 'Signing in...' : 'Sign in with Google'}
           </Button>
 
           {/* Footer */}
-          <div style={{ textAlign: "center", marginTop: 16 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              By signing in, you agree to our Terms of Service and Privacy Policy
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: 12,
+                display: "block",
+                lineHeight: 1.6,
+              }}
+            >
+              Secure authentication powered by Google
             </Text>
           </div>
         </Space>

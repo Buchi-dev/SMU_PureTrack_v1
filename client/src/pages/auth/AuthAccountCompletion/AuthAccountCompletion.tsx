@@ -8,11 +8,10 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Typography, Space, Button, Form, Input, Select, Alert, theme, Divider, message } from "antd";
+import { Card, Typography, Space, Button, Form, Input, Select, Alert, message } from "antd";
 import { 
   UserOutlined, 
   PhoneOutlined, 
-  BankOutlined,
   CheckCircleOutlined 
 } from "@ant-design/icons";
 import { useAuth } from "../../../hooks";
@@ -24,7 +23,6 @@ export const AuthAccountCompletion = () => {
   const { user, loading: authLoading, isAuthenticated, refetchUser } = useAuth();
   const { completeUserProfile, isLoading, error: mutationError } = useUserMutations();
   const navigate = useNavigate();
-  const { token } = theme.useToken();
   const [form] = Form.useForm();
 
   // Display mutation errors
@@ -131,48 +129,73 @@ export const AuthAccountCompletion = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        padding: token.paddingLG,
+        padding: "24px",
       }}
     >
       <Card
+        bordered={false}
         style={{
-          maxWidth: 500,
+          maxWidth: 680,
           width: "100%",
-          boxShadow: token.boxShadowTertiary,
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          backgroundColor: "rgba(255, 255, 255, 0.98)",
+          backdropFilter: "blur(10px)",
         }}
       >
-        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+        <Space 
+          direction="vertical" 
+          size={24} 
+          style={{ width: "100%", padding: "8px 0" }}
+        >
           {/* Header */}
           <div style={{ textAlign: "center" }}>
-            <div
-              style={{
-                fontSize: 48,
-                color: token.colorPrimary,
+            <img 
+              src="/system_logo.svg" 
+              alt="SMU PureTrack Logo" 
+              style={{ 
+                width: 80, 
+                height: 80, 
                 marginBottom: 16,
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+                filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08))",
+              }} 
+            />
+            <Title 
+              level={3} 
+              style={{ 
+                marginBottom: 8,
+                fontSize: 24,
+                fontWeight: 600,
               }}
             >
-              <UserOutlined />
-            </div>
-            <Title level={3} style={{ marginBottom: 8 }}>
               Complete Your Profile
             </Title>
-            <Text type="secondary">
-              Welcome! Please provide your department and phone number to continue.
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: 14,
+                display: "block",
+              }}
+            >
+              Welcome! Please provide your information to continue.
             </Text>
           </div>
 
-          <Divider style={{ margin: "8px 0" }} />
-
           {/* Info Alert */}
           <Alert
-            message="Account Setup"
-            description="After submitting your information, your account will be sent for admin approval. You'll be notified once approved."
+            message="After submitting, your account will be sent for admin approval."
             type="info"
             showIcon
+            style={{
+              borderRadius: 8,
+            }}
           />
 
           {/* Form */}
@@ -181,99 +204,117 @@ export const AuthAccountCompletion = () => {
             layout="vertical"
             onFinish={handleSubmit}
             requiredMark="optional"
+            size="large"
           >
-            <Form.Item
-              name="firstName"
-              label="First Name"
-              rules={[
-                { required: true, message: "Please enter your first name" },
-              ]}
-            >
-              <Input
-                size="large"
-                prefix={<UserOutlined />}
-                placeholder="John"
-              />
-            </Form.Item>
+            {/* Name Fields - Two Column Layout */}
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "1fr 1fr", 
+              gap: "16px",
+              marginBottom: "16px"
+            }}>
+              <Form.Item
+                name="firstName"
+                label="First Name"
+                rules={[
+                  { required: true, message: "Please enter your first name" },
+                ]}
+                style={{ marginBottom: 0 }}
+              >
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="John"
+                  style={{ borderRadius: 8 }}
+                />
+              </Form.Item>
 
-            <Form.Item
-              name="lastName"
-              label="Last Name"
-              rules={[
-                { required: true, message: "Please enter your last name" },
-              ]}
-            >
-              <Input
-                size="large"
-                prefix={<UserOutlined />}
-                placeholder="Doe"
-              />
-            </Form.Item>
+              <Form.Item
+                name="lastName"
+                label="Last Name"
+                rules={[
+                  { required: true, message: "Please enter your last name" },
+                ]}
+                style={{ marginBottom: 0 }}
+              >
+                <Input
+                  prefix={<UserOutlined />}
+                  placeholder="Doe"
+                  style={{ borderRadius: 8 }}
+                />
+              </Form.Item>
+            </div>
 
             <Form.Item
               name="middleName"
               label="Middle Name (Optional)"
             >
               <Input
-                size="large"
                 prefix={<UserOutlined />}
                 placeholder="Middle name"
+                style={{ borderRadius: 8 }}
               />
             </Form.Item>
 
-            <Form.Item
-              name="department"
-              label="Department"
-              rules={[
-                { required: true, message: "Please select your department" },
-              ]}
-            >
-              <Select
-                size="large"
-                placeholder="Select your department"
-                prefix={<BankOutlined />}
-                options={[
-                  { value: "Engineering", label: "Engineering" },
-                  { value: "Operations", label: "Operations" },
-                  { value: "Maintenance", label: "Maintenance" },
-                  { value: "Quality Control", label: "Quality Control" },
-                  { value: "Research", label: "Research" },
-                  { value: "Administration", label: "Administration" },
-                  { value: "IT", label: "IT" },
-                  { value: "Other", label: "Other" },
+            {/* Department and Phone - Two Column Layout */}
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "1fr 1fr", 
+              gap: "16px"
+            }}>
+              <Form.Item
+                name="department"
+                label="Department"
+                rules={[
+                  { required: true, message: "Please select your department" },
                 ]}
-              />
-            </Form.Item>
+                style={{ marginBottom: 0 }}
+              >
+                <Select
+                  placeholder="Select your department"
+                  style={{ borderRadius: 8 }}
+                  options={[
+                    { value: "Engineering", label: "Engineering" },
+                    { value: "Operations", label: "Operations" },
+                    { value: "Maintenance", label: "Maintenance" },
+                    { value: "Quality Control", label: "Quality Control" },
+                    { value: "Research", label: "Research" },
+                    { value: "Administration", label: "Administration" },
+                    { value: "IT", label: "IT" },
+                    { value: "Other", label: "Other" },
+                  ]}
+                />
+              </Form.Item>
 
-            <Form.Item
-              name="phoneNumber"
-              label="Phone Number"
-              rules={[
-                { required: true, message: "Please enter your phone number" },
-                {
-                  pattern: /^09\d{9}$/,
-                  message: "Please enter a valid 11-digit Philippine phone number (e.g., 09123456789)",
-                },
-              ]}
-            >
-              <Input
-                size="large"
-                prefix={<PhoneOutlined />}
-                placeholder="09123456789"
-                maxLength={11}
-                onKeyPress={(e) => {
-                  // Only allow numbers
-                  if (!/[0-9]/.test(e.key)) {
-                    e.preventDefault();
-                  }
-                }}
-              />
-            </Form.Item>
+              <Form.Item
+                name="phoneNumber"
+                label="Phone Number"
+                rules={[
+                  { required: true, message: "Please enter your phone number" },
+                  {
+                    pattern: /^09\d{9}$/,
+                    message: "Please enter a valid 11-digit Philippine phone number (e.g., 09123456789)",
+                  },
+                ]}
+                style={{ marginBottom: 0 }}
+              >
+                <Input
+                  prefix={<PhoneOutlined />}
+                  placeholder="09123456789"
+                  maxLength={11}
+                  style={{ borderRadius: 8 }}
+                  onKeyPress={(e) => {
+                    // Only allow numbers
+                    if (!/[0-9]/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
+              </Form.Item>
+            </div>
 
-            <Form.Item style={{ marginBottom: 0 }}>
+            <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
               <Button
                 type="primary"
-                size="large"
                 htmlType="submit"
                 loading={isLoading}
                 icon={<CheckCircleOutlined />}
@@ -282,6 +323,8 @@ export const AuthAccountCompletion = () => {
                   height: 48,
                   fontSize: 16,
                   fontWeight: 500,
+                  borderRadius: 8,
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                 }}
               >
                 Complete Profile
@@ -292,7 +335,13 @@ export const AuthAccountCompletion = () => {
           {/* User Info */}
           {user && (
             <div style={{ textAlign: "center", marginTop: 8 }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
+              <Text 
+                type="secondary" 
+                style={{ 
+                  fontSize: 12,
+                  display: "block",
+                }}
+              >
                 Logged in as: {user.email}
               </Text>
             </div>

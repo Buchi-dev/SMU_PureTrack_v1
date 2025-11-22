@@ -7,7 +7,7 @@
 
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Typography, Space, Button, Tag, Divider, theme } from "antd";
+import { Card, Typography, Space, Button, Tag, theme } from "antd";
 import { 
   ClockCircleOutlined, 
   ReloadOutlined, 
@@ -90,115 +90,178 @@ export const AuthPendingApproval = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)), url('/smu-building.jpg')`,
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/smu-building.jpg')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
-        padding: token.paddingLG,
+        padding: "24px",
       }}
     >
       <Card
-        style={{
-          maxWidth: 600,
-          width: "100%",
-          boxShadow: token.boxShadow,
-        }}
         bordered={false}
+        style={{
+          maxWidth: 580,
+          width: "100%",
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          backgroundColor: "rgba(255, 255, 255, 0.98)",
+          backdropFilter: "blur(10px)",
+        }}
       >
-        {/* Header with Icon */}
-        <Space direction="vertical" size="middle" style={{ width: "100%", textAlign: "center" }}>
-          <div>
-            <ClockCircleOutlined 
+        <Space 
+          direction="vertical" 
+          size={28} 
+          style={{ width: "100%", padding: "16px 0" }}
+        >
+          {/* Header with Icon */}
+          <div style={{ textAlign: "center" }}>
+            <img 
+              src="/system_logo.svg" 
+              alt="SMU PureTrack Logo" 
               style={{ 
-                fontSize: 56, 
-                color: token.colorWarning,
-                marginBottom: token.marginMD,
+                width: 90, 
+                height: 90, 
+                marginBottom: 20,
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+                filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.08))",
               }} 
             />
-            <Title level={3} style={{ margin: 0, marginBottom: token.marginXS }}>
+            <ClockCircleOutlined 
+              style={{ 
+                fontSize: 48, 
+                color: token.colorWarning,
+                marginBottom: 16,
+                display: "block",
+              }} 
+            />
+            <Title 
+              level={3} 
+              style={{ 
+                margin: 0, 
+                marginBottom: 8,
+                fontSize: 24,
+                fontWeight: 600,
+              }}
+            >
               Account Pending Approval
             </Title>
-            <Text type="secondary">
+            <Text 
+              type="secondary"
+              style={{ 
+                fontSize: 14,
+                display: "block",
+              }}
+            >
               Your account is under review
             </Text>
           </div>
 
-          <Divider style={{ margin: `${token.marginXS}px 0` }} />
-
-          {/* User Info */}
-          <Space direction="vertical" size="small" style={{ width: "100%" }}>
-            <div style={{ 
-              background: token.colorInfoBg, 
-              padding: token.paddingSM,
-              borderRadius: token.borderRadius,
-              border: `1px solid ${token.colorInfoBorder}`,
-            }}>
-              <Space direction="vertical" size={4} style={{ width: "100%" }}>
-                <Text strong style={{ fontSize: 13 }}>
-                  {user?.displayName || "User"}
-                </Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {user?.email}
-                </Text>
-              </Space>
+          {/* User Info & Status - Desktop Layout */}
+          <div style={{ 
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: "16px",
+            background: token.colorInfoBg, 
+            padding: "20px",
+            borderRadius: 8,
+            border: `1px solid ${token.colorInfoBorder}`,
+            alignItems: "center",
+          }}>
+            <div style={{ textAlign: "left" }}>
+              <Text strong style={{ fontSize: 16, display: "block", marginBottom: 4 }}>
+                {user?.displayName || "User"}
+              </Text>
+              <Text type="secondary" style={{ fontSize: 14 }}>
+                {user?.email}
+              </Text>
             </div>
             <Tag 
               icon={<ClockCircleOutlined />} 
               color="warning"
               style={{ 
-                margin: "0 auto",
-                fontSize: 13,
-                padding: `${token.paddingXXS}px ${token.paddingSM}px`,
+                fontSize: 14,
+                padding: "6px 16px",
+                margin: 0,
               }}
             >
               Status: Pending
             </Tag>
-          </Space>
-
-          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+          </div>
 
           {/* What's Next */}
-          <Space direction="vertical" size="small" style={{ width: "100%", textAlign: "left" }}>
-            <Title level={5} style={{ margin: 0 }}>
+          <div style={{ 
+            background: token.colorBgLayout, 
+            padding: "24px",
+            borderRadius: 8,
+          }}>
+            <Title level={5} style={{ margin: 0, marginBottom: 16, fontSize: 17, fontWeight: 600 }}>
               What happens next?
             </Title>
-            <Space direction="vertical" size={2}>
+            <div style={{ 
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "16px",
+            }}>
               <Space align="start" size="small">
-                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
-                <Text style={{ fontSize: 13 }}>Administrator will review your registration</Text>
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 4, fontSize: 18 }} />
+                <Text style={{ fontSize: 14, lineHeight: 1.6 }}>Administrator will review your registration</Text>
               </Space>
               <Space align="start" size="small">
-                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
-                <Text style={{ fontSize: 13 }}>You'll receive access once approved</Text>
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 4, fontSize: 18 }} />
+                <Text style={{ fontSize: 14, lineHeight: 1.6 }}>You'll receive access once approved</Text>
               </Space>
               <Space align="start" size="small">
-                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 2 }} />
-                <Text style={{ fontSize: 13 }}>This page auto-updates when status changes</Text>
+                <CheckCircleOutlined style={{ color: token.colorPrimary, marginTop: 4, fontSize: 18 }} />
+                <Text style={{ fontSize: 14, lineHeight: 1.6 }}>This page auto-updates when status changes</Text>
               </Space>
-            </Space>
-          </Space>
-
-          <Divider style={{ margin: `${token.marginXS}px 0` }} />
+            </div>
+          </div>
 
           {/* Actions */}
-          <Space style={{ width: "100%", justifyContent: "center" }} size="middle">
+          <div style={{ 
+            display: "flex",
+            gap: "12px",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}>
             <Button
               icon={<ReloadOutlined />}
               onClick={handleCheckAgain}
+              size="large"
+              style={{
+                borderRadius: 8,
+                minWidth: 140,
+                height: 48,
+              }}
             >
-              Refresh
+              Refresh Status
             </Button>
             <Button
               icon={<LogoutOutlined />}
               onClick={handleSignOut}
               danger
+              size="large"
+              style={{
+                borderRadius: 8,
+                minWidth: 140,
+                height: 48,
+              }}
             >
               Sign Out
             </Button>
-          </Space>
+          </div>
 
           {/* Help Text */}
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text 
+            type="secondary" 
+            style={{ 
+              fontSize: 12,
+              textAlign: "center",
+              display: "block",
+            }}
+          >
             <MailOutlined /> Need help? Contact your administrator
           </Text>
         </Space>
