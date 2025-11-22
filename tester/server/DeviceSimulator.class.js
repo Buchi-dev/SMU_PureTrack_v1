@@ -33,7 +33,7 @@ export class DeviceSimulator {
         drift: 0.5,
         noise: 15
       },
-      ph: {
+      pH: {
         baseline: 7.2,
         variance: 0.4,
         min: 6.0,

@@ -33,6 +33,31 @@ const validateSensorData = [
   body('timestamp')
     .optional()
     .isISO8601().withMessage('Invalid timestamp format'),
+  // Optional device metadata for auto-registration
+  body('name')
+    .optional()
+    .isString().withMessage('Device name must be a string')
+    .trim()
+    .isLength({ max: 100 }).withMessage('Device name must be less than 100 characters'),
+  body('type')
+    .optional()
+    .isString().withMessage('Device type must be a string')
+    .trim(),
+  body('firmwareVersion')
+    .optional()
+    .isString().withMessage('Firmware version must be a string')
+    .trim(),
+  body('macAddress')
+    .optional()
+    .isString().withMessage('MAC address must be a string')
+    .trim(),
+  body('ipAddress')
+    .optional()
+    .isString().withMessage('IP address must be a string')
+    .trim(),
+  body('sensors')
+    .optional()
+    .isArray().withMessage('Sensors must be an array'),
   handleValidationErrors,
 ];
 

@@ -83,6 +83,15 @@ export class DeviceSimulator {
     });
     readings.timestamp = new Date().toISOString();
     readings.deviceId = this.deviceId;
+    
+    // Include device metadata for auto-registration
+    readings.name = this.name;
+    readings.type = this.type;
+    readings.firmwareVersion = this.firmwareVersion;
+    readings.macAddress = this.macAddress;
+    readings.ipAddress = this.ipAddress;
+    readings.sensors = this.sensors;
+    
     return readings;
   }
 

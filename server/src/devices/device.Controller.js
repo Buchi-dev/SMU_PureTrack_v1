@@ -182,7 +182,20 @@ const deleteDevice = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const processSensorData = asyncHandler(async (req, res) => {
-  const { deviceId, pH, turbidity, tds, timestamp } = req.body;
+  const { 
+    deviceId, 
+    pH, 
+    turbidity, 
+    tds, 
+    timestamp,
+    // Optional device metadata for auto-registration
+    name,
+    type,
+    firmwareVersion,
+    macAddress,
+    ipAddress,
+    sensors
+  } = req.body;
 
   // Check if device exists, create if not (auto-registration)
   let device = await Device.findOne({ deviceId });
@@ -191,6 +204,12 @@ const processSensorData = asyncHandler(async (req, res) => {
     logger.info('[Device Controller] Auto-registering new device', { deviceId });
     device = new Device({
       deviceId,
+      name: name || `Device-${deviceId}`,
+      type: type || 'water-quality-sensor',
+      firmwareVersion: firmwareVersion || 'unknown',
+      macAddress: macAddress || '',
+      ipAddress: ipAddress || '',
+      sensors: sensors || ['pH', 'turbidity', 'tds'],
       status: 'online',
       registrationStatus: 'pending',
       lastSeen: new Date(),
@@ -200,6 +219,17 @@ const processSensorData = asyncHandler(async (req, res) => {
     // Update device status and last seen
     device.status = 'online';
     device.lastSeen = new Date();
+    
+    // Update metadata if provided
+    if (name && !device.name) device.name = name;
+    if (type && !device.type) device.type = type;
+    if (firmwareVersion) device.firmwareVersion = firmwareVersion;
+    if (macAddress && !device.macAddress) device.macAddress = macAddress;
+    if (ipAddress) device.ipAddress = ipAddress;
+    if (sensors && sensors.length > 0 && device.sensors.length === 0) {
+      device.sensors = sensors;
+    }
+    
     await device.save();
   }
 

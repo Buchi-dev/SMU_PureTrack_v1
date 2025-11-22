@@ -11,6 +11,30 @@ const deviceSchema = new mongoose.Schema(
       unique: true,
       index: true,
     },
+    name: {
+      type: String,
+      default: '',
+    },
+    type: {
+      type: String,
+      default: 'water-quality-sensor',
+    },
+    firmwareVersion: {
+      type: String,
+      default: '',
+    },
+    macAddress: {
+      type: String,
+      default: '',
+    },
+    ipAddress: {
+      type: String,
+      default: '',
+    },
+    sensors: {
+      type: [String],
+      default: [],
+    },
     location: {
       type: String,
       default: '',
@@ -55,6 +79,12 @@ deviceSchema.methods.toPublicProfile = function () {
   return {
     id: this._id,
     deviceId: this.deviceId,
+    name: this.name,
+    type: this.type,
+    firmwareVersion: this.firmwareVersion,
+    macAddress: this.macAddress,
+    ipAddress: this.ipAddress,
+    sensors: this.sensors,
     location: this.location,
     status: this.status,
     registrationStatus: this.registrationStatus,
