@@ -285,34 +285,6 @@ export async function subscribe(room: SocketRoom): Promise<void> {
 }
 
 /**
- * Unsubscribe from a Socket.IO room
- * 
- * @param {SocketRoom} room - Room name to unsubscribe from
- */
-export function unsubscribe(room: SocketRoom): void {
-  if (!socket?.connected) {
-    if (import.meta.env.DEV) {
-      console.warn('[Socket.IO] Cannot unsubscribe: not connected');
-    }
-    return;
-  }
-
-  // Check if actually subscribed
-  if (!activeSubscriptions.has(room)) {
-    if (import.meta.env.DEV) {
-      console.log(`[Socket.IO] Not subscribed to room: ${room}, skipping unsubscribe`);
-    }
-    return;
-  }
-
-  if (import.meta.env.DEV) {
-    console.log(`[Socket.IO] Unsubscribing from room: ${room}`);
-  }
-  socket.emit(`unsubscribe:${room.split(':')[0]}`, room.includes(':') ? room.split(':')[1] : undefined);
-  activeSubscriptions.delete(room);
-}
-
-/**
  * Listen to a Socket.IO event
  * 
  * @param {SocketEvent} event - Event name
@@ -393,38 +365,4 @@ export async function reconnect(): Promise<void> {
     }
     await initializeSocket();
   }
-}
-
-/**
- * Get connection statistics
- * 
- * @returns {Object} Connection statistics
- */
-export function getConnectionStats(): {
-  connected: boolean;
-  id: string | undefined;
-  transport: string | undefined;
-} {
-  return {
-    connected: socket?.connected || false,
-    id: socket?.id,
-    transport: socket?.io.engine.transport.name,
-  };
-}
-
-/**
- * Send ping to server (for connection testing)
- */
-export function ping(): void {
-  if (!socket?.connected) {
-    if (import.meta.env.DEV) {
-      console.warn('[Socket.IO] Cannot ping: not connected');
-    }
-    return;
-  }
-
-  if (import.meta.env.DEV) {
-    console.log('[Socket.IO] 🏓 Sending ping...');
-  }
-  socket.emit('ping');
 }

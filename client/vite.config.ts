@@ -70,5 +70,60 @@ export default defineConfig({
     host: true, // Listen on all addresses including LAN
     port: 5173,
   },
+  build: {
+    // Enable source maps for production debugging
+    sourcemap: false,
+    // Optimize chunk size
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        // Manual chunk splitting for better caching
+        manualChunks: {
+          // Vendor chunks - separate large libraries
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/analytics'],
+          'ui-vendor': ['antd', '@ant-design/icons'],
+          'chart-vendor': ['recharts'],
+          'socket-vendor': ['socket.io-client'],
+          'swr-vendor': ['swr'],
+        },
+        // Optimize asset naming
+        chunkFileNames: 'js/[name]-[hash].js',
+        entryFileNames: 'js/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name?.split('.') || [];
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return `images/[name]-[hash][extname]`;
+          } else if (/woff2?|eot|ttf|otf/i.test(ext)) {
+            return `fonts/[name]-[hash][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
+        },
+      },
+    },
+    // Minification options
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'], // Remove specific console methods
+      },
+    },
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'antd',
+      'swr',
+      'socket.io-client',
+      'recharts',
+    ],
+  },
 })
+
 

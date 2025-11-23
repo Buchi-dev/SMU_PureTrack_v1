@@ -20,7 +20,7 @@ import {
   type ParameterAnalytics,
   type TrendsQueryParams,
   type ParameterQueryParams,
-} from '../services/analytics.service';
+} from '../services/analytics.Service';
 import { useVisibilityPolling } from './useVisibilityPolling';
 
 // ============================================================================

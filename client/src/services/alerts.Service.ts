@@ -28,10 +28,6 @@ import type {
 // TYPE DEFINITIONS
 // ============================================================================
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
 export interface AlertFilters {
   status?: 'Unacknowledged' | 'Acknowledged' | 'Resolved';
   severity?: 'Critical' | 'Warning' | 'Advisory';
