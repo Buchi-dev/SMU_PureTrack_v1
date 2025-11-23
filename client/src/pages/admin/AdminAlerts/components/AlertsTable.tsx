@@ -239,7 +239,7 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
                 type="link"
                 size="small"
                 icon={<CheckCircleOutlined />}
-                onClick={() => onAcknowledge(record.alertId)}
+                onClick={() => onAcknowledge(record.id!)}
                 loading={isAcknowledging}
                 disabled={isAcknowledging}
               >
@@ -285,7 +285,7 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
       <Table
         columns={columns}
         dataSource={alerts}
-        rowKey="alertId"
+        rowKey="id"
         loading={loading}
         rowSelection={onBatchAcknowledge ? rowSelection : undefined}
         scroll={{ x: 1200, y: 600 }}

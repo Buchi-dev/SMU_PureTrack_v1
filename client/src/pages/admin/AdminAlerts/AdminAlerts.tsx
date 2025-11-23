@@ -90,7 +90,30 @@ export const AdminAlerts = () => {
     setDetailsVisible(true);
   };
 
-  // ✅ Use global write hook for batch operations
+  // ✅ Acknowledge alert handler with optimistic update (no manual refresh needed)
+  const handleAcknowledge = async (alertId: string) => {
+    try {
+      await acknowledgeAlert(alertId);
+      message.success('Alert acknowledged successfully');
+      // No need to refetch - optimistic update handles it
+    } catch (error) {
+      // Error already shown by useEffect
+    }
+  };
+
+  // ✅ Resolve alert handler with optimistic update (no manual refresh needed)
+  const handleResolve = async (alertId: string, notes?: string) => {
+    try {
+      await resolveAlert(alertId, notes);
+      message.success('Alert resolved successfully');
+      setDetailsVisible(false); // Close drawer after successful resolution
+      // No need to refetch - optimistic update handles it
+    } catch (error) {
+      // Error already shown by useEffect
+    }
+  };
+
+  // ✅ Use global write hook for batch operations with optimistic updates
   const handleBatchAcknowledge = async (alertIds: string[]) => {
     try {
       const results = await Promise.allSettled(
@@ -111,8 +134,7 @@ export const AdminAlerts = () => {
         );
       }
       
-      // Refresh data
-      await refetch();
+      // No need to refetch - optimistic updates handle it
     } catch {
       message.error('Failed to acknowledge alerts');
     }
@@ -157,7 +179,7 @@ export const AdminAlerts = () => {
             alerts={filteredAlerts}
             loading={loading}
             onViewDetails={viewAlertDetails}
-            onAcknowledge={acknowledgeAlert}
+            onAcknowledge={handleAcknowledge}
             onBatchAcknowledge={handleBatchAcknowledge}
             isAcknowledging={isOperating}
           />
@@ -168,8 +190,8 @@ export const AdminAlerts = () => {
           visible={detailsVisible}
           alert={selectedAlert}
           onClose={() => setDetailsVisible(false)}
-          onAcknowledge={acknowledgeAlert}
-          onResolve={resolveAlert}
+          onAcknowledge={handleAcknowledge}
+          onResolve={handleResolve}
           isAcknowledging={isOperating}
           isResolving={isOperating}
         />

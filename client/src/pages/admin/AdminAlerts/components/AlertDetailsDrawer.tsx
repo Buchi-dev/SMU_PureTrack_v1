@@ -85,9 +85,9 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
   const handleResolve = async (values: { notes?: string }) => {
     if (alert) {
       try {
-        await onResolve(alert.alertId, values.notes);
+        await onResolve(alert.id!, values.notes);
         form.resetFields();
-        onClose();
+        // Parent component will close the drawer
       } catch (error) {
         // Error handling is done in the parent component
         console.error('Error resolving alert:', error);
@@ -98,8 +98,8 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
   const handleQuickResolve = async () => {
     if (alert) {
       try {
-        await onResolve(alert.alertId, 'Quick resolved by admin');
-        onClose();
+        await onResolve(alert.id!, 'Quick resolved by admin');
+        // Parent component will close the drawer
       } catch (error) {
         // Error handling is done in the parent component
         console.error('Error resolving alert:', error);
@@ -136,7 +136,7 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
             <Button
               type="primary"
               icon={<CheckCircleOutlined />}
-              onClick={() => onAcknowledge(alert.alertId)}
+              onClick={() => onAcknowledge(alert.id!)}
               loading={acknowledging}
               size="small"
             >

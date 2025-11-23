@@ -46,6 +46,7 @@ export const WaterQualityAlertTypeSchema = z.enum(['threshold', 'trend']);
  * Note: Firestore Timestamp fields are typed as `any` for flexibility
  */
 export const WaterQualityAlertSchema = z.object({
+  id: z.string().optional(), // MongoDB _id (used for API operations)
   alertId: z.string(),
   deviceId: z.string(),
   deviceName: z.string().optional(),
