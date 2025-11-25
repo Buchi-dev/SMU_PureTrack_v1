@@ -47,8 +47,8 @@ export interface CompleteUserProfileRequest {
   firstName: string;
   lastName: string;
   middleName?: string;
-  department?: string;
-  phoneNumber?: string;
+  department: string;
+  phoneNumber: string;
 }
 
 export interface UserFilters {

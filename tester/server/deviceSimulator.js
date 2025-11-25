@@ -26,8 +26,8 @@ export class DeviceSimulator {
     // Backend config (real API key)
     // --------------------------
     this.networkConfig = {
-      // endpoint: "https://puretrack-api.onrender.com/api/v1/devices/readings",
-      endpoint: "http://localhost:5000/api/v1/devices/readings",
+      endpoint: "https://puretrack-api.onrender.com/api/v1/devices/readings",
+      // endpoint: "http://localhost:5000/api/v1/devices/readings",
       apiKey: "6a8d48a00823c869ad23c27cc34a3d446493cf35d6924d8f9d54e17c4565737a"
     };
 

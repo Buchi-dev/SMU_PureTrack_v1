@@ -238,7 +238,7 @@ const updateUserProfile = async (req, res) => {
  */
 const completeUserProfile = async (req, res) => {
   try {
-    const { department, phoneNumber } = req.body;
+    const { firstName, lastName, middleName, department, phoneNumber } = req.body;
     
     // Get the logged-in user's ID (could be _id or id depending on session serialization)
     const loggedInUserId = (req.user._id || req.user.id).toString();
@@ -252,15 +252,37 @@ const completeUserProfile = async (req, res) => {
       });
     }
 
-    const updates = {};
-    if (department) updates.department = department;
-    if (phoneNumber) updates.phoneNumber = phoneNumber;
-
-    if (Object.keys(updates).length === 0) {
+    // Strict validation: Both department and phoneNumber must be provided
+    if (!department || !phoneNumber) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide department and/or phone number',
+        message: 'Both department and phone number are required to complete your profile',
       });
+    }
+
+    const updates = {
+      department,
+      phoneNumber,
+    };
+
+    // Also update name fields if provided
+    if (firstName) updates.firstName = firstName;
+    if (lastName) updates.lastName = lastName;
+    if (middleName !== undefined) updates.middleName = middleName;
+
+    // Update displayName if names changed
+    if (firstName || lastName || middleName !== undefined) {
+      const user = await User.findById(req.params.id);
+      if (user) {
+        const updatedFirstName = firstName || user.firstName || '';
+        const updatedLastName = lastName || user.lastName || '';
+        const updatedMiddleName = middleName !== undefined ? middleName : user.middleName || '';
+        
+        updates.displayName = [updatedFirstName, updatedMiddleName, updatedLastName]
+          .filter(name => name.trim())
+          .join(' ')
+          .trim();
+      }
     }
 
     const user = await User.findByIdAndUpdate(

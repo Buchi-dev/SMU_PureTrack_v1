@@ -11,7 +11,7 @@ import { GoogleOutlined } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
 import { auth } from "../../../config/firebase.config";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const { Title, Text } = Typography;
 
@@ -76,6 +76,15 @@ export default function AuthLogin() {
     try {
       // Login with Google and verify token with backend
       const response = await authService.loginWithGoogle();
+      
+      // Check if user has SMU email domain
+      if (!response.user.email.endsWith('@smu.edu.ph')) {
+        // Sign out the user since they don't have the required domain
+        await signOut(auth);
+        setError('Only SMU email addresses (@smu.edu.ph) are allowed to sign in.');
+        setIsLoggingIn(false);
+        return;
+      }
       
       console.log('[AuthLogin] Login successful, user:', response.user);
       
