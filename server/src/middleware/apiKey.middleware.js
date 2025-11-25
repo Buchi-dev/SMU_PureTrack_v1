@@ -117,5 +117,4 @@ const ensureApiKeyWithTypes = (allowedTypes = []) => {
 
 module.exports = {
   ensureApiKey,
-  ensureApiKeyWithTypes,
 };

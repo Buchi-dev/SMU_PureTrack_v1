@@ -78,4 +78,4 @@ const checkDBHealth = async () => {
   }
 };
 
-module.exports = { connectDB, closeDB, checkDBHealth };
+module.exports = { connectDB, closeDB };

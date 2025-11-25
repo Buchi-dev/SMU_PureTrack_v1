@@ -1,7 +1,5 @@
 const cron = require('node-cron');
 const { Device, SensorReading } = require('../devices/device.Model');
-const User = require('../users/user.Model');
-const Alert = require('../alerts/alert.Model');
 const logger = require('../utils/logger');
 const { TIME } = require('../utils/constants');
 
@@ -111,6 +109,4 @@ function stopBackgroundJobs() {
 module.exports = {
   startBackgroundJobs,
   stopBackgroundJobs,
-  checkOfflineDevices,
-  cleanupOldReadings,
 };

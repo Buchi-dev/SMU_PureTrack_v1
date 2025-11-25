@@ -138,6 +138,5 @@ module.exports = {
   configureFirebase,
   verifyIdToken,
   getFirebaseUser,
-  createCustomToken,
   admin,
 };

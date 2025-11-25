@@ -13,14 +13,14 @@ const compression = require('compression');
 
 // Import configurations
 const { connectDB, closeDB } = require('./configs/mongo.Config');
-const { connectRedis, getRedisClient, closeRedis } = require('./configs/redis.Config');
+const { connectRedis, closeRedis } = require('./configs/redis.Config');
 const { configureFirebase } = require('./configs/firebase.Config');
 const { setupSwagger } = require('./configs/swagger.config');
 
 // Import utilities
 const logger = require('./utils/logger');
 const { initializeEmailQueue, closeEmailQueue } = require('./utils/email.queue');
-const { API_VERSION, SESSION } = require('./utils/constants');
+const { API_VERSION } = require('./utils/constants');
 const { setupSocketIO } = require('./utils/socketConfig');
 const { initializeChangeStreams, closeChangeStreams } = require('./utils/changeStreams');
 const { errorHandler, notFoundHandler } = require('./errors/errorHandler');

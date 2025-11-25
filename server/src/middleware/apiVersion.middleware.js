@@ -179,9 +179,5 @@ function getSupportedVersions() {
 
 module.exports = {
   apiVersion,
-  apiVersionInfo,
-  getApiVersion,
-  deprecateVersion,
   getSupportedVersions,
-  API_VERSION_CONFIG,
 };

@@ -279,7 +279,6 @@ module.exports = {
   ensureAuthenticated,
   ensureRole,
   ensureAdmin,
-  ensureStaff,
   optionalAuth,
   authenticatePendingAllowed,
 };
