@@ -55,7 +55,7 @@ export const RegisterDeviceModal = ({
         return;
       }
 
-      await onRegister(device.id, {
+      await onRegister(device.deviceId, {
         building: values.building,
         floor: values.floor,
         notes: values.notes || '',

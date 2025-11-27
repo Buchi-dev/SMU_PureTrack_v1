@@ -16,7 +16,16 @@ const {
   unsubscribeFromChannel,
   getSSEStats,
 } = require('./sseConfig');
+const { deviceSSEConnection } = require('../devices/device.Controller');
+const { ensureApiKey } = require('../middleware/apiKey.middleware');
 const logger = require('./logger');
+
+/**
+ * GET /sse/:deviceId
+ * Device SSE endpoint for receiving commands
+ * Requires API key authentication
+ */
+router.get('/:deviceId', ensureApiKey, deviceSSEConnection);
 
 /**
  * GET /sse/stream

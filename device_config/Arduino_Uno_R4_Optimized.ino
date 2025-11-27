@@ -768,7 +768,11 @@ void sendRegistrationRequest() {
   doc["name"] = DEVICE_NAME;
   doc["type"] = DEVICE_TYPE;
   doc["firmwareVersion"] = FIRMWARE_VERSION;
-  doc["macAddress"] = WiFi.macAddress();
+  char mac[18];
+  uint8_t macRaw[6];
+  WiFi.macAddress(macRaw);
+  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", macRaw[0], macRaw[1], macRaw[2], macRaw[3], macRaw[4], macRaw[5]);
+  doc["macAddress"] = mac;
   doc["ipAddress"] = WiFi.localIP().toString();
   
   JsonArray sensorsArray = doc.createNestedArray("sensors");
@@ -860,7 +864,7 @@ void connectSSE() {
   }
   
   // Send GET request for SSE endpoint
-  String sseEndpoint = "/api/v1/devices/sse/" + String(DEVICE_ID);
+  String sseEndpoint = "/sse/" + String(DEVICE_ID);
   
   sseClient.println("GET " + sseEndpoint + " HTTP/1.1");
   sseClient.println("Host: " + String(API_SERVER));
