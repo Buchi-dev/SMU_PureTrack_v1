@@ -5,9 +5,9 @@
 import axios, { type AxiosInstance } from 'axios';
 import { auth } from './firebase.config';
 
-// API Base URL - use relative paths in development (proxied by Vite), full URL in production
+// API Base URL - use relative paths in development (proxied by Vite), or when served from same domain in production
 export const API_BASE_URL = import.meta.env.PROD
-  ? (import.meta.env.VITE_API_BASE_URL || 'https://puretrack-api.onrender.com')
+  ? (import.meta.env.VITE_API_BASE_URL || '')
   : '';
 
 // Log API configuration on startup

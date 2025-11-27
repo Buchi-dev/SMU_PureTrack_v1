@@ -73,6 +73,7 @@ app.use(addCorrelationId);
 const allowedOrigins = [
   'https://smupuretrack.web.app',
   'https://smupuretrack.firebaseapp.com',
+  'http://localhost:5173',
   process.env.CLIENT_URL || 'http://localhost:5173'
 ].filter(Boolean);
 

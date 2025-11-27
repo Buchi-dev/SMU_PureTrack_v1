@@ -98,12 +98,10 @@ export async function initializeSocket(): Promise<Socket> {
     // Get fresh Firebase ID token
     const token = await user.getIdToken();
 
-    // Determine server URL - use relative path in development (proxied), full URL in production
-    const serverUrl = import.meta.env.PROD 
-      ? (import.meta.env.VITE_API_BASE_URL || 'https://puretrack-api.onrender.com')
-      : '';
-
-    if (import.meta.env.DEV) {
+    // Determine server URL - use relative path in development (proxied), or when served from same domain in production
+    const serverUrl = import.meta.env.PROD
+      ? (import.meta.env.VITE_API_BASE_URL || '')
+      : '';    if (import.meta.env.DEV) {
       console.log('[Socket.IO] Initializing connection to:', serverUrl || 'relative path (proxied)');
     }
 
@@ -117,6 +115,7 @@ export async function initializeSocket(): Promise<Socket> {
       // In production, start with polling (more reliable on Render.com)
       // WebSocket upgrade will happen automatically if available
       transports: isProd ? ['polling', 'websocket'] : ['websocket', 'polling'],
+      path: '/socket.io',
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
