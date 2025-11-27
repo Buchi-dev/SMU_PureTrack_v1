@@ -98,10 +98,10 @@ const getAllDevices = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const getDeviceById = asyncHandler(async (req, res) => {
-  const device = await Device.findById(req.params.id);
+  const device = await Device.findOne({ deviceId: req.params.deviceId });
 
   if (!device) {
-    throw new NotFoundError('Device', req.params.id);
+    throw new NotFoundError('Device', req.params.deviceId);
   }
 
   // Get latest reading
@@ -131,10 +131,10 @@ const getDeviceById = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const getDeviceReadings = asyncHandler(async (req, res) => {
-  const device = await Device.findById(req.params.id);
+  const device = await Device.findOne({ deviceId: req.params.deviceId });
 
   if (!device) {
-    throw new NotFoundError('Device', req.params.id);
+    throw new NotFoundError('Device', req.params.deviceId);
   }
 
   const { startDate, endDate, page = 1, limit = 100 } = req.query;
@@ -188,9 +188,9 @@ const updateDevice = asyncHandler(async (req, res) => {
   // Handle metadata updates - merge with existing metadata
   if (metadata !== undefined) {
     // Get the current device to merge metadata
-    const currentDevice = await Device.findById(req.params.id);
+    const currentDevice = await Device.findOne({ deviceId: req.params.deviceId });
     if (!currentDevice) {
-      throw new NotFoundError('Device', req.params.id);
+      throw new NotFoundError('Device', req.params.deviceId);
     }
     
     // Merge metadata - preserve existing fields and update/add new ones
@@ -212,14 +212,14 @@ const updateDevice = asyncHandler(async (req, res) => {
     throw new ValidationError('No valid fields to update');
   }
 
-  const device = await Device.findByIdAndUpdate(
-    req.params.id,
+  const device = await Device.findOneAndUpdate(
+    { deviceId: req.params.deviceId },
     updates,
     { new: true, runValidators: true }
   );
 
   if (!device) {
-    throw new NotFoundError('Device', req.params.id);
+    throw new NotFoundError('Device', req.params.deviceId);
   }
 
   ResponseHelper.success(res, device.toPublicProfile(), 'Device updated successfully');
@@ -231,7 +231,7 @@ const updateDevice = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const deleteDevice = asyncHandler(async (req, res) => {
-    const device = await Device.findById(req.params.id);
+    const device = await Device.findOne({ deviceId: req.params.deviceId });
 
     if (!device) {
       return res.status(404).json({
@@ -261,7 +261,7 @@ const deleteDevice = asyncHandler(async (req, res) => {
 
     // Delete device and all associated data
     await Promise.all([
-      Device.findByIdAndDelete(req.params.id),
+      Device.findOneAndDelete({ deviceId: req.params.deviceId }),
       SensorReading.deleteMany({ deviceId: device.deviceId }),
       Alert.deleteMany({ deviceId: device.deviceId }),
     ]);
@@ -596,10 +596,10 @@ const deviceRegister = asyncHandler(async (req, res) => {
 const approveDeviceRegistration = asyncHandler(async (req, res) => {
   const { location, metadata } = req.body;
 
-  const device = await Device.findById(req.params.id);
+  const device = await Device.findOne({ deviceId: req.params.deviceId });
 
   if (!device) {
-    throw new NotFoundError('Device', req.params.id);
+    throw new NotFoundError('Device', req.params.deviceId);
   }
 
   // Update device registration status

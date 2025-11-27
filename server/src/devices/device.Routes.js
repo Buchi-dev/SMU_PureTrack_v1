@@ -38,32 +38,32 @@ router.get('/', ensureAuthenticated, validatePagination, getAllDevices);
 router.get('/stats', ensureAuthenticated, getDeviceStats);
 
 /**
- * @route   GET /api/v1/devices/:id
+ * @route   GET /api/v1/devices/:deviceId
  * @desc    Get device by ID
  * @access  Authenticated users
  */
-router.get('/:id', ensureAuthenticated, validateMongoId, getDeviceById);
+router.get('/:deviceId', ensureAuthenticated, getDeviceById);
 
 /**
- * @route   GET /api/v1/devices/:id/readings
+ * @route   GET /api/v1/devices/:deviceId/readings
  * @desc    Get device sensor readings
  * @access  Authenticated users
  */
-router.get('/:id/readings', ensureAuthenticated, validateMongoId, validateDateRange, validatePagination, getDeviceReadings);
+router.get('/:deviceId/readings', ensureAuthenticated, validateDateRange, validatePagination, getDeviceReadings);
 
 /**
- * @route   PATCH /api/v1/devices/:id
+ * @route   PATCH /api/v1/devices/:deviceId
  * @desc    Update device
  * @access  Admin only
  */
-router.patch('/:id', ensureAdmin, validateMongoId, validateDeviceUpdate, updateDevice);
+router.patch('/:deviceId', ensureAdmin, validateDeviceUpdate, updateDevice);
 
 /**
- * @route   DELETE /api/v1/devices/:id
+ * @route   DELETE /api/v1/devices/:deviceId
  * @desc    Delete device
  * @access  Admin only
  */
-router.delete('/:id', ensureAdmin, validateMongoId, deleteDevice);
+router.delete('/:deviceId', ensureAdmin, deleteDevice);
 
 /**
  * @route   POST /api/v1/devices/readings
@@ -93,11 +93,11 @@ router.post('/register', ensureApiKey, deviceRegister);
 router.get('/sse/:deviceId', ensureApiKey, deviceSSEConnection);
 
 /**
- * @route   POST /api/v1/devices/:id/approve
+ * @route   POST /api/v1/devices/:deviceId/approve
  * @desc    Approve device registration (sets isRegistered: true)
  * @access  Admin only
  * @note    Admin approves device registration, server sends 'go' command via SSE
  */
-router.post('/:id/approve', ensureAdmin, validateMongoId, approveDeviceRegistration);
+router.post('/:deviceId/approve', ensureAdmin, approveDeviceRegistration);
 
 module.exports = router;
