@@ -5,15 +5,17 @@
 import axios, { type AxiosInstance } from 'axios';
 import { auth } from './firebase.config';
 
-// API Base URL from environment variables
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// API Base URL - use relative paths in development (proxied by Vite), full URL in production
+export const API_BASE_URL = import.meta.env.PROD
+  ? (import.meta.env.VITE_API_BASE_URL || 'https://puretrack-api.onrender.com')
+  : '';
 
 // Log API configuration on startup
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log('🌐 API Configuration');
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 console.log(`Environment: ${import.meta.env.MODE}`);
-console.log(`API Base URL: ${API_BASE_URL}`);
+console.log(`API Base URL: ${API_BASE_URL || 'relative paths (proxied)'}`);
 console.log(`Development Mode: ${import.meta.env.DEV}`);
 console.log(`Production Mode: ${import.meta.env.PROD}`);
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');

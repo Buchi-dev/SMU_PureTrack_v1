@@ -98,11 +98,13 @@ export async function initializeSocket(): Promise<Socket> {
     // Get fresh Firebase ID token
     const token = await user.getIdToken();
 
-    // Determine server URL
-    const serverUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    // Determine server URL - use relative path in development (proxied), full URL in production
+    const serverUrl = import.meta.env.PROD 
+      ? (import.meta.env.VITE_API_BASE_URL || 'https://puretrack-api.onrender.com')
+      : '';
 
     if (import.meta.env.DEV) {
-      console.log('[Socket.IO] Initializing connection to:', serverUrl);
+      console.log('[Socket.IO] Initializing connection to:', serverUrl || 'relative path (proxied)');
     }
 
     // Create Socket.IO connection
