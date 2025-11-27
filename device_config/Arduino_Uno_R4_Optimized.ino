@@ -49,6 +49,8 @@
 #define SENSOR_READ_INTERVAL 2000    // Read sensors every 2 seconds (real-time)
 #define HTTP_PUBLISH_INTERVAL 2000   // Publish every 2 seconds (real-time)
 #define HTTP_TIMEOUT 15000           // 15 second timeout for HTTPS requests (longer for SSL handshake)
+#define REGISTRATION_INTERVAL 5000   // Send registration request every 5 seconds when unregistered
+#define SSE_RECONNECT_INTERVAL 10000 // Reconnect to SSE every 10 seconds if disconnected
 
 
 // ===========================
@@ -114,6 +116,7 @@ float fitIntercept = 0.0;
 
 WiFiSSLClient wifiClient;  // SSL Client for HTTPS
 HttpClient httpClient = HttpClient(wifiClient, API_SERVER, API_PORT);
+WiFiSSLClient sseClient;   // Separate SSL Client for SSE connection
 ArduinoLEDMatrix matrix;   // LED Matrix object for 12x8 display
 
 
@@ -124,7 +127,16 @@ ArduinoLEDMatrix matrix;   // LED Matrix object for 12x8 display
 
 unsigned long lastSensorRead = 0;
 unsigned long lastHttpPublish = 0;
+unsigned long lastRegistrationAttempt = 0;
+unsigned long lastSSEReconnect = 0;
 unsigned long sensorReadStartTime = 0;
+
+
+// Device registration state
+bool isRegistered = false;         // Device registration status
+bool isApproved = false;           // Admin approval status (received "go" command)
+bool sseConnected = false;         // SSE connection status
+String sseBuffer = "";             // Buffer for SSE data parsing
 
 
 // Sensor readings (calibrated values)
@@ -258,6 +270,13 @@ void setup() {
   Serial.println("Advanced calibration active - piecewise linear interpolation + SMA smoothing");
   Serial.println("ECG heartbeat animation will trigger every 2 seconds during sensor readings.");
   Serial.println("Using HTTPS (port 443) - SSL certificate verification disabled for compatibility");
+  Serial.println();
+  Serial.println("=== DEVICE REGISTRATION SYSTEM ===");
+  Serial.println("Device will enter registration mode until approved by admin");
+  Serial.println("Waiting for 'go' command from server via SSE...");
+  
+  // Attempt initial SSE connection
+  connectSSE();
 }
 
 
@@ -289,40 +308,61 @@ void loop() {
     // Reset failure counter on successful WiFi connection
     if (WiFi.status() == WL_CONNECTED) {
       consecutiveFailures = 0;
+      sseConnected = false; // Force SSE reconnection
     }
   }
   
-  // Read and publish sensors every 2 seconds (real-time)
-  if (currentMillis - lastSensorRead >= SENSOR_READ_INTERVAL) {
-    lastSensorRead = currentMillis;
-    
-    Serial.println("--- Reading Sensors (Calibrated) ---");
-    
-    // Switch to heartbeat animation during sensing
-    if (matrixState == IDLE) {
-      Serial.println("💓 Triggering ECG heartbeat animation...");
-      matrixState = HEARTBEAT;
-      sensorReadStartTime = currentMillis;
-      matrix.loadSequence(LEDMATRIX_ANIMATION_HEARTBEAT_LINE);
-      matrix.play(false);  // Play once, don't loop
+  // Handle SSE connection and message processing
+  if (sseConnected) {
+    processSSEMessages();
+  } else {
+    // Try to reconnect to SSE
+    if (currentMillis - lastSSEReconnect >= SSE_RECONNECT_INTERVAL) {
+      lastSSEReconnect = currentMillis;
+      connectSSE();
     }
-    
-    readSensors();  // This now handles all detailed logging with calibrated values
-    
-    publishSensorData();
-    
-    if (serverConnected) {
-      Serial.println("✓ Calibrated data published to server!");
-      consecutiveFailures = 0;  // Reset on success
-    } else {
-      Serial.println("✗ Server not connected, calibrated data not published.");
-      consecutiveFailures++;
+  }
+  
+  // Device behavior depends on registration status
+  if (!isApproved) {
+    // REGISTRATION MODE: Send registration requests until approved
+    if (currentMillis - lastRegistrationAttempt >= REGISTRATION_INTERVAL) {
+      lastRegistrationAttempt = currentMillis;
+      sendRegistrationRequest();
+    }
+  } else {
+    // ACTIVE MODE: Device is approved, can read sensors and publish data
+    if (currentMillis - lastSensorRead >= SENSOR_READ_INTERVAL) {
+      lastSensorRead = currentMillis;
       
-      // Retry server connection after multiple failures
-      if (consecutiveFailures >= MAX_FAILURES) {
-        Serial.println("Multiple failures detected. Retesting server connection...");
-        testServerConnection();
-        consecutiveFailures = 0;
+      Serial.println("--- Reading Sensors (Calibrated) ---");
+      
+      // Switch to heartbeat animation during sensing
+      if (matrixState == IDLE) {
+        Serial.println("💓 Triggering ECG heartbeat animation...");
+        matrixState = HEARTBEAT;
+        sensorReadStartTime = currentMillis;
+        matrix.loadSequence(LEDMATRIX_ANIMATION_HEARTBEAT_LINE);
+        matrix.play(false);  // Play once, don't loop
+      }
+      
+      readSensors();  // This now handles all detailed logging with calibrated values
+      
+      publishSensorData();
+      
+      if (serverConnected) {
+        Serial.println("✓ Calibrated data published to server!");
+        consecutiveFailures = 0;  // Reset on success
+      } else {
+        Serial.println("✗ Server not connected, calibrated data not published.");
+        consecutiveFailures++;
+        
+        // Retry server connection after multiple failures
+        if (consecutiveFailures >= MAX_FAILURES) {
+          Serial.println("Multiple failures detected. Retesting server connection...");
+          testServerConnection();
+          consecutiveFailures = 0;
+        }
       }
     }
   }
@@ -701,4 +741,238 @@ void publishSensorData() {
   }
   
   httpClient.stop();
+}
+
+
+// ===========================
+// DEVICE REGISTRATION FUNCTIONS
+// ===========================
+
+
+/**
+ * Send registration request to server
+ */
+void sendRegistrationRequest() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("✗ WiFi not connected, skipping registration request");
+    return;
+  }
+  
+  Serial.println("--- Sending Registration Request ---");
+  
+  httpClient.stop();
+  delay(100);
+  
+  StaticJsonDocument<384> doc;
+  doc["deviceId"] = DEVICE_ID;
+  doc["name"] = DEVICE_NAME;
+  doc["type"] = DEVICE_TYPE;
+  doc["firmwareVersion"] = FIRMWARE_VERSION;
+  doc["macAddress"] = WiFi.macAddress();
+  doc["ipAddress"] = WiFi.localIP().toString();
+  
+  JsonArray sensorsArray = doc.createNestedArray("sensors");
+  sensorsArray.add("pH");
+  sensorsArray.add("turbidity");
+  sensorsArray.add("tds");
+  
+  String payload;
+  serializeJson(doc, payload);
+  
+  Serial.println(payload);
+  
+  httpClient.beginRequest();
+  httpClient.post("/api/v1/devices/register");
+  httpClient.sendHeader("Host", API_SERVER);
+  httpClient.sendHeader("Content-Type", "application/json");
+  httpClient.sendHeader("x-api-key", API_KEY);
+  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.2.2");
+  httpClient.sendHeader("Content-Length", payload.length());
+  httpClient.sendHeader("Connection", "close");
+  httpClient.beginBody();
+  httpClient.print(payload);
+  httpClient.endRequest();
+  
+  int statusCode = httpClient.responseStatusCode();
+  String response = httpClient.responseBody();
+  
+  Serial.print("Registration Status Code: ");
+  Serial.println(statusCode);
+  
+  if (statusCode == 200 || statusCode == 201) {
+    Serial.println("✓ Registration request sent successfully!");
+    Serial.print("Response: ");
+    Serial.println(response);
+    
+    // Parse response to check if approved
+    StaticJsonDocument<512> responseDoc;
+    DeserializationError error = deserializeJson(responseDoc, response);
+    
+    if (!error) {
+      bool registered = responseDoc["data"]["isRegistered"] | false;
+      String command = responseDoc["data"]["command"] | "";
+      
+      if (registered && command == "go") {
+        Serial.println("🎉 Device APPROVED! Switching to active mode...");
+        isRegistered = true;
+        isApproved = true;
+      } else {
+        Serial.println("⏳ Registration pending admin approval...");
+        isRegistered = true;
+        isApproved = false;
+      }
+    }
+  } else {
+    Serial.print("✗ Registration request failed with status: ");
+    Serial.println(statusCode);
+  }
+  
+  httpClient.stop();
+  Serial.println("------------------------------------");
+}
+
+
+/**
+ * Connect to SSE endpoint to receive commands
+ */
+void connectSSE() {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("✗ WiFi not connected, cannot connect SSE");
+    return;
+  }
+  
+  if (sseConnected) {
+    Serial.println("SSE already connected");
+    return;
+  }
+  
+  Serial.println("--- Connecting to SSE ---");
+  
+  // Close any existing connection
+  sseClient.stop();
+  delay(500);
+  
+  // Connect to server
+  if (!sseClient.connect(API_SERVER, API_PORT)) {
+    Serial.println("✗ SSE connection failed");
+    sseConnected = false;
+    return;
+  }
+  
+  // Send GET request for SSE endpoint
+  String sseEndpoint = "/api/v1/devices/sse/" + String(DEVICE_ID);
+  
+  sseClient.println("GET " + sseEndpoint + " HTTP/1.1");
+  sseClient.println("Host: " + String(API_SERVER));
+  sseClient.println("x-api-key: " + String(API_KEY));
+  sseClient.println("Accept: text/event-stream");
+  sseClient.println("Cache-Control: no-cache");
+  sseClient.println("Connection: keep-alive");
+  sseClient.println();
+  
+  // Wait for response headers
+  unsigned long timeout = millis() + 10000;
+  while (sseClient.available() == 0 && millis() < timeout) {
+    delay(100);
+  }
+  
+  if (sseClient.available() == 0) {
+    Serial.println("✗ SSE connection timeout");
+    sseClient.stop();
+    sseConnected = false;
+    return;
+  }
+  
+  // Read and verify response headers
+  bool headersValid = false;
+  while (sseClient.available()) {
+    String line = sseClient.readStringUntil('\n');
+    Serial.println("SSE Header: " + line);
+    
+    if (line.indexOf("text/event-stream") >= 0) {
+      headersValid = true;
+    }
+    
+    if (line == "\r" || line.length() == 0) {
+      break; // End of headers
+    }
+  }
+  
+  if (headersValid) {
+    Serial.println("✓ SSE connection established!");
+    sseConnected = true;
+    sseBuffer = "";
+  } else {
+    Serial.println("✗ Invalid SSE response");
+    sseClient.stop();
+    sseConnected = false;
+  }
+  
+  Serial.println("-------------------------");
+}
+
+
+/**
+ * Process incoming SSE messages
+ */
+void processSSEMessages() {
+  if (!sseConnected || !sseClient.connected()) {
+    Serial.println("SSE disconnected");
+    sseConnected = false;
+    sseClient.stop();
+    return;
+  }
+  
+  while (sseClient.available()) {
+    char c = sseClient.read();
+    
+    if (c == '\n') {
+      // Process complete line
+      if (sseBuffer.startsWith("event: ")) {
+        String eventType = sseBuffer.substring(7);
+        eventType.trim();
+        Serial.println("SSE Event: " + eventType);
+      } 
+      else if (sseBuffer.startsWith("data: ")) {
+        String eventData = sseBuffer.substring(6);
+        eventData.trim();
+        Serial.println("SSE Data: " + eventData);
+        
+        // Parse JSON data
+        StaticJsonDocument<512> doc;
+        DeserializationError error = deserializeJson(doc, eventData);
+        
+        if (!error) {
+          String command = doc["command"] | "";
+          
+          if (command == "go") {
+            Serial.println("🎉 Received 'GO' command! Device approved!");
+            Serial.println("Switching to ACTIVE mode - will start collecting sensor data");
+            isRegistered = true;
+            isApproved = true;
+          } 
+          else if (command == "deregister") {
+            Serial.println("⚠️ Received 'DEREGISTER' command!");
+            Serial.println("Device removed from system. Returning to registration mode...");
+            isRegistered = false;
+            isApproved = false;
+            // Stop sending sensor data, go back to registration mode
+          }
+          else if (command == "wait") {
+            Serial.println("⏳ Received 'WAIT' command - registration pending");
+            isRegistered = true;
+            isApproved = false;
+          }
+          else if (command == "update") {
+            Serial.println("🔄 Received 'UPDATE' command");
+            // Handle configuration updates if needed
+          }
+        }
+      }
+      
+      sseBuffer = "";
+    } else {
+      sseBuffer += c;
+    }
+  }
 }

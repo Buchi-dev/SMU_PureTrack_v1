@@ -99,15 +99,20 @@ export const RegisterDeviceModal = ({
       {device ? (
         <>
           <Alert
-            message="Device Registration"
+            message="Device Registration & Approval"
             description={
               <Space direction="vertical" size={0}>
                 <Text>
-                  You are registering <Text strong code>{device.deviceId}</Text> - <Text strong>{device.name}</Text>
+                  You are approving device <Text strong code>{device.deviceId}</Text> - <Text strong>{device.name}</Text>
                 </Text>
                 <Text type="secondary">
-                  Please provide the location information to complete the registration.
+                  This will set the device as registered and send a "go" command via SSE, allowing it to start transmitting sensor data.
                 </Text>
+                {device.isRegistered === false && (
+                  <Text type="warning" style={{ marginTop: 8 }}>
+                    ⚠️ This device is currently in registration mode and cannot send sensor readings until approved.
+                  </Text>
+                )}
               </Space>
             }
             type="info"
@@ -173,8 +178,8 @@ export const RegisterDeviceModal = ({
             </Form.Item>
 
             <Alert
-              message="Note"
-              description="Once registered, the device will appear in the Registered Devices tab and can be used for monitoring."
+              message="Important"
+              description="Once approved, the server will send a 'go' command to the device via SSE. The device will then start collecting and transmitting sensor readings. The device will appear in the Registered Devices tab."
               type="success"
               showIcon
               style={{ marginTop: 16 }}

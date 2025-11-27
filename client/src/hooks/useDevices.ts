@@ -342,10 +342,9 @@ export function useDeviceMutations(): UseDeviceMutationsReturn {
         // Also set the location string for backward compatibility
         const location = `${building} - ${floor}${notes ? ` (${notes})` : ''}`;
         
-        // Update device with both location string and structured metadata
-        await devicesService.updateDevice(deviceId, {
+        // Call the new approve endpoint to register the device
+        await devicesService.approveDeviceRegistration(deviceId, {
           location,
-          registrationStatus: 'registered',
           metadata,
         });
       } catch (err) {

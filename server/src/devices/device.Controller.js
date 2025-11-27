@@ -7,6 +7,7 @@ const CacheService = require('../utils/cache.service');
 const { NotFoundError, ValidationError, AppError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
 const asyncHandler = require('../middleware/asyncHandler');
+const { sendCommandToDevice, isDeviceConnected } = require('../utils/sseConfig');
 
 /**
  * Get all devices
@@ -239,12 +240,36 @@ const deleteDevice = asyncHandler(async (req, res) => {
       });
     }
 
+    // Send deregister command to device if connected via SSE
+    if (isDeviceConnected(device.deviceId)) {
+      logger.info('[Device Controller] Sending deregister command to device', {
+        deviceId: device.deviceId,
+      });
+      
+      sendCommandToDevice(device.deviceId, 'deregister', {
+        message: 'Device has been removed from the system',
+        reason: 'admin_deletion',
+      });
+      
+      // Give device a moment to receive the command
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } else {
+      logger.warn('[Device Controller] Device not connected via SSE, cannot send deregister command', {
+        deviceId: device.deviceId,
+      });
+    }
+
     // Delete device and all associated data
     await Promise.all([
       Device.findByIdAndDelete(req.params.id),
       SensorReading.deleteMany({ deviceId: device.deviceId }),
       Alert.deleteMany({ deviceId: device.deviceId }),
     ]);
+
+    logger.info('[Device Controller] Device and associated data deleted', {
+      deviceId: device.deviceId,
+      deviceMongoId: req.params.id,
+    });
 
   ResponseHelper.success(res, null, 'Device and all associated data deleted successfully');
 });
@@ -277,45 +302,47 @@ const processSensorData = asyncHandler(async (req, res) => {
     throw new ValidationError('deviceId is required');
   }
 
-  // Check if device exists, create if not (auto-registration)
+  // Check if device exists
   let device = await Device.findOne({ deviceId: trimmedDeviceId });
 
   if (!device) {
-    logger.info('[Device Controller] Auto-registering new device', { deviceId: trimmedDeviceId });
-    device = new Device({
-      deviceId: trimmedDeviceId,
-      name: name || `Device-${trimmedDeviceId}`,
-      type: type || 'water-quality-sensor',
-      firmwareVersion: firmwareVersion || 'unknown',
-      macAddress: macAddress || '',
-      ipAddress: ipAddress || '',
-      sensors: sensors || ['pH', 'turbidity', 'tds'],
-      status: 'online',
-      registrationStatus: 'pending',
-      lastSeen: new Date(),
+    // Device doesn't exist - reject the sensor data
+    logger.warn('[Device Controller] Unregistered device attempted to send sensor data', { 
+      deviceId: trimmedDeviceId 
     });
-    await device.save();
-    logger.info('[Device Controller] Device auto-registered successfully', { 
-      deviceId: trimmedDeviceId,
-      id: device._id 
-    });
-  } else {
-    // Update device status and last seen
-    device.status = 'online';
-    device.lastSeen = new Date();
     
-    // Update metadata if provided
-    if (name && !device.name) device.name = name;
-    if (type && !device.type) device.type = type;
-    if (firmwareVersion) device.firmwareVersion = firmwareVersion;
-    if (macAddress && !device.macAddress) device.macAddress = macAddress;
-    if (ipAddress) device.ipAddress = ipAddress;
-    if (sensors && sensors.length > 0 && device.sensors.length === 0) {
-      device.sensors = sensors;
-    }
-    
-    await device.save();
+    return ResponseHelper.error(res, 
+      'Device not registered. Please register your device first.', 
+      403,
+      'DEVICE_NOT_REGISTERED'
+    );
   }
+
+  // Check if device is registered (isRegistered must be true)
+  if (!device.isRegistered) {
+    logger.warn('[Device Controller] Device not approved, rejecting sensor data', {
+      deviceId: trimmedDeviceId,
+      registrationStatus: device.registrationStatus,
+      isRegistered: device.isRegistered,
+    });
+    
+    return ResponseHelper.error(res, 
+      'Device registration pending admin approval. Sensor data not accepted.', 
+      403,
+      'DEVICE_NOT_APPROVED'
+    );
+  }
+
+  // Device is registered - accept sensor data
+  // Update device status and last seen
+  device.status = 'online';
+  device.lastSeen = new Date();
+  
+  // Update metadata if provided
+  if (firmwareVersion) device.firmwareVersion = firmwareVersion;
+  if (ipAddress) device.ipAddress = ipAddress;
+  
+  await device.save();
 
   // Save sensor reading with trimmed deviceId
   const reading = new SensorReading({
@@ -472,6 +499,217 @@ const getDeviceStats = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * Device registration - for unregistered devices to send their info
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const deviceRegister = asyncHandler(async (req, res) => {
+  const {
+    deviceId,
+    name,
+    type,
+    firmwareVersion,
+    macAddress,
+    ipAddress,
+    sensors,
+  } = req.body;
+
+  // Trim deviceId to prevent whitespace issues
+  const trimmedDeviceId = deviceId?.trim();
+  
+  if (!trimmedDeviceId) {
+    throw new ValidationError('deviceId is required');
+  }
+
+  // Check if device already exists
+  let device = await Device.findOne({ deviceId: trimmedDeviceId });
+
+  if (!device) {
+    // Create new device in pending state
+    logger.info('[Device Controller] New device registration request', { deviceId: trimmedDeviceId });
+    
+    device = new Device({
+      deviceId: trimmedDeviceId,
+      name: name || `Device-${trimmedDeviceId}`,
+      type: type || 'water-quality-sensor',
+      firmwareVersion: firmwareVersion || 'unknown',
+      macAddress: macAddress || '',
+      ipAddress: ipAddress || '',
+      sensors: sensors || ['pH', 'turbidity', 'tds'],
+      status: 'online',
+      registrationStatus: 'pending',
+      isRegistered: false,
+      lastSeen: new Date(),
+    });
+    
+    await device.save();
+    
+    logger.info('[Device Controller] Device registration pending', { 
+      deviceId: trimmedDeviceId,
+      id: device._id 
+    });
+
+    return ResponseHelper.success(res, {
+      device: device.toPublicProfile(),
+      message: 'Device registration pending admin approval',
+      status: 'pending',
+      isRegistered: false,
+    }, 'Device registration request received');
+  } else {
+    // Device exists - update last seen and metadata
+    device.lastSeen = new Date();
+    device.status = 'online';
+    
+    // Update metadata if provided
+    if (firmwareVersion) device.firmwareVersion = firmwareVersion;
+    if (ipAddress) device.ipAddress = ipAddress;
+    if (name && !device.name) device.name = name;
+    
+    await device.save();
+
+    // Check registration status
+    if (device.isRegistered) {
+      return ResponseHelper.success(res, {
+        device: device.toPublicProfile(),
+        message: 'Device is registered and approved',
+        status: 'registered',
+        isRegistered: true,
+        command: 'go', // Tell device it can start sending sensor data
+      }, 'Device registration approved');
+    } else {
+      return ResponseHelper.success(res, {
+        device: device.toPublicProfile(),
+        message: 'Device registration pending admin approval',
+        status: 'pending',
+        isRegistered: false,
+      }, 'Device registration pending');
+    }
+  }
+});
+
+/**
+ * Approve device registration (Admin only)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const approveDeviceRegistration = asyncHandler(async (req, res) => {
+  const { location, metadata } = req.body;
+
+  const device = await Device.findById(req.params.id);
+
+  if (!device) {
+    throw new NotFoundError('Device', req.params.id);
+  }
+
+  // Update device registration status
+  device.isRegistered = true;
+  device.registrationStatus = 'registered';
+  
+  if (location !== undefined) {
+    device.location = location;
+  }
+  
+  if (metadata !== undefined) {
+    device.metadata = {
+      ...device.metadata?.toObject?.() || device.metadata || {},
+      ...metadata,
+    };
+    
+    if (metadata.location) {
+      device.metadata.location = {
+        ...device.metadata?.location || {},
+        ...metadata.location,
+      };
+    }
+  }
+
+  await device.save();
+
+  logger.info('[Device Controller] Device registration approved', {
+    deviceId: device.deviceId,
+    id: device._id,
+  });
+
+  // Send "go" command to device via SSE if connected
+  if (isDeviceConnected(device.deviceId)) {
+    const commandSent = sendCommandToDevice(device.deviceId, 'go', {
+      message: 'Device registration approved. You can now start sending sensor data.',
+      device: device.toPublicProfile(),
+    });
+    
+    if (commandSent) {
+      logger.info('[Device Controller] "go" command sent to device', {
+        deviceId: device.deviceId,
+      });
+    }
+  } else {
+    logger.warn('[Device Controller] Device not connected via SSE, "go" command not sent', {
+      deviceId: device.deviceId,
+    });
+  }
+
+  ResponseHelper.success(res, device.toPublicProfile(), 'Device registration approved successfully');
+});
+
+/**
+ * Device SSE connection endpoint
+ * Allows devices to establish SSE connection to receive commands
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const deviceSSEConnection = asyncHandler(async (req, res) => {
+  const { deviceId } = req.params;
+  const trimmedDeviceId = deviceId?.trim();
+
+  if (!trimmedDeviceId) {
+    throw new ValidationError('deviceId is required');
+  }
+
+  // Check if device exists
+  const device = await Device.findOne({ deviceId: trimmedDeviceId });
+
+  if (!device) {
+    return ResponseHelper.error(res, 
+      'Device not found. Please register first.', 
+      404,
+      'DEVICE_NOT_FOUND'
+    );
+  }
+
+  // Import setupDeviceSSEConnection
+  const { setupDeviceSSEConnection } = require('../utils/sseConfig');
+
+  // Setup SSE connection for this device
+  setupDeviceSSEConnection(trimmedDeviceId, res, {
+    name: device.name,
+    type: device.type,
+    firmwareVersion: device.firmwareVersion,
+  });
+
+  logger.info('[Device Controller] Device SSE connection established', {
+    deviceId: trimmedDeviceId,
+  });
+
+  // Send initial status
+  const { sendCommandToDevice: sendCmd } = require('../utils/sseConfig');
+  
+  // Send device status after a short delay
+  setTimeout(() => {
+    if (device.isRegistered) {
+      sendCmd(trimmedDeviceId, 'go', {
+        message: 'Device is registered. You can send sensor data.',
+        device: device.toPublicProfile(),
+      });
+    } else {
+      sendCmd(trimmedDeviceId, 'wait', {
+        message: 'Device registration pending approval. Please wait.',
+        device: device.toPublicProfile(),
+      });
+    }
+  }, 500);
+});
+
 module.exports = {
   getAllDevices,
   getDeviceById,
@@ -480,4 +718,7 @@ module.exports = {
   deleteDevice,
   processSensorData,
   getDeviceStats,
+  deviceRegister,
+  approveDeviceRegistration,
+  deviceSSEConnection,
 };

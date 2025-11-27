@@ -7,6 +7,9 @@ const {
   deleteDevice,
   processSensorData,
   getDeviceStats,
+  deviceRegister,
+  approveDeviceRegistration,
+  deviceSSEConnection,
 } = require('./device.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
 const { ensureApiKey } = require('../middleware/apiKey.middleware');
@@ -70,5 +73,31 @@ router.delete('/:id', ensureAdmin, validateMongoId, deleteDevice);
  * @note    This endpoint receives real-time sensor data from IoT devices
  */
 router.post('/readings', ensureApiKey, validateSensorData, processSensorData);
+
+/**
+ * @route   POST /api/v1/devices/register
+ * @desc    Device registration endpoint - for unregistered devices
+ * @access  Requires API key authentication
+ * @security ApiKeyAuth
+ * @note    Unregistered devices call this endpoint to request registration
+ */
+router.post('/register', ensureApiKey, deviceRegister);
+
+/**
+ * @route   GET /api/v1/devices/sse/:deviceId
+ * @desc    Establish SSE connection for device to receive commands
+ * @access  Requires API key authentication
+ * @security ApiKeyAuth
+ * @note    Devices maintain SSE connection to receive 'go', 'deregister', and other commands
+ */
+router.get('/sse/:deviceId', ensureApiKey, deviceSSEConnection);
+
+/**
+ * @route   POST /api/v1/devices/:id/approve
+ * @desc    Approve device registration (sets isRegistered: true)
+ * @access  Admin only
+ * @note    Admin approves device registration, server sends 'go' command via SSE
+ */
+router.post('/:id/approve', ensureAdmin, validateMongoId, approveDeviceRegistration);
 
 module.exports = router;

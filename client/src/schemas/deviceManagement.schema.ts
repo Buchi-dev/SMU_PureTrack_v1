@@ -56,6 +56,8 @@ export const DeviceSchema = z.object({
   ipAddress: z.string(),
   sensors: z.array(z.string()),
   status: DeviceStatusSchema,
+  registrationStatus: z.enum(['registered', 'pending']).optional(),
+  isRegistered: z.boolean().optional(),
   registeredAt: z.any(), // Firebase Timestamp
   lastSeen: z.any(), // Firebase Timestamp
   metadata: DeviceMetadataSchema.optional(),
@@ -153,9 +155,17 @@ export interface DeviceWithReadings extends Device {
 // ============================================================================
 
 /**
- * Check if device is registered (has location configured)
+ * Check if device is registered
+ * Now uses the isRegistered boolean field from the database
+ * Falls back to checking location metadata for legacy devices
  */
 export const isDeviceRegistered = (device: Device): boolean => {
+  // First check the explicit isRegistered field
+  if (device.isRegistered !== undefined) {
+    return device.isRegistered;
+  }
+  
+  // Fallback to legacy method - check if location is configured
   return !!(
     device.metadata?.location?.building &&
     device.metadata?.location?.floor

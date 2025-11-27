@@ -319,6 +319,40 @@ export class DevicesService {
     const response = await this.getDeviceReadings(deviceId, { limit });
     return response.data;
   }
+
+  // ==========================================================================
+  // DEVICE REGISTRATION SYSTEM
+  // ==========================================================================
+
+  /**
+   * Approve device registration (Admin only)
+   * Sets isRegistered: true and sends 'go' command to device via SSE
+   * 
+   * @param deviceId - Device ID to approve
+   * @param payload - Location and metadata for the device
+   * @returns Promise with approved device
+   * @example
+   * await devicesService.approveDeviceRegistration('WQ-001', {
+   *   location: 'Building A - Floor 2',
+   *   metadata: { location: { building: 'A', floor: '2' } }
+   * });
+   */
+  async approveDeviceRegistration(
+    deviceId: string,
+    payload: UpdateDevicePayload
+  ): Promise<DeviceResponse> {
+    try {
+      const response = await apiClient.post<DeviceResponse>(
+        `${DEVICE_ENDPOINTS.BY_ID(deviceId)}/approve`,
+        payload
+      );
+      return response.data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Approve registration error:', message);
+      throw new Error(message);
+    }
+  }
 }
 
 // ============================================================================

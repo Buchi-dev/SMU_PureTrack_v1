@@ -18,6 +18,12 @@ const logger = require('./logger');
 const sseConnections = new Map();
 
 /**
+ * Store device SSE connections
+ * Map: deviceId -> { response, connectedAt, deviceInfo }
+ */
+const deviceSSEConnections = new Map();
+
+/**
  * Store subscription preferences for each connection
  * Map: connectionId -> Set of subscribed channels
  */
@@ -416,6 +422,154 @@ function closeAllConnections() {
   logger.info('[SSE] All connections closed');
 }
 
+/**
+ * Setup SSE connection for IoT devices
+ * No authentication required - uses deviceId for identification
+ * 
+ * @param {string} deviceId - Device identifier
+ * @param {Response} res - Express response object
+ */
+function setupDeviceSSEConnection(deviceId, res, deviceInfo = {}) {
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable buffering in nginx
+  
+  // Send initial connection success message
+  sendSSEMessage(res, 'connected', {
+    deviceId,
+    message: 'Device SSE connection established',
+    timestamp: new Date().toISOString(),
+  });
+  
+  // Store device connection
+  deviceSSEConnections.set(deviceId, {
+    response: res,
+    connectedAt: new Date(),
+    deviceInfo,
+  });
+  
+  logger.info('[SSE] Device connected', {
+    deviceId,
+    totalDeviceConnections: deviceSSEConnections.size,
+    deviceInfo,
+  });
+  
+  // Send heartbeat every 30 seconds to keep connection alive
+  const heartbeatInterval = setInterval(() => {
+    if (res.writableEnded) {
+      clearInterval(heartbeatInterval);
+      return;
+    }
+    sendSSEMessage(res, 'heartbeat', { timestamp: new Date().toISOString() });
+  }, 30000);
+  
+  // Handle device disconnect
+  res.on('close', () => {
+    clearInterval(heartbeatInterval);
+    removeDeviceConnection(deviceId);
+    
+    logger.info('[SSE] Device disconnected', {
+      deviceId,
+      remainingDeviceConnections: deviceSSEConnections.size,
+    });
+  });
+}
+
+/**
+ * Send command to a specific device via SSE
+ * 
+ * @param {string} deviceId - Device ID
+ * @param {string} command - Command to send ('go', 'deregister', 'update', etc.)
+ * @param {Object} data - Additional data
+ * @returns {boolean} Success status
+ */
+function sendCommandToDevice(deviceId, command, data = {}) {
+  const deviceConnection = deviceSSEConnections.get(deviceId);
+  
+  if (!deviceConnection) {
+    logger.warn('[SSE] Device not connected, cannot send command', { deviceId, command });
+    return false;
+  }
+  
+  const payload = {
+    command,
+    ...data,
+    timestamp: new Date().toISOString(),
+  };
+  
+  const sent = sendSSEMessage(deviceConnection.response, 'command', payload);
+  
+  if (sent) {
+    logger.info('[SSE] Command sent to device', { deviceId, command });
+  } else {
+    logger.error('[SSE] Failed to send command to device', { deviceId, command });
+  }
+  
+  return sent;
+}
+
+/**
+ * Broadcast command to all connected devices
+ * 
+ * @param {string} command - Command to send
+ * @param {Object} data - Additional data
+ * @returns {Object} Success and failure counts
+ */
+function broadcastCommandToAllDevices(command, data = {}) {
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (const [deviceId, connection] of deviceSSEConnections.entries()) {
+    const sent = sendCommandToDevice(deviceId, command, data);
+    if (sent) {
+      successCount++;
+    } else {
+      failCount++;
+    }
+  }
+  
+  logger.info('[SSE] Broadcast command to all devices', {
+    command,
+    successCount,
+    failCount,
+  });
+  
+  return { successCount, failCount };
+}
+
+/**
+ * Remove a device connection
+ * 
+ * @param {string} deviceId - Device ID
+ */
+function removeDeviceConnection(deviceId) {
+  deviceSSEConnections.delete(deviceId);
+}
+
+/**
+ * Check if device is connected
+ * 
+ * @param {string} deviceId - Device ID
+ * @returns {boolean} Connection status
+ */
+function isDeviceConnected(deviceId) {
+  return deviceSSEConnections.has(deviceId);
+}
+
+/**
+ * Get device SSE statistics
+ * 
+ * @returns {Object} Device SSE statistics
+ */
+function getDeviceSSEStats() {
+  return {
+    totalDeviceConnections: deviceSSEConnections.size,
+    connectedDevices: Array.from(deviceSSEConnections.keys()),
+  };
+}
+
 module.exports = {
   sseMiddleware,
   setupSSEConnection,
@@ -426,4 +580,10 @@ module.exports = {
   unsubscribeFromChannel,
   getSSEStats,
   closeAllConnections,
+  // Device SSE functions
+  setupDeviceSSEConnection,
+  sendCommandToDevice,
+  broadcastCommandToAllDevices,
+  isDeviceConnected,
+  getDeviceSSEStats,
 };

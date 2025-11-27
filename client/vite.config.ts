@@ -81,12 +81,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
-      '/socket.io': {
-        target: 'https://puretrack-api.onrender.com',
-        changeOrigin: true,
-        secure: true,
-        ws: true,
-      }
     }
     // proxy: {
     //   '/api': {
@@ -122,7 +116,6 @@ export default defineConfig({
           'firebase-vendor': ['firebase/app', 'firebase/auth', 'firebase/analytics'],
           'ui-vendor': ['antd', '@ant-design/icons'],
           'chart-vendor': ['recharts'],
-          'socket-vendor': ['socket.io-client'],
           'swr-vendor': ['swr'],
         },
         // Optimize asset naming
@@ -158,7 +151,6 @@ export default defineConfig({
       'react-router-dom',
       'antd',
       'swr',
-      'socket.io-client',
       'recharts',
     ],
   },

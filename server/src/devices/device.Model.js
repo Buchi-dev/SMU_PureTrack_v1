@@ -51,6 +51,11 @@ const deviceSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    isRegistered: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     lastSeen: {
       type: Date,
       default: Date.now,
@@ -79,6 +84,8 @@ const deviceSchema = new mongoose.Schema(
  */
 deviceSchema.index({ status: 1, lastSeen: -1 });
 deviceSchema.index({ registrationStatus: 1, createdAt: -1 });
+deviceSchema.index({ isRegistered: 1, status: 1 });
+deviceSchema.index({ deviceId: 1, isRegistered: 1 });
 
 /**
  * Instance method to get public device data
@@ -96,12 +103,14 @@ deviceSchema.methods.toPublicProfile = function () {
     location: this.location,
     status: this.status,
     registrationStatus: this.registrationStatus,
+    isRegistered: this.isRegistered,
     lastSeen: this.lastSeen,
     metadata: this.metadata,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };
 };
+
 
 /**
  * Sensor Reading Schema for storing device measurements
