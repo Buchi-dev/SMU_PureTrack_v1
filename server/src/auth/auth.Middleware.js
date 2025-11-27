@@ -41,6 +41,17 @@ const authenticateFirebase = asyncHandler(async (req, res, next) => {
     
     decodedToken = await verifyIdToken(idToken);
     
+    // DEFENSE IN DEPTH: Validate domain even in middleware
+    // This catches any tokens that bypassed the verify-token endpoint
+    const userEmail = decodedToken.email;
+    if (!userEmail || !userEmail.endsWith('@smu.edu.ph')) {
+      logger.warn('[Auth Middleware] Domain validation failed in middleware', {
+        email: userEmail,
+        path: req.path,
+      });
+      throw AuthenticationError.invalidDomain(userEmail);
+    }
+    
     // Only log successful verification in verbose mode
     if (process.env.VERBOSE_LOGGING === 'true') {
       logger.info('[Auth Middleware] Token verified', {

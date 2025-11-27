@@ -93,6 +93,17 @@ class AuthenticationError extends AppError {
       ERROR_CODES.AUTH_FORBIDDEN
     );
   }
+
+  /**
+   * Create error for invalid email domain
+   */
+  static invalidDomain(email = '') {
+    return new AuthenticationError(
+      'Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.',
+      ERROR_CODES.AUTH_INVALID_DOMAIN || 'AUTH_INVALID_DOMAIN',
+      { email, requiredDomain: '@smu.edu.ph' }
+    );
+  }
 }
 
 module.exports = AuthenticationError;

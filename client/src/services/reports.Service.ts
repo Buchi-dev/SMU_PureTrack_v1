@@ -107,7 +107,10 @@ export class ReportsService {
     try {
       const response = await apiClient.post<ReportResponse>(
         REPORT_ENDPOINTS.WATER_QUALITY,
-        request
+        request,
+        {
+          timeout: 30000, // 30 seconds for report generation
+        }
       );
       return response.data;
     } catch (error) {
@@ -135,7 +138,10 @@ export class ReportsService {
     try {
       const response = await apiClient.post<ReportResponse>(
         REPORT_ENDPOINTS.DEVICE_STATUS,
-        request
+        request,
+        {
+          timeout: 30000, // 30 seconds for report generation
+        }
       );
       return response.data;
     } catch (error) {

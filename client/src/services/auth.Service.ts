@@ -88,11 +88,21 @@ export class AuthService {
           // This bypasses the interceptor which might use a cached/old token
           headers: {
             'Authorization': `Bearer ${idToken}`
-          }
+          },
+          // Use longer timeout for token verification to allow backend processing
+          timeout: 15000, // 15 seconds
         }
       );
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      // Check for specific error codes from backend
+      if (error.response?.data?.errorCode === 'AUTH_INVALID_DOMAIN') {
+        const message = error.response.data.message || 
+          'Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.';
+        console.error('[AuthService] Domain validation failed:', message);
+        throw new Error(message);
+      }
+      
       const message = getErrorMessage(error);
       console.error('[AuthService] Token verification error:', message);
       throw new Error(message);
@@ -163,18 +173,56 @@ export class AuthService {
    * const user = await authService.loginWithGoogle();
    */
   async loginWithGoogle(): Promise<VerifyTokenResponse> {
+    let firebaseUserCredential = null;
+    
     try {
       // Sign in with Google via Firebase
-      const result = await signInWithPopup(auth, googleProvider);
-      
+      firebaseUserCredential = await signInWithPopup(auth, googleProvider);
+      const firebaseUser = firebaseUserCredential.user;
+
+      // CRITICAL: Check domain BEFORE backend verification to fail fast
+      const email = firebaseUser.email;
+      if (!email || !email.endsWith('@smu.edu.ph')) {
+        console.warn('[AuthService] Domain validation failed - personal account detected:', email);
+        
+        // Immediately sign out from Firebase to prevent session persistence
+        await firebaseSignOut(auth);
+        
+        throw new Error('Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.');
+      }
+
       // Get ID token from Firebase
-      const idToken = await result.user.getIdToken();
-      
+      const idToken = await firebaseUser.getIdToken();
+
       // Verify token with backend and sync user to database
+      // Backend will do secondary domain validation
       const response = await this.verifyToken(idToken);
-      
+
       return response;
-    } catch (error) {
+    } catch (error: any) {
+      // Ensure Firebase session is cleaned up on ANY error
+      if (firebaseUserCredential) {
+        try {
+          await firebaseSignOut(auth);
+          console.log('[AuthService] Firebase session cleaned up after error');
+        } catch (signOutError) {
+          console.error('[AuthService] Failed to sign out after error:', signOutError);
+        }
+      }
+      
+      // Handle specific Firebase errors
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error('Sign-in cancelled. Please try again.');
+      }
+      
+      if (error.code === 'auth/popup-blocked') {
+        throw new Error('Pop-up blocked by browser. Please allow pop-ups for this site.');
+      }
+      
+      if (error.code === 'auth/network-request-failed') {
+        throw new Error('Network error. Please check your internet connection.');
+      }
+      
       const message = getErrorMessage(error);
       console.error('[AuthService] Google login error:', message);
       throw new Error(message);

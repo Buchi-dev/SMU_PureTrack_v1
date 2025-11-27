@@ -3,6 +3,7 @@ const { verifyIdToken, getFirebaseUser } = require('../configs/firebase.Config')
 const { authenticateFirebase, optionalAuth } = require('./auth.Middleware');
 const User = require('../users/user.Model');
 const logger = require('../utils/logger');
+const { AuthenticationError } = require('../errors');
 
 const router = express.Router();
 
@@ -22,20 +23,45 @@ router.post('/verify-token', async (req, res) => {
       });
     }
 
-    // Verify Firebase token
-    const decodedToken = await verifyIdToken(idToken);
-    
-    // Get Firebase user data
-    const firebaseUser = await getFirebaseUser(decodedToken.uid);
-
-    // Validate email domain - only allow SMU emails
-    const userEmail = decodedToken.email || firebaseUser.email;
-    if (!userEmail || !userEmail.endsWith('@smu.edu.ph')) {
-      return res.status(403).json({
+    // Verify Firebase token FIRST (fast operation)
+    let decodedToken;
+    try {
+      decodedToken = await verifyIdToken(idToken);
+    } catch (verifyError) {
+      logger.error('[Auth] Firebase token verification failed', {
+        error: verifyError.message,
+        errorCode: verifyError.code,
+      });
+      return res.status(401).json({
         success: false,
-        message: 'Access denied. Only SMU email addresses (@smu.edu.ph) are allowed.',
+        message: 'Invalid or expired Firebase token',
+        errorCode: 'AUTH_TOKEN_INVALID',
       });
     }
+
+    // IMMEDIATE domain validation BEFORE any database operations
+    // This prevents timeouts for unauthorized users
+    const userEmail = decodedToken.email;
+    if (!userEmail || !userEmail.endsWith('@smu.edu.ph')) {
+      logger.warn('[Auth] Domain validation failed - personal account rejected', {
+        email: userEmail,
+        requiredDomain: '@smu.edu.ph',
+      });
+      
+      // Return 403 Forbidden with specific error code
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.',
+        errorCode: 'AUTH_INVALID_DOMAIN',
+        metadata: {
+          email: userEmail,
+          requiredDomain: '@smu.edu.ph',
+        },
+      });
+    }
+
+    // Get Firebase user data only AFTER domain validation
+    const firebaseUser = await getFirebaseUser(decodedToken.uid);
 
     // Check if user exists in database
     let user = await User.findOne({ firebaseUid: decodedToken.uid });

@@ -23,7 +23,7 @@ console.log('━━━━━━━━━━━━━━━━━━━━━━�
 /**
  * Create axios instance with default configuration
  * - withCredentials: true enables session cookies
- * - timeout: 30 seconds for long-running operations (reports, analytics)
+ * - timeout: 10 seconds for authentication (fast-fail), 30 seconds for reports/analytics
  */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -31,7 +31,7 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds
+  timeout: 10000, // 10 seconds default - auth should fail fast
 });
 
 /**
@@ -132,6 +132,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     if (error.response) {
       const { status, data } = error.response;
+      
+      // Handle domain validation errors (403 with AUTH_INVALID_DOMAIN)
+      if (status === 403 && data.errorCode === 'AUTH_INVALID_DOMAIN') {
+        console.error('[API] Domain validation failed:', data.message);
+        // Don't redirect, let the component handle it
+        return Promise.reject(error);
+      }
       
       // Handle authentication errors
       if (status === 401) {
@@ -264,13 +271,36 @@ apiClient.interceptors.response.use(
  */
 export const getErrorMessage = (error: unknown): string => {
   if (typeof error === 'object' && error !== null) {
-    const err = error as { response?: { data?: { message?: string; error?: string } }; message?: string };
+    const err = error as { 
+      response?: { 
+        data?: { 
+          message?: string; 
+          error?: string;
+          errorCode?: string;
+        } 
+      }; 
+      message?: string;
+      code?: string;
+    };
+    
+    // Check for domain validation error
+    if (err.response?.data?.errorCode === 'AUTH_INVALID_DOMAIN') {
+      return err.response.data.message || 
+        'Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.';
+    }
+    
     if (err.response?.data?.message) {
       return err.response.data.message;
     }
     if (err.response?.data?.error) {
       return err.response.data.error;
     }
+    
+    // Handle timeout errors specifically
+    if (err.code === 'ECONNABORTED' && err.message?.includes('timeout')) {
+      return 'Request timed out. Please check your connection and try again.';
+    }
+    
     if (err.message) {
       return err.message;
     }
