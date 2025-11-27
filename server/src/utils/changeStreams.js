@@ -2,7 +2,7 @@
  * MongoDB Change Streams Manager
  * 
  * Watches MongoDB collections for real-time changes and broadcasts
- * updates to connected clients via Socket.IO
+ * updates to connected clients via SSE (Server-Sent Events)
  * 
  * Supports:
  * - Alert creation and updates
@@ -19,6 +19,7 @@ const User = require('../users/user.Model');
 const logger = require('./logger');
 const { SENSOR_THRESHOLDS } = require('./constants');
 const { queueAlertEmail } = require('./email.queue');
+const { broadcastToChannel } = require('./sseConfig');
 
 // Store change stream references
 let alertChangeStream;
@@ -31,16 +32,11 @@ let userChangeStream;
  * 
  * Prerequisites:
  * - MongoDB must be running as a replica set
- * - Socket.IO must be initialized (global.io)
+ * - SSE must be configured
  * 
  * @returns {Promise<void>}
  */
 async function initializeChangeStreams() {
-  if (!global.io) {
-    logger.error('[Change Streams] Socket.IO not initialized. Cannot start change streams.');
-    return;
-  }
-
   const isProduction = process.env.NODE_ENV === 'production';
 
   try {
@@ -82,17 +78,15 @@ async function initializeChangeStreams() {
             timestamp: newAlert.timestamp,
           });
 
-          // Broadcast to all clients subscribed to alerts
-          global.io.to('alerts').emit('alert:new', {
+          // Broadcast to all clients subscribed to alerts via SSE
+          broadcastToChannel('alerts', 'alert:new', {
             alert: newAlert,
-            timestamp: new Date(),
           });
 
-          // Broadcast to specific device room if subscribed
+          // Broadcast to specific device channel if available
           if (newAlert.deviceId) {
-            global.io.to(`device:${newAlert.deviceId}`).emit('alert:new', {
+            broadcastToChannel(`device:${newAlert.deviceId}`, 'alert:new', {
               alert: newAlert,
-              timestamp: new Date(),
             });
           }
 
@@ -173,11 +167,10 @@ async function initializeChangeStreams() {
           const updatedAlert = change.fullDocument;
           const updatedFields = change.updateDescription?.updatedFields || {};
 
-          global.io.to('alerts').emit('alert:updated', {
+          broadcastToChannel('alerts', 'alert:updated', {
             alertId: change.documentKey._id,
             updates: updatedFields,
             fullDocument: updatedAlert,
-            timestamp: new Date(),
           });
 
           if (verboseMode) {
@@ -227,9 +220,8 @@ async function initializeChangeStreams() {
 
         if (change.operationType === 'insert') {
           // New device registered
-          global.io.to('devices').emit('device:new', {
+          broadcastToChannel('devices', 'device:new', {
             device,
-            timestamp: new Date(),
           });
 
           if (verboseMode) {
@@ -243,19 +235,17 @@ async function initializeChangeStreams() {
           // Device updated (status, location, etc.)
           const updatedFields = change.updateDescription?.updatedFields || {};
 
-          // Broadcast to devices room
-          global.io.to('devices').emit('device:updated', {
+          // Broadcast to devices channel
+          broadcastToChannel('devices', 'device:updated', {
             deviceId: device.deviceId,
             updates: updatedFields,
             fullDocument: device,
-            timestamp: new Date(),
           });
 
-          // Broadcast to specific device room
-          global.io.to(`device:${device.deviceId}`).emit('device:updated', {
+          // Broadcast to specific device channel
+          broadcastToChannel(`device:${device.deviceId}`, 'device:updated', {
             updates: updatedFields,
             fullDocument: device,
-            timestamp: new Date(),
           });
 
           if (verboseMode) {
@@ -295,28 +285,25 @@ async function initializeChangeStreams() {
         if (change.operationType === 'insert') {
           const reading = change.fullDocument;
 
-          // Broadcast to all clients subscribed to devices
-          global.io.to('devices').emit('reading:new', {
+          // Broadcast to all clients subscribed to devices via SSE
+          broadcastToChannel('devices', 'reading:new', {
             reading,
-            timestamp: new Date(),
           });
 
-          // Broadcast to specific device room
+          // Broadcast to specific device channel
           if (reading.deviceId) {
-            global.io.to(`device:${reading.deviceId}`).emit('reading:new', {
+            broadcastToChannel(`device:${reading.deviceId}`, 'reading:new', {
               reading,
-              timestamp: new Date(),
             });
           }
 
           // Check for anomalies and broadcast warnings
           const hasAnomalies = checkForAnomalies(reading);
           if (hasAnomalies.length > 0) {
-            global.io.to('devices').emit('reading:anomaly', {
+            broadcastToChannel('devices', 'reading:anomaly', {
               deviceId: reading.deviceId,
               anomalies: hasAnomalies,
               reading,
-              timestamp: new Date(),
             });
           }
 
@@ -360,10 +347,9 @@ async function initializeChangeStreams() {
 
           // Only broadcast if role or status changed (important updates)
           if (updatedFields.role || updatedFields.status) {
-            global.io.to('admin').emit('user:updated', {
+            broadcastToChannel('admin', 'user:updated', {
               userId: user.uid,
               updates: updatedFields,
-              timestamp: new Date(),
             });
 
             const isProduction = process.env.NODE_ENV === 'production';

@@ -28,7 +28,7 @@ import {
 } from '../services/devices.Service';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
 import { useVisibilityPolling } from './useVisibilityPolling';
-import { getSocket, subscribe } from '../utils/socket';
+import { addEventListener, removeEventListener, subscribeToChannel, isConnected } from '../utils/sse';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -38,7 +38,7 @@ export interface UseDevicesOptions {
   filters?: DeviceFilters;
   pollInterval?: number;
   enabled?: boolean;
-  realtime?: boolean; // Enable WebSocket real-time updates
+  realtime?: boolean; // Enable SSE real-time updates
 }
 
 export interface UseDevicesReturn {
@@ -93,9 +93,9 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = 300000, // 5 minutes - only used as fallback when WebSocket unavailable
+    pollInterval = 300000, // 5 minutes - only used as fallback when SSE unavailable
     enabled = true,
-    realtime = true, // Enable WebSocket by default
+    realtime = true, // Enable SSE by default
   } = options;
 
   // Add visibility detection to pause polling when tab is hidden
@@ -119,30 +119,32 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: realtime ? 0 : adjustedPollInterval, // Disable HTTP polling when WebSocket is active
-      revalidateOnFocus: false, // Don't refetch on tab focus - rely on WebSocket
+      refreshInterval: realtime ? 0 : adjustedPollInterval, // Disable HTTP polling when SSE is active
+      revalidateOnFocus: false, // Don't refetch on tab focus - rely on SSE
       revalidateOnReconnect: true, // Only refetch when network reconnects
       dedupingInterval: 30000, // Prevent duplicate requests for 30 seconds
     }
   );
 
-  // WebSocket subscription for real-time updates
+  // SSE subscription for real-time updates
   // Uses ref to prevent multiple subscriptions from the same component
   useEffect(() => {
     if (!enabled || !realtime) return;
 
-    const socket = getSocket();
-    if (!socket?.connected) {
+    if (!isConnected()) {
       if (import.meta.env.DEV) {
-        console.warn('[useDevices] Socket not connected, using polling fallback');
+        console.warn('[useDevices] SSE not connected, using polling fallback');
       }
       return;
     }
 
-    // Only subscribe once - subscription is shared across all components
-    subscribe('devices');
+    // Subscribe to devices channel
+    subscribeToChannel('devices').catch(error => {
+      console.error('[useDevices] Failed to subscribe to devices channel:', error);
+    });
+    
     if (import.meta.env.DEV) {
-      console.log('[useDevices] Subscribed to real-time devices');
+      console.log('[useDevices] Subscribed to real-time devices via SSE');
     }
 
     // Handle device updates
@@ -169,18 +171,19 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       mutate(); // Revalidate cache
     };
 
-    socket.on('device:updated', handleDeviceUpdated);
-    socket.on('device:new', handleNewDevice);
-    socket.on('reading:new', handleNewReading);
+    // Register SSE event listeners
+    addEventListener('device:updated', handleDeviceUpdated);
+    addEventListener('device:new', handleNewDevice);
+    addEventListener('reading:new', handleNewReading);
 
     return () => {
-      // Only remove event listeners, don't unsubscribe from room
-      // The subscription is shared across all components using this hook
-      socket.off('device:updated', handleDeviceUpdated);
-      socket.off('device:new', handleNewDevice);
-      socket.off('reading:new', handleNewReading);
+      // Remove event listeners on cleanup
+      removeEventListener('device:updated', handleDeviceUpdated);
+      removeEventListener('device:new', handleNewDevice);
+      removeEventListener('reading:new', handleNewReading);
+      
       if (import.meta.env.DEV) {
-        console.log('[useDevices] Cleaned up event listeners (subscription remains active)');
+        console.log('[useDevices] Cleaned up SSE event listeners');
       }
     };
   }, [enabled, realtime, mutate]);

@@ -58,8 +58,9 @@ function renderTemplate(template, data) {
 }
 
 /**
- * Create nodemailer transporter
+ * Create nodemailer transporter with connection pooling and extended timeouts
  * Uses Gmail SMTP or configured SMTP settings
+ * Optimized for cloud environments (Render.com, etc.)
  */
 const createTransporter = () => {
   // Check if SMTP is configured
@@ -84,11 +85,24 @@ const createTransporter = () => {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    debug: true, // Enable debug logging
-    logger: true, // Enable internal logging
+    // Connection pooling to reuse connections (reduces timeout issues)
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    // Extended timeouts for cloud environments
+    connectionTimeout: 60000, // 60 seconds (up from 2 minutes default timeout causing issues)
+    greetingTimeout: 30000, // 30 seconds
+    socketTimeout: 60000, // 60 seconds
+    // Retry logic
+    retry: {
+      times: 3,
+      interval: 5000, // 5 seconds between retries
+    },
+    debug: process.env.NODE_ENV !== 'production', // Only in development
+    logger: process.env.NODE_ENV !== 'production', // Only in development
   });
 
-  // Test the connection
+  // Test the connection asynchronously (non-blocking)
   transporter.verify((error, success) => {
     if (error) {
       logger.error('[Email Service] SMTP connection verification failed', {
@@ -97,6 +111,7 @@ const createTransporter = () => {
         errno: error.errno,
         syscall: error.syscall,
         hostname: error.hostname,
+        hint: 'Check if SMTP port is blocked by cloud provider firewall',
       });
     } else {
       logger.info('[Email Service] SMTP connection verified successfully');

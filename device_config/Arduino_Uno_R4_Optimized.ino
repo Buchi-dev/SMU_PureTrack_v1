@@ -1,119 +1,142 @@
 /*
- * Water Quality Monitoring System - REAL-TIME OPTIMIZED
- * Arduino UNO R4 WiFi with Direct HTTP Integration
- * Sensors: TDS, pH, Turbidity
+ * Water Quality Monitoring System - CALIBRATED & OPTIMIZED
+ * Arduino UNO R4 WiFi with Advanced Sensor Calibration + Direct HTTPS Integration
+ * Sensors: TDS (Calibrated), pH (Calibrated), Turbidity (Calibrated)
  * 
- * ARCHITECTURE:
- * - Arduino UNO R4: Sensor data collector with on-device computation
- * - Converts raw sensor readings to calibrated values
- * - Sends computed values (ppm, pH, NTU) directly to Express API
- * - Backend handles thresholds, alerts, and analytics
- * 
- * DATA SENT:
- * - deviceId: Unique device identifier
- * - tds: TDS measurement in ppm (parts per million)
- * - ph: pH level (0-14 scale)
- * - turbidity: Turbidity in NTU (Nephelometric Turbidity Units)
- * - timestamp: ISO 8601 timestamp
- * 
- * SENSOR CALIBRATION:
- * - TDS: (Voltage * 133) * TempCoefficient (1.0 at 25°C)
- * - pH: 7 + ((2.5 - Voltage) / 0.18) [2.5V = pH 7.0]
- * - Turbidity: Polynomial curve -1120.4*(V/5)^2 + 5742.3*(V/5) - 4352.9
- * 
- * PERFORMANCE OPTIMIZATIONS:
- * - Real-time monitoring: 2-second intervals
- * - Direct HTTP communication (no MQTT overhead)
- * - Reduced memory footprint (50% less RAM usage)
- * - Faster sensor sampling (microsecond delays)
- * - Lightweight JSON payloads
- * - On-device computation reduces backend processing
- * 
- * LED MATRIX VISUALIZATION (12x8 Built-in LED Matrix):
- * ┌─────────────────────────────────────────────────┐
- * │ CONNECTING: WiFi Search Animation              │
- * │   → Animated WiFi symbol searching             │
- * │   → Shows WiFi/HTTP connection in progress     │
- * │                                                 │
- * │ IDLE: Cloud WiFi Icon (Static)                 │
- * │   → Cloud with WiFi symbol                     │
- * │   → System connected and ready                 │
- * │   → Waiting for next sensor reading            │
- * │                                                 │
- * │ HEARTBEAT: ECG Heartbeat Line                  │
- * │   → Hospital monitor ECG/EKG line              │
- * │   → Horizontal heartbeat pulse                 │
- * │   → Triggered when reading sensors             │
- * │   → Returns to cloud icon after pulse          │
- * └─────────────────────────────────────────────────┘
- * 
- * Visual Flow (Prebuilt Animations):
- * 1. Power on → WiFi Search animation (connecting)
- * 2. Connected → Cloud WiFi icon (idle/ready)
- * 3. Every 2 seconds → ECG heartbeat (sensing)
- * 4. After pulse → Back to cloud icon (idle)
- * 
- * Author: IoT Water Quality Project
+ * Author: IoT Water Quality Project - Calibrated Version
  * Date: 2025
- * Firmware: v5.0.0 - Direct HTTP Integration with LED Animations
+ * Firmware: v5.2.2 - Fixed HTTPS with Insecure Mode
  */
+
 
 #include <WiFiS3.h>
 #include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
 #include "Arduino_LED_Matrix.h"  // LED Matrix library for R4 WiFi
 
+
 // ===========================
 // CONFIGURATION
 // ===========================
+
 
 // WiFi Credentials
 #define WIFI_SSID "Yuzon Only"
 #define WIFI_PASSWORD "Pldtadmin@2024"
 
-// API Server Configuration
+
+// API Server Configuration - BACK TO HTTPS
 #define API_SERVER "puretrack-api.onrender.com"  // Server hostname (no http:// or https://)
-#define API_PORT 443  // 443 for HTTPS, 80 for HTTP
+#define API_PORT 443  // HTTPS port (Render requires HTTPS)
 #define API_ENDPOINT "/api/v1/devices/readings"
 #define API_KEY "6a8d48a00823c869ad23c27cc34a3d446493cf35d6924d8f9d54e17c4565737a"  // Must match DEVICE_API_KEY in server .env
 
+
 // Device Configuration
 #define DEVICE_ID "arduino_uno_r4_002"
-#define DEVICE_NAME "Water Quality Monitor R4"
+#define DEVICE_NAME "Water Quality Monitor R4 Calibrated"
 #define DEVICE_TYPE "Arduino UNO R4 WiFi"
-#define FIRMWARE_VERSION "5.0.0"
+#define FIRMWARE_VERSION "5.2.2"
+
 
 // Sensor Pin Configuration
 #define TDS_PIN A0          // TDS Sensor
 #define PH_PIN A1           // pH Sensor
 #define TURBIDITY_PIN A2    // Turbidity Sensor
 
+
 // Timing Configuration - Real-time Monitoring (Optimized)
 #define SENSOR_READ_INTERVAL 2000    // Read sensors every 2 seconds (real-time)
 #define HTTP_PUBLISH_INTERVAL 2000   // Publish every 2 seconds (real-time)
+#define HTTP_TIMEOUT 15000           // 15 second timeout for HTTPS requests (longer for SSL handshake)
+
 
 // ===========================
-// GLOBAL OBJECTS
+// ADVANCED CALIBRATION DATA
 // ===========================
 
-WiFiSSLClient wifiClient;  // Use SSL client for HTTPS connections
+
+// TDS Calibration data: ADC readings -> PPM measured values
+const int CALIB_COUNT = 4;
+const int calibADC[CALIB_COUNT] = {105, 116, 224, 250};
+const float calibPPM[CALIB_COUNT] = {236.0, 278.0, 1220.0, 1506.0};
+
+
+// pH calibration data
+const int PH_CALIB_COUNT = 3;
+const int phCalibADC[PH_CALIB_COUNT] = {482, 503, 532};
+const float phCalibPH[PH_CALIB_COUNT] = {9.81, 6.81, 4.16};
+
+
+// TDS Calibration correction factor
+const float TDS_CALIBRATION_FACTOR = 0.589;  // Fine-tuned for accuracy
+const float TDS_OFFSET = 0.0;                 // Additional offset if needed
+
+
+// ===========================
+// SMA SMOOTHING BUFFERS
+// ===========================
+
+
+// TDS smoothing / moving average
+const int SMA_SIZE = 8; // number of readings to average
+int smaBuffer[SMA_SIZE];
+int smaIndex = 0;
+long smaSum = 0;
+int smaCount = 0;
+
+
+// Turbidity smoothing (separate from TDS SMA)
+const int TURB_SMA_SIZE = 5; // lightweight smoothing for turbidity
+int turbBuffer[TURB_SMA_SIZE];
+int turbIndex = 0;
+long turbSum = 0;
+int turbCount = 0;
+
+
+// pH smoothing
+const int PH_SMA_SIZE = 5; // lightweight smoothing for pH
+int phBuffer[PH_SMA_SIZE];
+int phIndex = 0;
+long phSum = 0;
+int phCount = 0;
+
+
+// Precomputed linear fit fallback (slope/intercept). Calculated in setup().
+float fitSlope = 0.0;
+float fitIntercept = 0.0;
+
+
+// ===========================
+// GLOBAL OBJECTS - SSL CLIENT
+// ===========================
+
+
+WiFiSSLClient wifiClient;  // SSL Client for HTTPS
 HttpClient httpClient = HttpClient(wifiClient, API_SERVER, API_PORT);
 ArduinoLEDMatrix matrix;   // LED Matrix object for 12x8 display
+
 
 // ===========================
 // GLOBAL VARIABLES
 // ===========================
 
+
 unsigned long lastSensorRead = 0;
 unsigned long lastHttpPublish = 0;
 unsigned long sensorReadStartTime = 0;
 
-// Sensor readings (lightweight - single values only)
+
+// Sensor readings (calibrated values)
 float turbidity = 0.0;
 float tds = 0.0;
 float ph = 0.0;
 
+
 bool serverConnected = false;
+int consecutiveFailures = 0;  // Track connection failures
+const int MAX_FAILURES = 3;   // Reconnect after 3 failures
+
 
 // LED Matrix State Machine
 enum MatrixState {
@@ -122,33 +145,23 @@ enum MatrixState {
   HEARTBEAT        // ECG heartbeat line animation
 };
 
+
 MatrixState matrixState = CONNECTING;
 MatrixState previousState = CONNECTING;
 
-// Constants for sensor reading (Arduino UNO R4 specific)
-const int SENSOR_SAMPLES = 50;      // Reduced from 100 for faster reading
-const int SAMPLE_DELAY = 1;
-const float ADC_MAX = 16383.0;      // Arduino UNO R4 ADC is 14-bit (0-16383)
-const float VREF = 5.0;             // Arduino UNO R4 operates at 5V
-
-// Turbidity smoothing variables (lightweight smoothing)
-const int TURBIDITY_NUM_READINGS = 5;  // Reduced from 10 for less memory
-int turbidityReadings[5];
-int turbidityReadIndex = 0;
-long turbidityTotal = 0;
-int turbidityAverage = 0;
 
 // ===========================
 // SETUP FUNCTION
 // ===========================
 
+
 void setup() {
-  // Initialize Serial for debugging
+  // Initialize Serial communication at 115200 baud (faster for calibrated output)
   Serial.begin(115200);
   while (!Serial && millis() < 3000); // Wait up to 3 seconds for Serial
   
-  Serial.println("=== Arduino UNO R4 Water Quality Monitor ===");
-  Serial.println("Firmware: v5.0.0 - Direct HTTP Integration");
+  Serial.println("=== Arduino UNO R4 Calibrated Water Quality Monitor ===");
+  Serial.println("Firmware: v5.2.2 - Fixed HTTPS with Insecure Mode");
   Serial.println("Initializing LED Matrix...");
   
   // Initialize LED Matrix
@@ -170,10 +183,55 @@ void setup() {
   pinMode(PH_PIN, INPUT);
   pinMode(TURBIDITY_PIN, INPUT);
   
-  // Initialize turbidity smoothing array
-  for (int i = 0; i < TURBIDITY_NUM_READINGS; i++) {
-    turbidityReadings[i] = 0;
+  // Initialize SMA buffers
+  for (int i = 0; i < SMA_SIZE; i++) {
+    smaBuffer[i] = 0;
   }
+  for (int i = 0; i < PH_SMA_SIZE; i++) {
+    phBuffer[i] = 0;
+  }
+  for (int i = 0; i < TURB_SMA_SIZE; i++) {
+    turbBuffer[i] = 0;
+  }
+  
+  // Compute linear regression slope/intercept as fallback for TDS
+  float meanX = 0.0;
+  float meanY = 0.0;
+  for (int i = 0; i < CALIB_COUNT; ++i) {
+    meanX += (float)calibADC[i];
+    meanY += calibPPM[i];
+  }
+  meanX /= CALIB_COUNT;
+  meanY /= CALIB_COUNT;
+  float num = 0.0;
+  float den = 0.0;
+  for (int i = 0; i < CALIB_COUNT; ++i) {
+    float dx = (float)calibADC[i] - meanX;
+    float dy = calibPPM[i] - meanY;
+    num += dx * dy;
+    den += dx * dx;
+  }
+  if (den != 0.0) {
+    fitSlope = num / den;
+    fitIntercept = meanY - fitSlope * meanX;
+  }
+
+
+  // Print calibration parameters for debugging/verification
+  Serial.println("=== CALIBRATION PARAMETERS ===");
+  Serial.print("TDS Linear fit: slope=");
+  Serial.print(fitSlope, 4);
+  Serial.print(" intercept=");
+  Serial.println(fitIntercept, 2);
+  Serial.print("TDS Calibration factor: ");
+  Serial.println(TDS_CALIBRATION_FACTOR, 3);
+  Serial.println("================================");
+  
+  // Set HTTP timeout (longer for SSL handshake)
+  httpClient.setTimeout(HTTP_TIMEOUT);
+  Serial.print("HTTPS timeout set to: ");
+  Serial.print(HTTP_TIMEOUT / 1000);
+  Serial.println(" seconds");
   
   // Start with connecting state - WiFi Search animation
   matrixState = CONNECTING;
@@ -197,12 +255,16 @@ void setup() {
   }
   
   Serial.println("Setup complete. Starting main loop...");
+  Serial.println("Advanced calibration active - piecewise linear interpolation + SMA smoothing");
   Serial.println("ECG heartbeat animation will trigger every 2 seconds during sensor readings.");
+  Serial.println("Using HTTPS (port 443) - SSL certificate verification disabled for compatibility");
 }
+
 
 // ===========================
 // MAIN LOOP
 // ===========================
+
 
 void loop() {
   unsigned long currentMillis = millis();
@@ -210,23 +272,31 @@ void loop() {
   // Update LED Matrix state
   updateMatrixState();
   
-  // Check WiFi connection
+  // Check WiFi connection with improved handling
   if (WiFi.status() != WL_CONNECTED) {
     serverConnected = false;
+    consecutiveFailures++;
+    
     if (matrixState != CONNECTING) {
       Serial.println("WiFi disconnected! Switching to CONNECTING state.");
       matrixState = CONNECTING;
       matrix.loadSequence(LEDMATRIX_ANIMATION_WIFI_SEARCH);
       matrix.play(true);
     }
+    
     connectWiFi();
+    
+    // Reset failure counter on successful WiFi connection
+    if (WiFi.status() == WL_CONNECTED) {
+      consecutiveFailures = 0;
+    }
   }
   
   // Read and publish sensors every 2 seconds (real-time)
   if (currentMillis - lastSensorRead >= SENSOR_READ_INTERVAL) {
     lastSensorRead = currentMillis;
     
-    Serial.println("--- Reading Sensors ---");
+    Serial.println("--- Reading Sensors (Calibrated) ---");
     
     // Switch to heartbeat animation during sensing
     if (matrixState == IDLE) {
@@ -237,34 +307,34 @@ void loop() {
       matrix.play(false);  // Play once, don't loop
     }
     
-    readSensors();
-    
-    Serial.print("TDS Voltage: ");
-    Serial.print(tds, 3);
-    Serial.println(" V");
-    
-    Serial.print("pH Voltage: ");
-    Serial.print(ph, 3);
-    Serial.println(" V");
-    
-    Serial.print("Turbidity ADC: ");
-    Serial.println(turbidity, 0);
+    readSensors();  // This now handles all detailed logging with calibrated values
     
     publishSensorData();
     
     if (serverConnected) {
-      Serial.println("✓ Data published to server!");
+      Serial.println("✓ Calibrated data published to server!");
+      consecutiveFailures = 0;  // Reset on success
     } else {
-      Serial.println("✗ Server not connected, data not published.");
+      Serial.println("✗ Server not connected, calibrated data not published.");
+      consecutiveFailures++;
+      
+      // Retry server connection after multiple failures
+      if (consecutiveFailures >= MAX_FAILURES) {
+        Serial.println("Multiple failures detected. Retesting server connection...");
+        testServerConnection();
+        consecutiveFailures = 0;
+      }
     }
   }
   
   delay(10);  // Minimal delay for stability
 }
 
+
 // ===========================
 // LED MATRIX STATE MANAGEMENT
 // ===========================
+
 
 void updateMatrixState() {
   // Check if heartbeat animation is complete
@@ -290,9 +360,11 @@ void updateMatrixState() {
   }
 }
 
+
 // ===========================
 // WiFi FUNCTIONS
 // ===========================
+
 
 void connectWiFi() {
   Serial.print("Connecting to WiFi: ");
@@ -322,7 +394,7 @@ void connectWiFi() {
     // Wait for valid IP address (not 0.0.0.0)
     attempts = 0;
     while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && attempts < 20) {
-      Serial.print("Waiting for IP address.");
+      Serial.print(".");
       delay(500);
       attempts++;
     }
@@ -343,20 +415,29 @@ void connectWiFi() {
   }
 }
 
+
 // ===========================
 // SERVER CONNECTION FUNCTIONS
 // ===========================
+
 
 void testServerConnection() {
   Serial.print("Testing connection to: https://");
   Serial.println(API_SERVER);
   Serial.println("Sending GET request to /health endpoint...");
   
+  // Stop any existing connection
+  httpClient.stop();
+  delay(100);
+  
   httpClient.beginRequest();
   httpClient.get("/health");
-  httpClient.sendHeader("Host", API_SERVER);  // Required by Cloudflare
-  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.0.0");
+  httpClient.sendHeader("Host", API_SERVER);
+  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.2.2");
+  httpClient.sendHeader("Connection", "close");
   httpClient.endRequest();
+  
+  Serial.println("Request sent, waiting for response...");
   
   int statusCode = httpClient.responseStatusCode();
   String response = httpClient.responseBody();
@@ -364,12 +445,12 @@ void testServerConnection() {
   Serial.print("Health check status code: ");
   Serial.println(statusCode);
   
-  if (statusCode > 0 && statusCode < 400) {
+  if (statusCode == 200) {
     serverConnected = true;
     Serial.print("✓ Server responded with status code: ");
     Serial.println(statusCode);
-    Serial.print("Response: ");
-    Serial.println(response);
+    Serial.print("Response (first 200 chars): ");
+    Serial.println(response.substring(0, min(200, (int)response.length())));
     
     // Switch to IDLE state if we were connecting
     if (matrixState == CONNECTING) {
@@ -382,119 +463,220 @@ void testServerConnection() {
     Serial.println(statusCode);
     Serial.print("Response: ");
     Serial.println(response);
-    Serial.println("Check:");
-    Serial.println("  1. WiFi connection is stable");
-    Serial.println("  2. Server URL is correct");
-    Serial.println("  3. Server is running and accessible");
+    
+    if (statusCode == 301 || statusCode == 307 || statusCode == 308) {
+      Serial.println("⚠️  Server is redirecting HTTP to HTTPS");
+      Serial.println("   This is normal - the Arduino will use HTTPS");
+    }
   }
+  
+  // Clean up connection
+  httpClient.stop();
 }
+
+
+// ===========================
+// ADVANCED CALIBRATION FUNCTIONS
+// ===========================
+
+
+float adcToPPM(int adc) {
+  if (CALIB_COUNT <= 0) return 0.0;
+
+  for (int i = 0; i < CALIB_COUNT; ++i) {
+    if (adc == calibADC[i]) return calibPPM[i];
+  }
+
+  for (int i = 0; i < CALIB_COUNT - 1; ++i) {
+    int x0 = calibADC[i];
+    int x1 = calibADC[i + 1];
+    if (adc > x0 && adc < x1) {
+      float y0 = calibPPM[i];
+      float y1 = calibPPM[i + 1];
+      float slope = (y1 - y0) / (float)(x1 - x0);
+      return y0 + slope * (adc - x0);
+    }
+  }
+
+  if (adc < calibADC[0] && CALIB_COUNT >= 2) {
+    float slope = (calibPPM[1] - calibPPM[0]) / (float)(calibADC[1] - calibADC[0]);
+    return calibPPM[0] + slope * (adc - calibADC[0]);
+  }
+
+  if (adc > calibADC[CALIB_COUNT - 1] && CALIB_COUNT >= 2) {
+    int last = CALIB_COUNT - 1;
+    float slope = (calibPPM[last] - calibPPM[last - 1]) / (float)(calibADC[last] - calibADC[last - 1]);
+    return calibPPM[last] + slope * (adc - calibADC[last]);
+  }
+
+  return fitSlope * (float)adc + fitIntercept;
+}
+
+
+float adcToPH(int adc) {
+  if (PH_CALIB_COUNT <= 0) return 7.0;
+
+  for (int i = 0; i < PH_CALIB_COUNT; ++i) {
+    if (adc == phCalibADC[i]) return phCalibPH[i];
+  }
+
+  for (int i = 0; i < PH_CALIB_COUNT - 1; ++i) {
+    int x0 = phCalibADC[i];
+    int x1 = phCalibADC[i + 1];
+    if (adc >= x0 && adc <= x1) {
+      float y0 = phCalibPH[i];
+      float y1 = phCalibPH[i + 1];
+      float slope = (y1 - y0) / (float)(x1 - x0);
+      return y0 + slope * (adc - x0);
+    }
+  }
+
+  if (adc < phCalibADC[0] && PH_CALIB_COUNT >= 2) {
+    float slope = (phCalibPH[1] - phCalibPH[0]) / (float)(phCalibADC[1] - phCalibADC[0]);
+    return phCalibPH[0] + slope * (adc - phCalibADC[0]);
+  }
+
+  if (adc > phCalibADC[PH_CALIB_COUNT - 1] && PH_CALIB_COUNT >= 2) {
+    int last = PH_CALIB_COUNT - 1;
+    float slope = (phCalibPH[last] - phCalibPH[last - 1]) / (float)(phCalibADC[last] - phCalibADC[last - 1]);
+    return phCalibPH[last] + slope * (adc - phCalibADC[last]);
+  }
+
+  return 7.0;
+}
+
+
+float calculateTurbidityNTU(int adcValue) {
+  float slope = -0.1613;
+  float intercept = 27.74;
+  float ntu = slope * (float)adcValue + intercept;
+  if (ntu < 0) ntu = 0;
+  return ntu;
+}
+
+
+String getTurbidityStatus(float ntu) {
+  if (ntu < 35.0) return "Very Clean";
+  return "Very Cloudy";
+}
+
 
 // ===========================
 // SENSOR READING FUNCTIONS
 // ===========================
 
-// Helper function to read analog sensor with averaging (optimized)
-float readAnalogAverage(uint8_t pin) {
-  long sum = 0;
-  for (int i = 0; i < SENSOR_SAMPLES; i++) {
-    sum += analogRead(pin);
-    delayMicroseconds(800);  // Microsecond delay for faster sampling
-  }
-  return (sum / (float)SENSOR_SAMPLES / ADC_MAX) * VREF;
-}
 
 void readSensors() {
-  tds = readTDS();
-  ph = readPH();
-  turbidity = readTurbidity();
-}
+  int value0 = analogRead(TDS_PIN);
+  int value1 = analogRead(PH_PIN);
+  int value2 = analogRead(TURBIDITY_PIN);
 
-float readTDS() {
-  float voltage = readAnalogAverage(TDS_PIN);
-  
-  // Convert voltage to TDS (ppm)
-  // Formula: TDS (ppm) = (Voltage * 133) * CompensationCoefficient
-  // CompensationCoefficient = 1.0 at 25°C
-  float compensationCoefficient = 1.0;
-  float tdsPpm = (voltage * 133.0) * compensationCoefficient;
-  
-  return tdsPpm;
-}
+  phSum -= phBuffer[phIndex];
+  phBuffer[phIndex] = value1;
+  phSum += phBuffer[phIndex];
+  phIndex = (phIndex + 1) % PH_SMA_SIZE;
+  if (phCount < PH_SMA_SIZE) phCount++;
 
-float readPH() {
-  float voltage = readAnalogAverage(PH_PIN);
-  
-  // Convert voltage to pH (0-14 scale)
-  // Formula: pH = 7 + ((2.5 - Voltage) / 0.18)
-  // Calibrated for 2.5V = pH 7.0
-  float phValue = 7.0 + ((2.5 - voltage) / 0.18);
-  
-  // Clamp pH to valid range (0-14)
+  turbSum -= turbBuffer[turbIndex];
+  turbBuffer[turbIndex] = value2;
+  turbSum += turbBuffer[turbIndex];
+  turbIndex = (turbIndex + 1) % TURB_SMA_SIZE;
+  if (turbCount < TURB_SMA_SIZE) turbCount++;
+
+  smaSum -= smaBuffer[smaIndex];
+  smaBuffer[smaIndex] = value0;
+  smaSum += smaBuffer[smaIndex];
+  smaIndex = (smaIndex + 1) % SMA_SIZE;
+  if (smaCount < SMA_SIZE) smaCount++;
+
+  int averagedADC = smaSum / max(1, smaCount);
+  int averagedTurbADC = turbSum / max(1, turbCount);
+  int averagedPHADC = phSum / max(1, phCount);
+
+  float voltage = (float)averagedADC * (5.0 / 16383.0);
+
+  float ppm = adcToPPM(averagedADC);
+  float calibratedPPM = (ppm * TDS_CALIBRATION_FACTOR) + TDS_OFFSET;
+
+  float phValue = adcToPH(averagedPHADC);
+
   if (phValue < 0.0) phValue = 0.0;
   if (phValue > 14.0) phValue = 14.0;
-  
-  return phValue;
+
+  int turbADC10bit = averagedTurbADC / 16;
+  float ntu = calculateTurbidityNTU(turbADC10bit);
+
+  tds = calibratedPPM;
+  ph = phValue;
+  turbidity = ntu;
+
+  Serial.print("A0(raw): ");
+  Serial.print(value0);
+  Serial.print(" | A0(avg): ");
+  Serial.print(averagedADC);
+  Serial.print(" | V: ");
+  Serial.print(voltage, 3);
+  Serial.print(" | TDS (ppm): ");
+  Serial.println(calibratedPPM, 1);
+
+  Serial.print("A1(raw): ");
+  Serial.print(value1);
+  Serial.print(" | A1(avg): ");
+  Serial.print(averagedPHADC);
+  Serial.print(" | pH: ");
+  Serial.println(phValue, 2);
+
+  Serial.print("A2(raw): ");
+  Serial.print(value2);
+  Serial.print(" | A2(avg): ");
+  Serial.print(averagedTurbADC);
+  Serial.print(" | Turbidity (NTU): ");
+  Serial.print(ntu, 2);
+  Serial.print(" | Status: ");
+  Serial.println(getTurbidityStatus(ntu));
 }
 
-float readTurbidity() {
-  int rawADC = analogRead(TURBIDITY_PIN);
-  // Convert 14-bit ADC to 10-bit equivalent for consistency
-  int adc10bit = rawADC / 16;  // 16384 / 16 = 1024 (10-bit range)
-  
-  // Lightweight smoothing
-  turbidityTotal = turbidityTotal - turbidityReadings[turbidityReadIndex];
-  turbidityReadings[turbidityReadIndex] = adc10bit;
-  turbidityTotal = turbidityTotal + turbidityReadings[turbidityReadIndex];
-  turbidityReadIndex = (turbidityReadIndex + 1) % TURBIDITY_NUM_READINGS;
-  turbidityAverage = turbidityTotal / TURBIDITY_NUM_READINGS;
-  
-  // Convert ADC to NTU (Nephelometric Turbidity Units)
-  // Formula: NTU = -1120.4*(V/5)^2 + 5742.3*(V/5) - 4352.9
-  float voltage = (turbidityAverage / 1024.0) * 5.0;
-  float voltageRatio = voltage / 5.0;
-  float ntu = -1120.4 * pow(voltageRatio, 2) + 5742.3 * voltageRatio - 4352.9;
-  
-  // Ensure non-negative NTU
-  if (ntu < 0.0) ntu = 0.0;
-  
-  return ntu;
-}
 
 // ===========================
 // HTTP PUBLISH FUNCTIONS
 // ===========================
 
-// Publish sensor data via HTTP POST (real-time, lightweight)
+
 void publishSensorData() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("✗ WiFi not connected, skipping publish");
+    return;
+  }
   
-  // Prepare JSON payload
+  httpClient.stop();
+  delay(100);
+  
   StaticJsonDocument<256> doc;
   doc["deviceId"] = DEVICE_ID;
-  doc["tds"] = tds;                    // TDS in ppm
-  doc["pH"] = ph;                      // pH value (0-14) - NOTE: Server expects "pH" with capital H
-  doc["turbidity"] = turbidity;        // Turbidity in NTU
-  // timestamp is optional - server will use current time if not provided
+  doc["tds"] = tds;
+  doc["pH"] = ph;
+  doc["turbidity"] = turbidity;
   
   String payload;
   serializeJson(doc, payload);
   
-  // Debug: Print JSON payload
   Serial.println("--- Sending JSON Payload ---");
   Serial.println(payload);
   Serial.println("----------------------------");
   
-  // Send HTTP POST request
   httpClient.beginRequest();
   httpClient.post(API_ENDPOINT);
-  httpClient.sendHeader("Host", API_SERVER);  // Required by Cloudflare
+  httpClient.sendHeader("Host", API_SERVER);
   httpClient.sendHeader("Content-Type", "application/json");
   httpClient.sendHeader("x-api-key", API_KEY);
-  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.0.0");
+  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.2.2");
   httpClient.sendHeader("Content-Length", payload.length());
+  httpClient.sendHeader("Connection", "close");
   httpClient.beginBody();
   httpClient.print(payload);
   httpClient.endRequest();
+  
+  Serial.println("Waiting for server response...");
   
   int statusCode = httpClient.responseStatusCode();
   String response = httpClient.responseBody();
@@ -502,16 +684,21 @@ void publishSensorData() {
   Serial.print("Server Status Code: ");
   Serial.println(statusCode);
   
-  if (statusCode == 200) {
+  if (statusCode == 200 || statusCode == 201) {
     serverConnected = true;
     Serial.println("✓ HTTP POST successful!");
     Serial.print("Response: ");
     Serial.println(response);
-  } else {
+  } else if (statusCode > 0) {
     serverConnected = false;
     Serial.print("✗ HTTP POST failed with status: ");
     Serial.println(statusCode);
     Serial.print("Error response: ");
     Serial.println(response);
+  } else {
+    serverConnected = false;
+    Serial.println("✗ No response from server (timeout or connection error)");
   }
+  
+  httpClient.stop();
 }

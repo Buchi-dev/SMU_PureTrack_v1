@@ -21,7 +21,7 @@ const { setupSwagger } = require('./configs/swagger.config');
 const logger = require('./utils/logger');
 const { initializeEmailQueue, closeEmailQueue } = require('./utils/email.queue');
 const { API_VERSION } = require('./utils/constants');
-const { setupSocketIO } = require('./utils/socketConfig');
+const { closeAllConnections: closeSSE } = require('./utils/sseConfig');
 const { initializeChangeStreams, closeChangeStreams } = require('./utils/changeStreams');
 const { errorHandler, notFoundHandler } = require('./errors/errorHandler');
 const { getSupportedVersions } = require('./middleware/apiVersion.middleware');
@@ -40,6 +40,7 @@ const alertRoutes = require('./alerts/alert.Routes');
 const deviceRoutes = require('./devices/device.Routes');
 const reportRoutes = require('./reports/report.Routes');
 const analyticsRoutes = require('./analytics/analytics.Routes');
+const sseRoutes = require('./utils/sseRoutes');
 
 // Initialize Express app
 const app = express();
@@ -97,6 +98,11 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Favicon handler - prevent 404 errors in logs
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end(); // No content
+});
+
 // Trust proxy (for proper IP detection behind reverse proxy)
 app.set('trust proxy', 1);
 
@@ -151,6 +157,9 @@ async function initializeApp() {
   // Health check routes
   app.use('/health', healthRoutes);
 
+  // SSE (Server-Sent Events) routes for real-time updates
+  app.use('/sse', sseRoutes);
+
   // API Routes with versioning
   app.use('/auth', authRoutes);
   app.use(`${API_VERSION.PREFIX}/users`, userRoutes);
@@ -173,20 +182,16 @@ async function initializeApp() {
 }
 
 // ============================================
-// SERVER STARTUP WITH SOCKET.IO
+// SERVER STARTUP
 // ============================================
 
 const PORT = process.env.PORT || 5000;
 let server;
-let io;
 
 // Initialize app asynchronously then start server
 initializeApp().then(() => {
-  // Create HTTP server
+  // Create HTTP server (no Socket.IO needed - SSE uses standard HTTP)
   server = http.createServer(app);
-  
-  // Setup Socket.IO
-  io = setupSocketIO(server);
   
   // Start server
   server.listen(PORT, () => {
@@ -199,7 +204,7 @@ initializeApp().then(() => {
       logger.info('Water Quality Monitoring API - PRODUCTION');
       logger.info('========================================');
       logger.info(`Port: ${PORT} | Environment: ${envSummary.nodeEnv} | API: ${API_VERSION.CURRENT}`);
-      logger.info(`Services: MongoDB ✓ | Redis ✓ | SMTP ✓ | Firebase ✓ | Socket.IO ✓`);
+      logger.info(`Services: MongoDB ✓ | Redis ✓ | SMTP ✓ | Firebase ✓ | SSE ✓`);
       logger.info(`Health: http://localhost:${PORT}/health`);
       logger.info('========================================');
     } else {
@@ -218,7 +223,7 @@ initializeApp().then(() => {
       logger.info(`   SMTP:        ${envSummary.smtpConfigured ? '[OK]' : '[WARN] Not configured'}`);
       logger.info(`   Firebase:    ${envSummary.firebaseConfigured ? '[OK]' : '[FAIL]'}`);
       logger.info(`   API Key:     ${envSummary.apiKeyConfigured ? '[OK]' : '[FAIL]'}`);
-      logger.info(`   Socket.IO:   [OK]`);
+      logger.info(`   SSE:         [OK]`);
       logger.info('');
       logger.info('[DOCS] Documentation: http://localhost:' + PORT + '/api-docs');
       logger.info('[HEALTH] Health Check:  http://localhost:' + PORT + '/health');
@@ -251,29 +256,27 @@ const gracefulShutdown = async (signal) => {
       logger.info('HTTP server closed');
     });
 
-    // Stop background jobs
+    // Stop background jobs first
     stopBackgroundJobs();
 
     // Close change streams
     await closeChangeStreams();
 
-    // Disconnect all Socket.IO clients
-    if (io) {
-      io.close(() => {
-        logger.info('Socket.IO server closed');
-      });
-    }
+    // Disconnect all SSE clients
+    closeSSE();
 
     // Close email queue
     await closeEmailQueue();
 
-    // Close Redis connection
-    await closeRedis();
+    // Close Redis connection (suppress "connection closed" warning during shutdown)
+    if (redisClient) {
+      await closeRedis();
+    }
 
-    // Close MongoDB connection
+    // Close MongoDB connection (suppress "disconnected" warning during shutdown)
     await closeDB();
 
-    logger.info('Graceful shutdown completed');
+    logger.info('Graceful shutdown completed successfully');
     process.exit(0);
   } catch (error) {
     logger.error('Error during graceful shutdown:', { error: error.message });

@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 let redisClient = null;
 
 /**
- * Connect to Redis server
+ * Connect to Redis server with improved reconnection logic
  * @returns {Promise<RedisClient>}
  */
 const connectRedis = async () => {
@@ -24,25 +24,35 @@ const connectRedis = async () => {
       url: process.env.REDIS_URL,
       socket: {
         reconnectStrategy: (retries) => {
-          if (retries > 10) {
-            logger.error('Redis reconnection failed after 10 attempts');
+          if (retries > 20) {
+            logger.error('Redis reconnection failed after 20 attempts');
             return new Error('Redis reconnection limit reached');
           }
-          // Exponential backoff: 50ms * 2^retries
-          return Math.min(retries * 50, 3000);
+          // Exponential backoff: 50ms * 2^retries, max 5 seconds
+          const delay = Math.min(retries * 100, 5000);
+          if (retries % 5 === 0) {
+            logger.info(`Redis reconnection attempt #${retries}, next retry in ${delay}ms`);
+          }
+          return delay;
         },
+        // Extended timeouts for cloud environments
+        connectTimeout: 30000, // 30 seconds
+        keepAlive: 30000, // Keep connection alive
       },
     });
 
     // Error handling
     redisClient.on('error', (err) => {
-      logger.error('Redis Client Error:', { error: err.message });
+      // Only log critical errors, not every timeout
+      if (err.code !== 'ETIMEDOUT' && err.code !== 'ECONNRESET') {
+        logger.error('Redis Client Error:', { error: err.message, code: err.code });
+      }
     });
 
     const isProduction = process.env.NODE_ENV === 'production';
 
     redisClient.on('connect', () => {
-      if (!isProduction) {
+      if (!isProduction && process.env.VERBOSE_LOGGING === 'true') {
         logger.info('Redis client connecting...');
       }
     });
@@ -56,11 +66,16 @@ const connectRedis = async () => {
     });
 
     redisClient.on('reconnecting', () => {
-      logger.warn('Redis client reconnecting...');
+      if (!isProduction || process.env.VERBOSE_LOGGING === 'true') {
+        logger.info('Redis client reconnecting...');
+      }
     });
 
     redisClient.on('end', () => {
-      logger.warn('Redis client connection closed');
+      // Only log if not a graceful shutdown
+      if (!isProduction || process.env.VERBOSE_LOGGING === 'true') {
+        logger.info('Redis client connection closed');
+      }
     });
 
     // Connect to Redis

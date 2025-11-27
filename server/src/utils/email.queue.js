@@ -77,7 +77,7 @@ const initializeEmailQueue = (redisUrl) => {
 };
 
 /**
- * Process email job
+ * Process email job with improved error handling
  * @param {Object} job - Bull job object
  */
 const processEmailJob = async (job) => {
@@ -87,7 +87,7 @@ const processEmailJob = async (job) => {
     jobId: job.id,
     type,
     recipient: recipient.email,
-    attempts: job.attemptsMade,
+    attempts: job.attemptsMade + 1, // Current attempt (0-indexed, so +1)
     maxAttempts: EMAIL.RETRY_ATTEMPTS,
     jobData: {
       alertId: data?.alert?.alertId,
@@ -115,11 +115,27 @@ const processEmailJob = async (job) => {
     }
 
     if (!success) {
-      logger.error('Email sending returned false:', {
-        jobId: job.id,
-        type,
-        recipient: recipient.email,
-      });
+      const attemptNumber = job.attemptsMade + 1;
+      
+      // Different logging based on retry status
+      if (attemptNumber < EMAIL.RETRY_ATTEMPTS) {
+        logger.warn('Email sending failed, will retry:', {
+          jobId: job.id,
+          type,
+          recipient: recipient.email,
+          attemptNumber,
+          maxAttempts: EMAIL.RETRY_ATTEMPTS,
+          nextRetryIn: `${EMAIL.RETRY_DELAY / 1000}s`,
+        });
+      } else {
+        logger.error('Email sending failed after all retries:', {
+          jobId: job.id,
+          type,
+          recipient: recipient.email,
+          totalAttempts: EMAIL.RETRY_ATTEMPTS,
+        });
+      }
+      
       throw new Error('Email sending failed');
     }
 
@@ -131,15 +147,21 @@ const processEmailJob = async (job) => {
 
     return { success: true, recipient: recipient.email };
   } catch (error) {
+    const attemptNumber = job.attemptsMade + 1;
+    const isLastAttempt = attemptNumber >= EMAIL.RETRY_ATTEMPTS;
+    
     logger.error('Email job processing error:', {
       jobId: job.id,
       type,
       recipient: recipient.email,
       error: error.message,
-      stack: error.stack,
-      attempts: job.attemptsMade,
+      // Only log stack trace on final failure to reduce log noise
+      ...(isLastAttempt && { stack: error.stack }),
+      attemptNumber,
       maxAttempts: EMAIL.RETRY_ATTEMPTS,
+      willRetry: !isLastAttempt,
     });
+    
     throw error; // Re-throw to trigger retry
   }
 };

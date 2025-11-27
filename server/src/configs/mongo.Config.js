@@ -19,6 +19,10 @@ const connectDB = async () => {
       retryWrites: true,
       retryReads: true,
       w: 'majority',
+      
+      // Auto-reconnection (important for production stability)
+      autoIndex: false, // Don't build indexes in production
+      maxIdleTimeMS: 300000, // Close idle connections after 5 minutes
     };
 
     const conn = await mongoose.connect(process.env.MONGO_URI, options);
@@ -32,22 +36,29 @@ const connectDB = async () => {
       logger.info(`   Pool Size: ${MONGO_POOL.MIN_POOL_SIZE}-${MONGO_POOL.MAX_POOL_SIZE}`);
     }
 
-    // Connection event handlers
+    // Connection event handlers with auto-reconnect
     mongoose.connection.on('error', (err) => {
       logger.error('MongoDB connection error:', { error: err.message });
     });
 
     mongoose.connection.on('disconnected', () => {
-      logger.warn('MongoDB disconnected');
+      logger.warn('MongoDB disconnected. Auto-reconnection will be attempted...');
     });
 
     mongoose.connection.on('reconnected', () => {
-      logger.info('MongoDB reconnected');
+      logger.info('MongoDB reconnected successfully');
+    });
+    
+    mongoose.connection.on('reconnectFailed', () => {
+      logger.error('MongoDB reconnection failed after all attempts');
     });
 
   } catch (error) {
     logger.error(`[ERROR] MongoDB Connection Error: ${error.message}`);
-    process.exit(1);
+    // Don't exit process in production - allow retry
+    if (process.env.NODE_ENV !== 'production') {
+      process.exit(1);
+    }
   }
 };
 

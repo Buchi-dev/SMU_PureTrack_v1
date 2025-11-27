@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { authService, type AuthUser } from "../services/auth.Service";
 import { auth } from "../config/firebase.config";
 import { onAuthStateChanged } from "firebase/auth";
-import { initializeSocket, disconnectSocket } from "../utils/socket";
+import { initializeSSE, disconnectSSE } from "../utils/sse";
 import { AuthContext, type AuthContextType } from "./auth.context";
 
 // User status types (mapped from MongoDB model)
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   // Track if listener has been initialized to prevent duplicates
   const listenerInitialized = useRef(false);
-  const socketInitialized = useRef(false);
+  const sseInitialized = useRef(false);
 
   /**
    * Fetch current user from backend
@@ -96,29 +96,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
           setFirebaseReady(true);
           setLoading(false);
-          socketInitialized.current = false;
+          sseInitialized.current = false;
           
-          // Do NOT proceed with user fetch or socket connection
+          // Do NOT proceed with user fetch or SSE connection
           return;
         }
         
         // User is signed in with Firebase AND has valid domain
         setFirebaseReady(true);
         
-        // Initialize Socket.IO connection once
-        if (!socketInitialized.current) {
-          socketInitialized.current = true;
+        // Initialize SSE connection once
+        if (!sseInitialized.current) {
+          sseInitialized.current = true;
           if (import.meta.env.DEV) {
-            console.log('[AuthContext] User authenticated, connecting to Socket.IO...');
+            console.log('[AuthContext] User authenticated, connecting to SSE...');
           }
           try {
-            await initializeSocket();
+            await initializeSSE();
             if (import.meta.env.DEV) {
-              console.log('[AuthContext] Socket.IO connected successfully');
+              console.log('[AuthContext] SSE connected successfully');
             }
-          } catch (socketError) {
-            console.error('[AuthContext] Failed to connect to Socket.IO:', socketError);
-            socketInitialized.current = false; // Allow retry on error
+          } catch (sseError) {
+            console.error('[AuthContext] Failed to connect to SSE:', sseError);
+            sseInitialized.current = false; // Allow retry on error
             // Non-fatal error, app can still work with HTTP polling
           }
         }
@@ -128,10 +128,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         // User is signed out
         if (import.meta.env.DEV) {
-          console.log('[AuthContext] User logged out, disconnecting Socket.IO...');
+          console.log('[AuthContext] User logged out, disconnecting SSE...');
         }
-        disconnectSocket();
-        socketInitialized.current = false;
+        disconnectSSE();
+        sseInitialized.current = false;
         
         setFirebaseReady(true);
         setUser(null);
