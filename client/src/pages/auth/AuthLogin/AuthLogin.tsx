@@ -11,7 +11,7 @@ import { GoogleOutlined } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
 import { auth } from "../../../config/firebase.config";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 const { Title, Text } = Typography;
 
@@ -77,14 +77,8 @@ export default function AuthLogin() {
       // Login with Google and verify token with backend
       const response = await authService.loginWithGoogle();
       
-      // Check if user has SMU email domain
-      if (!response.user.email.endsWith('@smu.edu.ph')) {
-        // Sign out the user since they don't have the required domain
-        await signOut(auth);
-        setError('Only SMU email addresses (@smu.edu.ph) are allowed to sign in.');
-        setIsLoggingIn(false);
-        return;
-      }
+      // Domain check is now done in authService.loginWithGoogle()
+      // If we reach here, the user has a valid SMU email
       
       console.log('[AuthLogin] Login successful, user:', response.user);
       
@@ -145,7 +139,15 @@ export default function AuthLogin() {
       
     } catch (err) {
       console.error('[AuthLogin] Login failed:', err);
-      setError((err as Error).message || 'Failed to sign in. Please try again.');
+      const errorMessage = (err as Error).message || 'Failed to sign in. Please try again.';
+      
+      // Show user-friendly error for domain validation
+      if (errorMessage.includes('@smu.edu.ph') || errorMessage.includes('personal account')) {
+        setError('Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Please sign in with your SMU account.');
+      } else {
+        setError(errorMessage);
+      }
+      
       setIsLoggingIn(false);
     }
   };

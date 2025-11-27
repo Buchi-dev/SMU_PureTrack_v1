@@ -79,7 +79,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (firebaseUser) {
-        // User is signed in with Firebase
+        // CRITICAL: Domain validation BEFORE any backend calls
+        const email = firebaseUser.email;
+        if (!email || !email.endsWith('@smu.edu.ph')) {
+          console.error('[AuthContext] Domain validation failed - personal account detected:', email);
+          console.error('[AuthContext] Signing out unauthorized user immediately');
+          
+          // Sign out immediately to prevent any further processing
+          try {
+            await auth.signOut();
+          } catch (signOutError) {
+            console.error('[AuthContext] Error signing out unauthorized user:', signOutError);
+          }
+          
+          // Clear state and stop loading
+          setUser(null);
+          setFirebaseReady(true);
+          setLoading(false);
+          socketInitialized.current = false;
+          
+          // Do NOT proceed with user fetch or socket connection
+          return;
+        }
+        
+        // User is signed in with Firebase AND has valid domain
         setFirebaseReady(true);
         
         // Initialize Socket.IO connection once

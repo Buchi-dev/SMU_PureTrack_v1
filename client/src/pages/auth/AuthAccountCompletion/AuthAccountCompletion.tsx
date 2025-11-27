@@ -52,6 +52,14 @@ export const AuthAccountCompletion = () => {
     }
 
     if (user) {
+      // CRITICAL: Domain validation - block personal accounts
+      if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
+        console.error('[AccountCompletion] Unauthorized access attempt - personal account detected:', user.email);
+        message.error('Access denied: Only SMU email addresses (@smu.edu.ph) are allowed.');
+        navigate("/auth/login");
+        return;
+      }
+      
       // If user already has department and phone, skip to appropriate page
       if (user.department && user.phoneNumber) {
         // Profile already complete, redirect based on status

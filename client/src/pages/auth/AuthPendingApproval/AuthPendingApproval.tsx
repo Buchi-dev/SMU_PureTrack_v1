@@ -34,6 +34,13 @@ export const AuthPendingApproval = () => {
 
     // Check status and redirect accordingly
     if (!authLoading && user) {
+      // CRITICAL: Domain validation - block personal accounts
+      if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
+        console.error('[PendingApproval] Unauthorized access attempt - personal account detected:', user.email);
+        navigate("/auth/login");
+        return;
+      }
+      
       console.log("User status:", user.status);
 
       // If status changes to active, redirect to dashboard
