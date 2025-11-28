@@ -13,6 +13,7 @@ export const ROUTES = {
     ANALYTICS: '/admin/analytics',
     USERS: '/admin/users',
     REPORTS: '/admin/reports',
+    REPORT_HISTORY: '/admin/reports/history',
     ALERTS: '/admin/alerts',
     SETTINGS: '/admin/settings',
   },

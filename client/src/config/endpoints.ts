@@ -59,6 +59,8 @@ export const REPORT_ENDPOINTS = {
   WATER_QUALITY: `${API_VERSION}/reports/water-quality`,
   DEVICE_STATUS: `${API_VERSION}/reports/device-status`,
   LIST: `${API_VERSION}/reports`,
+  HISTORY: `${API_VERSION}/reports/history`,
+  DOWNLOAD: (fileId: string) => `${API_VERSION}/reports/download/${fileId}`,
   BY_ID: (reportId: string) => `${API_VERSION}/reports/${reportId}`,
   DELETE: (reportId: string) => `${API_VERSION}/reports/${reportId}`,
 } as const;

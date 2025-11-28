@@ -61,6 +61,12 @@ export interface Report {
   updatedAt: string;
 }
 
+export interface ReportResponse {
+  success: boolean;
+  data: Report;
+  message?: string;
+}
+
 export interface ReportListResponse {
   success: boolean;
   data: Report[];
@@ -72,10 +78,37 @@ export interface ReportListResponse {
   };
 }
 
-export interface ReportResponse {
+export interface ReportHistoryItem {
+  id: string;
+  reportId: string;
+  type: string;
+  title: string;
+  createdAt: string;
+  fileSize: number;
+  downloadCount: number;
+  startDate: string;
+  endDate: string;
+  deviceCount: number;
+  downloadUrl: string;
+}
+
+export interface ReportHistoryFilters {
+  type?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface ReportHistoryResponse {
   success: boolean;
-  data: Report;
-  message?: string;
+  data: ReportHistoryItem[];
+  pagination: {
+    total: number;
+    page: number;
+    pages: number;
+    limit: number;
+  };
 }
 
 // ============================================================================
@@ -247,16 +280,74 @@ export class ReportsService {
   }
 
   /**
+   * Get report history with stored PDFs
+   * 
+   * @param filters - Optional filters for report history
+   * @returns List of reports with download information
+   * @throws {Error} If request fails
+   * @example
+   * const history = await reportsService.getReportHistory({
+   *   type: 'water-quality',
+   *   page: 1,
+   *   limit: 10
+   * });
+   */
+  async getReportHistory(filters: ReportHistoryFilters = {}): Promise<ReportHistoryResponse> {
+    try {
+      const params = new URLSearchParams();
+
+      if (filters.type) params.append('type', filters.type);
+      if (filters.startDate) params.append('startDate', filters.startDate);
+      if (filters.endDate) params.append('endDate', filters.endDate);
+      if (filters.page) params.append('page', filters.page.toString());
+      if (filters.limit) params.append('limit', filters.limit.toString());
+
+      const url = `${REPORT_ENDPOINTS.HISTORY}?${params.toString()}`;
+      const response = await apiClient.get(url);
+
+      return {
+        success: response.data.success,
+        data: response.data.data,
+        pagination: response.data.pagination,
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch report history: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
+   * Download a report PDF
+   * 
+   * @param fileId - GridFS file ID
+   * @returns Blob for download
+   * @throws {Error} If download fails
+   * @example
+   * const blob = await reportsService.downloadReport('507f1f77bcf86cd799439011');
+   */
+  async downloadReport(fileId: string): Promise<Blob> {
+    try {
+      const url = REPORT_ENDPOINTS.DOWNLOAD(fileId);
+      const response = await apiClient.get(url, {
+        responseType: 'blob',
+      });
+
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to download report: ${getErrorMessage(error)}`);
+    }
+  }
+
+  /**
    * @deprecated Use generateDataSummaryReport() - not yet implemented on server
    */
-  async generateDataSummaryReport(): Promise<ReportResponse> {
+  async generateDataSummaryReport(): Promise<ReportListResponse> {
     throw new Error('Data summary reports not yet implemented on Express server');
   }
 
   /**
    * @deprecated Use generateComplianceReport() - not yet implemented on server
    */
-  async generateComplianceReport(): Promise<ReportResponse> {
+  async generateComplianceReport(): Promise<ReportListResponse> {
     throw new Error('Compliance reports not yet implemented on Express server');
   }
 }

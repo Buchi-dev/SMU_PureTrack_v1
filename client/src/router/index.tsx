@@ -15,6 +15,7 @@ import {
   AdminUserManagement,
   AdminSettings
 } from '../pages/admin';
+import ReportHistory from '../pages/admin/AdminReports/ReportHistory';
 
 // Staff Pages
 import { 
@@ -154,6 +155,14 @@ const router = createBrowserRouter([
     element: (
       <AdminRoute>
         <AdminReports />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: '/admin/reports/history',
+    element: (
+      <AdminRoute>
+        <ReportHistory />
       </AdminRoute>
     ),
   },

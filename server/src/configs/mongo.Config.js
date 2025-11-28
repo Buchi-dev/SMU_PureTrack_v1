@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 const { MONGO_POOL } = require('../utils/constants');
+const gridFSService = require('../utils/gridfs.service');
 
 /**
  * Connect to MongoDB database with optimized connection pooling
@@ -52,6 +53,9 @@ const connectDB = async () => {
     mongoose.connection.on('reconnectFailed', () => {
       logger.error('MongoDB reconnection failed after all attempts');
     });
+
+    // Initialize GridFS service after connection
+    gridFSService.initialize();
 
   } catch (error) {
     logger.error(`[ERROR] MongoDB Connection Error: ${error.message}`);

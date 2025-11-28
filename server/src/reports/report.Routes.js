@@ -5,6 +5,8 @@ const {
   getAllReports,
   getReportById,
   deleteReport,
+  getReportHistory,
+  downloadReport,
 } = require('./report.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
 const {
@@ -37,11 +39,18 @@ router.post('/device-status', ensureAuthenticated, validateReportGeneration, gen
 router.get('/', ensureAuthenticated, validatePagination, getAllReports);
 
 /**
- * @route   GET /api/v1/reports/:id
- * @desc    Get report by ID
+ * @route   GET /api/v1/reports/history
+ * @desc    Get report history with stored PDFs
  * @access  Authenticated users
  */
-router.get('/:id', ensureAuthenticated, validateMongoId, getReportById);
+router.get('/history', ensureAuthenticated, validatePagination, getReportHistory);
+
+/**
+ * @route   GET /api/v1/reports/download/:fileId
+ * @desc    Download report PDF from GridFS
+ * @access  Authenticated users (only their own reports)
+ */
+router.get('/download/:fileId', ensureAuthenticated, downloadReport);
 
 /**
  * @route   DELETE /api/v1/reports/:id

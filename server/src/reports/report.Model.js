@@ -55,6 +55,25 @@ const reportSchema = new mongoose.Schema(
       readingCount: Number,
       processingTime: Number,
     },
+    // GridFS file storage metadata
+    gridFsFileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      index: true,
+    },
+    fileSize: {
+      type: Number,
+      default: 0,
+    },
+    fileChecksum: {
+      type: String,
+    },
+    downloadCount: {
+      type: Number,
+      default: 0,
+    },
+    lastDownloadedAt: {
+      type: Date,
+    },
     error: {
       type: String,
     },
@@ -70,6 +89,7 @@ const reportSchema = new mongoose.Schema(
 reportSchema.index({ type: 1, createdAt: -1 });
 reportSchema.index({ generatedBy: 1, createdAt: -1 });
 reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ gridFsFileId: 1 }); // Index for GridFS file lookups
 
 /**
  * Instance method to get public report data
@@ -87,6 +107,12 @@ reportSchema.methods.toPublicProfile = function () {
     data: this.data,
     summary: this.summary,
     metadata: this.metadata,
+    // GridFS file information
+    gridFsFileId: this.gridFsFileId,
+    fileSize: this.fileSize,
+    fileChecksum: this.fileChecksum,
+    downloadCount: this.downloadCount,
+    lastDownloadedAt: this.lastDownloadedAt,
     error: this.error,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
