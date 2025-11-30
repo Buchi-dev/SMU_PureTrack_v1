@@ -3,32 +3,27 @@ import {
   Layout,
   Space,
   Alert,
-  Row,
-  Col,
   Spin,
   Empty,
   Card,
   Divider,
-  Segmented,
-  Tooltip,
-  List,
   Typography,
+  message,
 } from 'antd';
 import {
   LineChartOutlined,
   InfoCircleOutlined,
-  BarChartOutlined,
-  AppstoreOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
 import { PageHeader } from '../../../components/PageHeader';
 import { useDevices, useAlerts } from '../../../hooks';
 import { useDeviceSeverityCalculator } from './hooks/useDeviceSeverityCalculator';
-import { StatsOverview, DeviceCard, DeviceListItem, FilterControls } from './components';
+import { StatsOverview, DeviceTable, FilterControls } from './components';
+import { sendDeviceCommand } from '../../../utils/mqtt';
 
 const { Content } = Layout;
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 export const AdminDeviceReadings = () => {
   // ✅ GLOBAL HOOKS: Real-time data
@@ -42,7 +37,6 @@ export const AdminDeviceReadings = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'compact'>('grid');
 
   // Combine loading and error states
   const loading = devicesLoading || alertsLoading;
@@ -66,10 +60,21 @@ export const AdminDeviceReadings = () => {
     };
   }, [enrichedDevices]);
 
+  const handleForceDeviceSendData = () => {
+    // Send "send_now" command to all online devices
+    enrichedDevices.forEach((device) => {
+      if (device.status === 'online') {
+        sendDeviceCommand(device.deviceId, 'send_now');
+      }
+    });
+    message.success(`Send Now command sent to ${enrichedDevices.filter(d => d.status === 'online').length} online device(s)`);
+  };
+
   // Manual refresh handler
   const handleRefresh = () => {
     refetchDevices();
     refetchAlerts();
+    handleForceDeviceSendData();
   };
 
   // Apply filters to enriched devices
@@ -102,12 +107,6 @@ export const AdminDeviceReadings = () => {
       return true;
     });
   }, [enrichedDevices, severityFilter, statusFilter, searchTerm]);
-
-  // Group devices by severity
-  const criticalDevices = filteredDevices.filter((d) => d.severityLevel === 'critical');
-  const warningDevices = filteredDevices.filter((d) => d.severityLevel === 'warning');
-  const normalDevices = filteredDevices.filter((d) => d.severityLevel === 'normal');
-  const offlineDevices = filteredDevices.filter((d) => d.severityLevel === 'offline');
 
   return (
     <AdminLayout>
@@ -170,32 +169,10 @@ export const AdminDeviceReadings = () => {
                 onSearchChange={setSearchTerm}
               />
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 <Text type="secondary">
                   Showing {filteredDevices.length} of {enrichedDevices.length} device{enrichedDevices.length !== 1 ? 's' : ''}
                 </Text>
-                <Segmented
-                  options={[
-                    {
-                      label: (
-                        <Tooltip title="Grid View">
-                          <AppstoreOutlined />
-                        </Tooltip>
-                      ),
-                      value: 'grid',
-                    },
-                    {
-                      label: (
-                        <Tooltip title="Compact View">
-                          <BarChartOutlined />
-                        </Tooltip>
-                      ),
-                      value: 'compact',
-                    },
-                  ]}
-                  value={viewMode}
-                  onChange={(value) => setViewMode(value as 'grid' | 'compact')}
-                />
               </div>
             </Space>
           </Card>
@@ -220,144 +197,11 @@ export const AdminDeviceReadings = () => {
             </Card>
           )}
 
-          {/* Critical Devices Section */}
-          {criticalDevices.length > 0 && (
-            <>
-              <div
-                style={{
-                  background: '#fff2e8',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '2px solid #ff4d4f',
-                }}
-              >
-                <Title level={4} style={{ margin: 0, color: '#ff4d4f' }}>
-                  🚨 Critical Devices ({criticalDevices.length})
-                </Title>
-                <Text type="secondary">Immediate attention required</Text>
-              </div>
-              {viewMode === 'grid' ? (
-                <Row gutter={[16, 16]}>
-                  {criticalDevices.map((device) => (
-                    <Col key={device.deviceId} xs={24} sm={24} md={12} lg={8} xl={6}>
-                      <DeviceCard device={device} />
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <List
-                  dataSource={criticalDevices}
-                  renderItem={(device) => <DeviceListItem key={device.deviceId} device={device} />}
-                  bordered
-                  style={{ background: '#fff' }}
-                />
-              )}
-            </>
-          )}
-
-          {/* Warning Devices Section */}
-          {warningDevices.length > 0 && (
-            <>
-              <div
-                style={{
-                  background: '#fffbe6',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '2px solid #faad14',
-                }}
-              >
-                <Title level={4} style={{ margin: 0, color: '#faad14' }}>
-                  ⚠️ Warning Devices ({warningDevices.length})
-                </Title>
-                <Text type="secondary">Monitor closely</Text>
-              </div>
-              {viewMode === 'grid' ? (
-                <Row gutter={[16, 16]}>
-                  {warningDevices.map((device) => (
-                    <Col key={device.deviceId} xs={24} sm={24} md={12} lg={8} xl={6}>
-                      <DeviceCard device={device} />
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <List
-                  dataSource={warningDevices}
-                  renderItem={(device) => <DeviceListItem key={device.deviceId} device={device} />}
-                  bordered
-                  style={{ background: '#fff' }}
-                />
-              )}
-            </>
-          )}
-
-          {/* Normal Devices Section */}
-          {normalDevices.length > 0 && (
-            <>
-              <div
-                style={{
-                  background: '#f6ffed',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '2px solid #52c41a',
-                }}
-              >
-                <Title level={4} style={{ margin: 0, color: '#52c41a' }}>
-                  ✅ Normal Operation ({normalDevices.length})
-                </Title>
-                <Text type="secondary">All parameters within acceptable range</Text>
-              </div>
-              {viewMode === 'grid' ? (
-                <Row gutter={[16, 16]}>
-                  {normalDevices.map((device) => (
-                    <Col key={device.deviceId} xs={24} sm={24} md={12} lg={8} xl={6}>
-                      <DeviceCard device={device} />
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <List
-                  dataSource={normalDevices}
-                  renderItem={(device) => <DeviceListItem key={device.deviceId} device={device} />}
-                  bordered
-                  style={{ background: '#fff' }}
-                />
-              )}
-            </>
-          )}
-
-          {/* Offline Devices Section */}
-          {offlineDevices.length > 0 && (
-            <>
-              <div
-                style={{
-                  background: '#fafafa',
-                  padding: '16px',
-                  borderRadius: '8px',
-                  border: '2px solid #d9d9d9',
-                }}
-              >
-                <Title level={4} style={{ margin: 0, color: '#8c8c8c' }}>
-                  📡 Offline Devices ({offlineDevices.length})
-                </Title>
-                <Text type="secondary">No recent data available</Text>
-              </div>
-              {viewMode === 'grid' ? (
-                <Row gutter={[16, 16]}>
-                  {offlineDevices.map((device) => (
-                    <Col key={device.deviceId} xs={24} sm={24} md={12} lg={8} xl={6}>
-                      <DeviceCard device={device} />
-                    </Col>
-                  ))}
-                </Row>
-              ) : (
-                <List
-                  dataSource={offlineDevices}
-                  renderItem={(device) => <DeviceListItem key={device.deviceId} device={device} />}
-                  bordered
-                  style={{ background: '#fff' }}
-                />
-              )}
-            </>
+          {/* Table View - Shows all devices in a single table */}
+          {filteredDevices.length > 0 && (
+            <Card>
+              <DeviceTable devices={filteredDevices} />
+            </Card>
           )}
         </Space>
       </Content>
