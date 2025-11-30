@@ -74,9 +74,20 @@ async function initializeChangeStreams() {
             severity: newAlert.severity,
             parameter: newAlert.parameter,
             value: newAlert.value,
+            occurrenceCount: newAlert.occurrenceCount,
             message: newAlert.message,
             timestamp: newAlert.timestamp,
           });
+
+          // ✅ Only send emails for truly new alerts (first occurrence)
+          // Skip email notifications for alert occurrence updates
+          if (newAlert.occurrenceCount > 1) {
+            logger.info('[Change Streams] Skipping email for alert occurrence update', {
+              alertId: newAlert.alertId,
+              occurrenceCount: newAlert.occurrenceCount,
+            });
+            return; // Don't send emails for occurrence updates
+          }
 
           // Publish to MQTT topic for real-time client updates
           // mqttService.publish(MQTT_CONFIG.TOPICS.ALERTS_NEW, {

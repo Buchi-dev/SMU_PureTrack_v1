@@ -8,6 +8,7 @@ const { NotFoundError, ValidationError, AppError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
 const asyncHandler = require('../middleware/asyncHandler');
 const mqttService = require('../utils/mqtt.service');
+const { checkAlertCooldown, updateAlertOccurrence } = require('../middleware/alertCooldown');
 
 /**
  * Get all devices
@@ -425,29 +426,33 @@ async function checkThresholdsAndCreateAlerts(device, reading) {
 }
 
 /**
- * Create alert helper
+ * Create alert helper with cooldown logic
  */
 async function createAlert(device, parameter, value, threshold, severity, timestamp) {
   try {
-    const alertId = uuidv4();
     const thresholdValue = typeof threshold === 'object' ? (threshold.max || threshold.min) : threshold;
-    const message = `${parameter} level ${value > thresholdValue ? 'above' : 'below'} safe threshold`;
 
-    // Check if similar alert already exists (within last hour, same device, same parameter, unacknowledged)
-    const recentAlert = await Alert.findOne({
-      deviceId: device.deviceId,
-      parameter,
-      status: 'Unacknowledged',
-      timestamp: { $gte: new Date(Date.now() - 60 * 60 * 1000) },
-    });
+    // ✅ Check cooldown before creating alert
+    const cooldownCheck = await checkAlertCooldown(device.deviceId, parameter, severity);
 
-    if (recentAlert) {
-      logger.info('[Device Controller] Skipping duplicate alert', {
+    if (!cooldownCheck.canCreateAlert) {
+      // Update existing alert occurrence count instead of creating new alert
+      const updatedAlert = await updateAlertOccurrence(cooldownCheck.activeAlert, value, timestamp);
+
+      logger.info('[Device Controller] Updated existing alert occurrence', {
         deviceId: device.deviceId,
         parameter,
+        alertId: updatedAlert.alertId,
+        occurrenceCount: updatedAlert.occurrenceCount,
+        minutesRemaining: cooldownCheck.minutesRemaining,
       });
-      return null;
+
+      return updatedAlert; // Return existing alert (updated)
     }
+
+    // ✅ Create new alert if no cooldown active
+    const alertId = uuidv4();
+    const message = `${parameter} level ${value > thresholdValue ? 'above' : 'below'} safe threshold`;
 
     const alert = new Alert({
       alertId,
@@ -459,19 +464,25 @@ async function createAlert(device, parameter, value, threshold, severity, timest
       threshold: thresholdValue,
       message,
       timestamp,
+      occurrenceCount: 1,
+      firstOccurrence: timestamp,
+      lastOccurrence: timestamp,
+      currentValue: value,
     });
 
     await alert.save();
-    logger.info('[Device Controller] Created alert', {
+
+    logger.info('[Device Controller] Created new alert', {
       alertId,
       severity,
       deviceId: device.deviceId,
       parameter,
       value,
     });
+
     return alert;
   } catch (error) {
-    logger.error('[Device Controller] Error creating alert', {
+    logger.error('[Device Controller] Error creating/updating alert', {
       error: error.message,
       deviceId: device.deviceId,
       parameter,

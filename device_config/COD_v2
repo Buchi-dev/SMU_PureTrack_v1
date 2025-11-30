@@ -1,13 +1,10 @@
 /*
  * Water Quality Monitoring System - 24/7 ULTRA-LEAN VERSION
- * Arduino UNO R4 WiFi - Clock-Synchronized 30 Minute Data Transmission
+ * Arduino UNO R4 WiFi - 30 Minute Data Transmission
  * Daily restart at 12:00 AM Philippine Time (16:00 UTC)
  * SSL/TLS ENABLED for HiveMQ Cloud (Port 8883)
- * EEPROM: Persistent registration status
- * Data sends at :00 and :30 minutes every hour (synchronized with clock)
- * FIXED: Deregister command now forces MQTT reconnection
  * 
- * Firmware: v6.8.1 - Production SSL + EEPROM + Clock Sync + Deregister Fix
+ * Firmware: v6.6.0 - Production SSL
  */
 
 #include <WiFiS3.h>
@@ -16,7 +13,6 @@
 #include <ArduinoJson.h>
 #include <WiFiUdp.h>
 #include <NTPClient.h>
-#include <EEPROM.h>
 
 // ===========================
 // CONFIGURATION
@@ -28,7 +24,7 @@
 
 // MQTT Broker Configuration - HiveMQ Cloud (SSL/TLS)
 #define MQTT_BROKER "0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud"
-#define MQTT_PORT 8883
+#define MQTT_PORT 8883  // SSL/TLS port
 #define MQTT_CLIENT_ID "arduino_uno_r4_002"
 #define MQTT_USERNAME "Admin"
 #define MQTT_PASSWORD "Admin123"
@@ -37,7 +33,7 @@
 #define DEVICE_ID "arduino_uno_r4_002"
 #define DEVICE_NAME "Water Quality Monitor R4"
 #define DEVICE_TYPE "Arduino UNO R4 WiFi"
-#define FIRMWARE_VERSION "6.8.1"
+#define FIRMWARE_VERSION "6.6.0"
 
 // Sensor Pin Configuration
 #define TDS_PIN A0
@@ -45,28 +41,23 @@
 #define TURBIDITY_PIN A2
 
 // Timing Configuration
-#define SENSOR_READ_INTERVAL 60000      // 1 minute (local monitoring)
-#define REGISTRATION_INTERVAL 60000
-#define MQTT_RECONNECT_INTERVAL 30000
-#define WATCHDOG_INTERVAL 300000
-#define NTP_UPDATE_INTERVAL 3600000
+#define SENSOR_READ_INTERVAL 60000      // 1 minute
+#define DATA_SEND_INTERVAL 1800000      // 30 minutes
+#define REGISTRATION_INTERVAL 60000     // 1 minute
+#define MQTT_RECONNECT_INTERVAL 30000   // 30 seconds
+#define STATUS_UPDATE_INTERVAL 1800000  // 30 minutes
+#define WATCHDOG_INTERVAL 300000        // 5 minutes
+#define NTP_UPDATE_INTERVAL 3600000     // 1 hour
 
 // Time Settings - Philippine Time (UTC+8)
-#define RESTART_HOUR_UTC 16
+#define RESTART_HOUR_UTC 16             // 16:00 UTC = 12:00 AM PH Time
 #define RESTART_MINUTE 0
-#define TIMEZONE_OFFSET_SECONDS 28800
+#define TIMEZONE_OFFSET_SECONDS 28800   // +8 hours
 #define MAX_UPTIME_HOURS 25
 
 // 24/7 Operation Settings
-#define MAX_MQTT_FAILURES 10
+#define MAX_MQTT_FAILURES 10            // Increased for SSL timeouts
 #define MAX_WIFI_FAILURES 3
-
-// EEPROM Settings
-#define EEPROM_SIZE 512
-#define EEPROM_MAGIC_NUMBER 0xA5B7
-#define EEPROM_ADDR_MAGIC 0
-#define EEPROM_ADDR_APPROVED 2
-#define EEPROM_ADDR_BOOT_COUNT 3
 
 // ===========================
 // CALIBRATION DATA
@@ -109,9 +100,9 @@ float fitSlope = 0.0;
 float fitIntercept = 0.0;
 
 // ===========================
-// GLOBAL OBJECTS
+// GLOBAL OBJECTS - SSL ENABLED
 // ===========================
-WiFiSSLClient wifiSSLClient;
+WiFiSSLClient wifiSSLClient;  // SSL client for encrypted connection
 PubSubClient mqttClient(wifiSSLClient);
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, NTP_UPDATE_INTERVAL);
@@ -120,8 +111,10 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, NTP_UPDATE_INTERVAL);
 // GLOBAL VARIABLES
 // ===========================
 unsigned long lastSensorRead = 0;
+unsigned long lastDataSend = 0;
 unsigned long lastRegistrationAttempt = 0;
 unsigned long lastMqttReconnect = 0;
+unsigned long lastStatusUpdate = 0;
 unsigned long lastWatchdog = 0;
 unsigned long lastNtpUpdate = 0;
 unsigned long bootTime = 0;
@@ -139,153 +132,12 @@ int consecutiveMqttFailures = 0;
 int consecutiveWifiFailures = 0;
 
 unsigned long transmissionCount = 0;
-unsigned long bootCount = 0;
-
-// Clock-based transmission tracking
-int lastTransmissionMinute = -1;
 
 // MQTT Topics
 String topicData = "devices/" + String(DEVICE_ID) + "/data";
 String topicStatus = "devices/" + String(DEVICE_ID) + "/status";
 String topicRegister = "devices/" + String(DEVICE_ID) + "/register";
 String topicCommands = "devices/" + String(DEVICE_ID) + "/commands";
-
-// ===========================
-// EEPROM FUNCTIONS
-// ===========================
-
-void initEEPROM() {
-  Serial.println("\n=== EEPROM Initialization ===");
-  
-  uint16_t magic = (EEPROM.read(EEPROM_ADDR_MAGIC) << 8) | EEPROM.read(EEPROM_ADDR_MAGIC + 1);
-  
-  if (magic != EEPROM_MAGIC_NUMBER) {
-    Serial.println("First boot - initializing EEPROM");
-    
-    EEPROM.write(EEPROM_ADDR_MAGIC, (EEPROM_MAGIC_NUMBER >> 8) & 0xFF);
-    EEPROM.write(EEPROM_ADDR_MAGIC + 1, EEPROM_MAGIC_NUMBER & 0xFF);
-    EEPROM.write(EEPROM_ADDR_APPROVED, 0);
-    writeBootCount(0);
-    
-    isApproved = false;
-    bootCount = 0;
-    
-    Serial.println("EEPROM initialized");
-  } else {
-    Serial.println("EEPROM valid - reading stored values");
-    
-    isApproved = EEPROM.read(EEPROM_ADDR_APPROVED) == 1;
-    bootCount = readBootCount();
-    bootCount++;
-    writeBootCount(bootCount);
-    
-    Serial.print("Approved status: ");
-    Serial.println(isApproved ? "YES" : "NO");
-    Serial.print("Boot count: ");
-    Serial.println(bootCount);
-  }
-  
-  Serial.println("=============================\n");
-}
-
-void saveApprovedStatus(bool approved) {
-  EEPROM.write(EEPROM_ADDR_APPROVED, approved ? 1 : 0);
-  isApproved = approved;
-  
-  Serial.print("✓ Saved approved status to EEPROM: ");
-  Serial.println(approved ? "YES" : "NO");
-}
-
-unsigned long readBootCount() {
-  unsigned long count = 0;
-  count |= ((unsigned long)EEPROM.read(EEPROM_ADDR_BOOT_COUNT) << 24);
-  count |= ((unsigned long)EEPROM.read(EEPROM_ADDR_BOOT_COUNT + 1) << 16);
-  count |= ((unsigned long)EEPROM.read(EEPROM_ADDR_BOOT_COUNT + 2) << 8);
-  count |= EEPROM.read(EEPROM_ADDR_BOOT_COUNT + 3);
-  return count;
-}
-
-void writeBootCount(unsigned long count) {
-  EEPROM.write(EEPROM_ADDR_BOOT_COUNT, (count >> 24) & 0xFF);
-  EEPROM.write(EEPROM_ADDR_BOOT_COUNT + 1, (count >> 16) & 0xFF);
-  EEPROM.write(EEPROM_ADDR_BOOT_COUNT + 2, (count >> 8) & 0xFF);
-  EEPROM.write(EEPROM_ADDR_BOOT_COUNT + 3, count & 0xFF);
-}
-
-void clearEEPROM() {
-  Serial.println("Clearing EEPROM...");
-  for (int i = 0; i < 50; i++) {
-    EEPROM.write(i, 0);
-  }
-  Serial.println("EEPROM cleared - restart required");
-}
-
-// ===========================
-// CLOCK-BASED TRANSMISSION
-// ===========================
-
-bool isTransmissionTime() {
-  if (!timeInitialized) return false;
-  
-  timeClient.update();
-  int currentMinute = timeClient.getMinutes();
-  
-  // Transmission at :00 and :30 minutes
-  bool isScheduledTime = (currentMinute == 0 || currentMinute == 30);
-  
-  // Check if we haven't already transmitted this minute
-  bool notYetTransmitted = (currentMinute != lastTransmissionMinute);
-  
-  return isScheduledTime && notYetTransmitted;
-}
-
-void getNextTransmissionTime(char* buffer) {
-  if (!timeInitialized) {
-    strcpy(buffer, "Unknown");
-    return;
-  }
-  
-  timeClient.update();
-  int currentHour = timeClient.getHours();
-  int currentMinute = timeClient.getMinutes();
-  
-  int nextMinute, nextHour;
-  
-  if (currentMinute < 30) {
-    nextMinute = 30;
-    nextHour = currentHour;
-  } else {
-    nextMinute = 0;
-    nextHour = (currentHour + 1) % 24;
-  }
-  
-  sprintf(buffer, "%02d:%02d UTC", nextHour, nextMinute);
-}
-
-String getNextTransmissionPHTime() {
-  if (!timeInitialized) return "Unknown";
-  
-  timeClient.update();
-  unsigned long epochTime = timeClient.getEpochTime();
-  unsigned long phTime = epochTime + TIMEZONE_OFFSET_SECONDS;
-  
-  int currentHour = (phTime % 86400L) / 3600;
-  int currentMinute = (phTime % 3600) / 60;
-  
-  int nextMinute, nextHour;
-  
-  if (currentMinute < 30) {
-    nextMinute = 30;
-    nextHour = currentHour;
-  } else {
-    nextMinute = 0;
-    nextHour = (currentHour + 1) % 24;
-  }
-  
-  char buffer[9];
-  sprintf(buffer, "%02d:%02d PH", nextHour, nextMinute);
-  return String(buffer);
-}
 
 // ===========================
 // SETUP FUNCTION
@@ -296,21 +148,19 @@ void setup() {
   
   bootTime = millis();
 
-  Serial.println("\n=== Arduino R4 - Clock-Synchronized TX ===");
-  Serial.println("Firmware: v6.8.1");
+  Serial.println("\n=== Arduino R4 - SSL/TLS Enabled ===");
+  Serial.println("Firmware: v6.6.0");
   Serial.print("Boot: ");
   Serial.println(bootTime);
   Serial.println("MQTT: SSL/TLS (Port 8883)");
   Serial.println("Restart: 12:00 AM Philippine Time");
-  Serial.println("Data TX: :00 and :30 minutes (clock-synced)");
-  Serial.println("FIXED: Deregister reconnection issue");
   
-  initEEPROM();
-  
+  // Initialize sensor pins
   pinMode(TDS_PIN, INPUT);
   pinMode(PH_PIN, INPUT);
   pinMode(TURBIDITY_PIN, INPUT);
 
+  // Initialize buffers
   memset(smaBuffer, 0, sizeof(smaBuffer));
   memset(phBuffer, 0, sizeof(phBuffer));
   memset(turbBuffer, 0, sizeof(turbBuffer));
@@ -318,11 +168,12 @@ void setup() {
   computeCalibrationParams();
   printCalibrationInfo();
 
+  // MQTT Configuration - SSL optimized
   mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
   mqttClient.setCallback(mqttCallback);
-  mqttClient.setKeepAlive(90);
-  mqttClient.setSocketTimeout(60);
-  mqttClient.setBufferSize(768);  // Increased from 512
+  mqttClient.setKeepAlive(90);           // Increased for SSL
+  mqttClient.setSocketTimeout(60);       // Increased for SSL handshake
+  mqttClient.setBufferSize(512);
 
   Serial.println("\n=== Connecting... ===");
   
@@ -330,9 +181,11 @@ void setup() {
   
   if (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0)) {
     
+    // Initialize NTP
     timeClient.begin();
     delay(1000);
     
+    // Try NTP sync multiple times
     Serial.print("NTP sync");
     for (int i = 0; i < 5; i++) {
       Serial.print(".");
@@ -349,33 +202,19 @@ void setup() {
       Serial.println(" Failed (will retry)");
     }
     
+    // Wait before SSL connection
     delay(2000);
     
+    // Connect to MQTT with SSL
     connectMQTT();
     
     if (mqttConnected) {
       delay(3000);
-      
-      if (!isApproved) {
-        Serial.println("Device NOT approved - sending registration");
-        sendRegistration();
-      } else {
-        Serial.println("Device already approved - skipping registration");
-        sendStatusUpdate();
-      }
+      sendRegistration();
     }
   }
 
-  Serial.println("\n=== System Ready ===");
-  Serial.print("Mode: ");
-  Serial.println(isApproved ? "ACTIVE MONITORING" : "WAITING FOR APPROVAL");
-  
-  if (timeInitialized) {
-    Serial.print("Next TX: ");
-    Serial.println(getNextTransmissionPHTime());
-  }
-  
-  Serial.println();
+  Serial.println("\n=== System Ready ===\n");
 }
 
 // ===========================
@@ -424,14 +263,8 @@ void loop() {
   if (!mqttClient.connected()) {
     mqttConnected = false;
     
-    // Connect if needed for registration or approaching transmission time
-    bool needMqtt = !isApproved;
-    
-    if (timeInitialized && isApproved) {
-      int currentMinute = timeClient.getMinutes();
-      // Connect 2 minutes before transmission time
-      needMqtt = (currentMinute == 28 || currentMinute == 29 || currentMinute == 58 || currentMinute == 59 || currentMinute == 0 || currentMinute == 30);
-    }
+    bool needMqtt = !isApproved || 
+                    (currentMillis - lastDataSend >= DATA_SEND_INTERVAL);
     
     if (needMqtt && currentMillis - lastMqttReconnect >= MQTT_RECONNECT_INTERVAL) {
       lastMqttReconnect = currentMillis;
@@ -459,27 +292,27 @@ void loop() {
   } 
   // Active monitoring mode
   else {
-    // Read sensors every 1 minute (local monitoring)
+    // Read sensors every 1 minute
     if (currentMillis - lastSensorRead >= SENSOR_READ_INTERVAL) {
       lastSensorRead = currentMillis;
       readSensors();
       
-      if (timeInitialized) {
-        Serial.print("Next TX: ");
-        Serial.println(getNextTransmissionPHTime());
-      }
+      unsigned long timeSinceLastSend = currentMillis - lastDataSend;
+      unsigned long timeUntilNextSend = DATA_SEND_INTERVAL - timeSinceLastSend;
+      Serial.print("Next TX: ");
+      Serial.print(timeUntilNextSend / 60000);
+      Serial.println(" min");
     }
 
-    // Clock-synchronized data transmission
-    if (isTransmissionTime()) {
-      Serial.println("\n=== SCHEDULED 30-MIN TX ===");
-      Serial.print("Current time: ");
-      Serial.println(timeClient.getFormattedTime());
+    // Send data every 30 minutes
+    if (currentMillis - lastDataSend >= DATA_SEND_INTERVAL) {
+      lastDataSend = currentMillis;
       
-      // Ensure MQTT connection
+      Serial.println("\n=== 30-MIN TX ===");
+      
       if (!mqttConnected) {
         connectMQTT();
-        delay(3000);
+        delay(3000);  // Wait for SSL handshake
       }
       
       if (mqttConnected) {
@@ -487,18 +320,13 @@ void loop() {
         sendStatusUpdate();
         transmissionCount++;
         
-        // Mark this minute as transmitted
-        lastTransmissionMinute = timeClient.getMinutes();
-        
         Serial.print("TX Count: ");
         Serial.println(transmissionCount);
-        Serial.print("Next TX: ");
-        Serial.println(getNextTransmissionPHTime());
       } else {
-        Serial.println("MQTT unavailable - transmission skipped");
+        Serial.println("MQTT unavailable");
       }
       
-      Serial.println("=== TX COMPLETE ===\n");
+      Serial.println("=== COMPLETE ===\n");
     }
   }
 
@@ -531,10 +359,7 @@ void checkMidnightRestart() {
       Serial.print("Uptime: ");
       Serial.print((millis() - bootTime) / 3600000);
       Serial.println(" hours");
-      Serial.print("Boot count: ");
-      Serial.println(bootCount);
       Serial.println("Restarting in 5 seconds...");
-      Serial.println("Registration status will be preserved");
       Serial.println("=========================================\n");
       
       if (mqttConnected) {
@@ -635,6 +460,7 @@ void connectWiFi() {
 
   Serial.println("\nWiFi OK");
   
+  // Wait for valid IP address
   attempts = 0;
   while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && attempts < 20) {
     Serial.print("Waiting for IP");
@@ -675,7 +501,7 @@ void handleWiFiDisconnection() {
 }
 
 // ===========================
-// MQTT FUNCTIONS
+// MQTT FUNCTIONS - SSL OPTIMIZED
 // ===========================
 
 void connectMQTT() {
@@ -702,6 +528,7 @@ void connectMQTT() {
   Serial.println(" (SSL/TLS)");
   Serial.println("Establishing SSL handshake...");
 
+  // SSL connection takes longer - be patient
   bool connected = mqttClient.connect(
     MQTT_CLIENT_ID,
     MQTT_USERNAME,
@@ -743,14 +570,14 @@ void connectMQTT() {
 
 void printMqttError(int state) {
   switch (state) {
-    case -4: Serial.println("  SSL_CONNECTION_TIMEOUT"); break;
+    case -4: Serial.println("  SSL_CONNECTION_TIMEOUT - Check firewall/SSL cert"); break;
     case -3: Serial.println("  CONNECTION_LOST"); break;
-    case -2: Serial.println("  CONNECT_FAILED"); break;
+    case -2: Serial.println("  CONNECT_FAILED - Check broker address"); break;
     case -1: Serial.println("  DISCONNECTED"); break;
     case 1: Serial.println("  BAD_PROTOCOL"); break;
     case 2: Serial.println("  BAD_CLIENT_ID"); break;
-    case 3: Serial.println("  UNAVAILABLE"); break;
-    case 4: Serial.println("  BAD_CREDENTIALS"); break;
+    case 3: Serial.println("  UNAVAILABLE - Broker down"); break;
+    case 4: Serial.println("  BAD_CREDENTIALS - Check username/password"); break;
     case 5: Serial.println("  UNAUTHORIZED"); break;
     default: Serial.println("  UNKNOWN"); break;
   }
@@ -777,21 +604,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   if (command == nullptr) return;
 
   if (strcmp(command, "go") == 0) {
-    Serial.println("CMD: GO - Device approved!");
-    saveApprovedStatus(true);
-    lastTransmissionMinute = -1;
+    Serial.println("CMD: GO");
+    isApproved = true;
+    lastDataSend = millis() - DATA_SEND_INTERVAL;
     
   } else if (strcmp(command, "deregister") == 0) {
-    Serial.println("CMD: DEREGISTER - Approval revoked");
-    saveApprovedStatus(false);
-    
-    // FIXED: Force MQTT disconnect and reconnect
-    Serial.println("Disconnecting MQTT for fresh registration...");
-    mqttClient.disconnect();
-    delay(2000);
-    mqttConnected = false;
-    consecutiveMqttFailures = 0;
-    lastMqttReconnect = millis() - MQTT_RECONNECT_INTERVAL; // Force immediate reconnect
+    Serial.println("CMD: DEREGISTER");
+    isApproved = false;
     
   } else if (strcmp(command, "restart") == 0) {
     Serial.println("CMD: RESTART");
@@ -800,26 +619,12 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     
   } else if (strcmp(command, "send_now") == 0) {
     Serial.println("CMD: SEND NOW");
-    lastTransmissionMinute = -1;
-    
-    if (mqttConnected && isApproved) {
-      Serial.println("\n=== MANUAL TX (send_now) ===");
-      publishSensorData();
-      sendStatusUpdate();
-      transmissionCount++;
-      Serial.println("=== TX COMPLETE ===\n");
-    }
+    lastDataSend = millis() - DATA_SEND_INTERVAL;
     
   } else if (strcmp(command, "sync_time") == 0) {
     Serial.println("CMD: SYNC TIME");
     timeClient.forceUpdate();
     printCurrentTime();
-    
-  } else if (strcmp(command, "reset_eeprom") == 0) {
-    Serial.println("CMD: RESET EEPROM");
-    clearEEPROM();
-    delay(2000);
-    NVIC_SystemReset();
     
   } else {
     Serial.print("CMD: Unknown - ");
@@ -834,7 +639,6 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
 void publishSensorData() {
   if (!mqttClient.connected()) {
     Serial.println("MQTT not connected");
-    mqttConnected = false;
     return;
   }
 
@@ -845,7 +649,7 @@ void publishSensorData() {
   doc["pH"] = round(ph * 100) / 100.0;
   doc["turbidity"] = round(turbidity * 10) / 10.0;
   doc["messageType"] = "sensor_data";
-  doc["interval"] = "30min_clock_sync";
+  doc["interval"] = "30min";
   doc["transmissionNumber"] = transmissionCount;
 
   String payload;
@@ -862,24 +666,13 @@ void publishSensorData() {
     Serial.println("✗ Publish failed!");
     Serial.print("State: ");
     Serial.println(mqttClient.state());
-    
-    // FIXED: If state is 0 but publish fails, force reconnect
-    if (mqttClient.state() == 0) {
-      Serial.println("State shows connected but publish failed - forcing reconnect");
-      mqttClient.disconnect();
-      mqttConnected = false;
-      delay(1000);
-    }
-    
     consecutiveMqttFailures++;
   }
 }
 
 void sendRegistration() {
-  // FIXED: Better connection check
   if (!mqttClient.connected()) {
     Serial.println("MQTT not connected - cannot register");
-    mqttConnected = false;
     return;
   }
 
@@ -898,11 +691,10 @@ void sendRegistration() {
   doc["timestamp"] = timeInitialized ? timeClient.getEpochTime() : (millis() / 1000);
   doc["messageType"] = "registration";
   doc["uptime"] = (millis() - bootTime) / 1000;
-  doc["dataInterval"] = "30min_clock_sync";
+  doc["dataInterval"] = 1800;
   doc["restartSchedule"] = "daily_midnight_ph";
   doc["timezone"] = "Asia/Manila";
   doc["connectionType"] = "SSL/TLS";
-  doc["bootCount"] = bootCount;
 
   uint8_t macRaw[6];
   WiFi.macAddress(macRaw);
@@ -929,13 +721,6 @@ void sendRegistration() {
   Serial.print("Size: ");
   Serial.print(payload.length());
   Serial.println(" bytes");
-  
-  // FIXED: Check payload size
-  if (payload.length() > 768) {
-    Serial.println("✗ Payload too large!");
-    return;
-  }
-  
   Serial.println(payload);
 
   bool published = mqttClient.publish(topicRegister.c_str(), payload.c_str(), false);
@@ -946,18 +731,7 @@ void sendRegistration() {
     Serial.println("✗ Registration failed!");
     Serial.print("MQTT state: ");
     Serial.println(mqttClient.state());
-    
-    // FIXED: If state is 0 (connected) but publish fails, force reconnect
-    if (mqttClient.state() == 0) {
-      Serial.println("State shows connected but publish failed - forcing reconnect");
-      mqttClient.disconnect();
-      mqttConnected = false;
-      delay(1000);
-    } else {
-      printMqttError(mqttClient.state());
-    }
-    
-    consecutiveMqttFailures++;
+    printMqttError(mqttClient.state());
   }
   
   Serial.println("--- End Registration ---\n");
@@ -978,12 +752,10 @@ void sendStatusUpdate() {
   doc["messageType"] = "device_status";
   doc["isApproved"] = isApproved;
   doc["transmissionCount"] = transmissionCount;
-  doc["bootCount"] = bootCount;
   
   if (timeInitialized) {
     doc["utcTime"] = timeClient.getFormattedTime();
     doc["phTime"] = getPhilippineTimeString();
-    doc["nextTransmission"] = getNextTransmissionPHTime();
   }
 
   String payload;
@@ -1000,7 +772,6 @@ void sendShutdownStatus() {
   doc["reason"] = "scheduled_midnight_ph_time";
   doc["uptime"] = (millis() - bootTime) / 1000;
   doc["messageType"] = "device_status";
-  doc["bootCount"] = bootCount;
   
   String payload;
   serializeJson(doc, payload);
@@ -1137,22 +908,14 @@ void printWatchdog() {
   Serial.print((millis() - bootTime) / 3600);
   Serial.println("h");
   
-  Serial.print("Boot count: ");
-  Serial.println(bootCount);
-  
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
-  
-  Serial.print("Approved: ");
-  Serial.println(isApproved ? "YES" : "NO");
   
   if (timeInitialized) {
     Serial.print("UTC:  ");
     Serial.println(timeClient.getFormattedTime());
     Serial.print("PH:   ");
     Serial.println(getPhilippineTimeString());
-    Serial.print("Next TX: ");
-    Serial.println(getNextTransmissionPHTime());
     
     int currentHourUTC = timeClient.getHours();
     int hoursUntilRestart;
@@ -1174,7 +937,7 @@ void printWatchdog() {
   Serial.println(WiFi.status() == WL_CONNECTED ? "OK" : "DOWN");
   Serial.print("MQTT SSL: ");
   Serial.println(mqttConnected ? "OK" : "DOWN");
-  Serial.print("TX Count: ");
+  Serial.print("TX: ");
   Serial.println(transmissionCount);
   Serial.println("================\n");
 }

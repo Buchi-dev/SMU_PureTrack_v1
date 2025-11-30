@@ -71,6 +71,39 @@ const alertSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    
+    // ✅ NEW: Track alert lifecycle for deduplication
+    acknowledged: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    
+    // ✅ NEW: Track multiple occurrences
+    occurrenceCount: {
+      type: Number,
+      default: 1,
+    },
+    firstOccurrence: {
+      type: Date,
+      default: Date.now,
+    },
+    lastOccurrence: {
+      type: Date,
+      default: Date.now,
+    },
+    currentValue: {
+      type: Number,
+    },
+    
+    // ✅ NEW: Track email sending
+    emailSent: {
+      type: Boolean,
+      default: false,
+    },
+    emailSentAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true, // Adds createdAt and updatedAt
@@ -86,6 +119,9 @@ alertSchema.index({ deviceId: 1, timestamp: -1 });
 alertSchema.index({ status: 1, timestamp: -1 });
 alertSchema.index({ severity: 1, status: 1 });
 alertSchema.index({ deviceId: 1, parameter: 1, status: 1, timestamp: -1 }); // For duplicate check and filtering
+
+// ✅ NEW: Compound index for alert deduplication/cooldown checks
+alertSchema.index({ deviceId: 1, parameter: 1, acknowledged: 1, createdAt: -1 });
 alertSchema.index({ deviceId: 1, status: 1, timestamp: -1 }); // For device-specific alert queries
 
 /**
@@ -103,6 +139,7 @@ alertSchema.methods.toPublicProfile = function () {
     threshold: this.threshold,
     message: this.message,
     status: this.status,
+    acknowledged: this.acknowledged,
     acknowledgedAt: this.acknowledgedAt,
     acknowledgedBy: this.acknowledgedBy,
     resolvedAt: this.resolvedAt,
@@ -111,6 +148,14 @@ alertSchema.methods.toPublicProfile = function () {
     timestamp: this.timestamp,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
+    
+    // ✅ NEW: Include lifecycle tracking fields
+    occurrenceCount: this.occurrenceCount,
+    firstOccurrence: this.firstOccurrence,
+    lastOccurrence: this.lastOccurrence,
+    currentValue: this.currentValue,
+    emailSent: this.emailSent,
+    emailSentAt: this.emailSentAt,
   };
 };
 

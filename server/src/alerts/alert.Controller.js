@@ -90,6 +90,7 @@ const acknowledgeAlert = asyncHandler(async (req, res) => {
 
   // Update alert
   alert.status = 'Acknowledged';
+  alert.acknowledged = true;  // ✅ Set boolean flag for deduplication
   alert.acknowledgedAt = new Date();
   alert.acknowledgedBy = req.user._id;
   await alert.save();
@@ -121,6 +122,7 @@ const resolveAlert = asyncHandler(async (req, res) => {
 
   // Update alert
   alert.status = 'Resolved';
+  alert.acknowledged = true;  // ✅ Set boolean flag for deduplication
   alert.resolvedAt = new Date();
   alert.resolvedBy = req.user._id;
   if (resolutionNotes) {
