@@ -79,15 +79,15 @@ async function initializeChangeStreams() {
           });
 
           // Publish to MQTT topic for real-time client updates
-          mqttService.publish('water-quality/alerts/new', {
-            alert: newAlert,
-          });
+          // mqttService.publish(MQTT_CONFIG.TOPICS.ALERTS_NEW, {
+          //   alert: newAlert,
+          // });
 
           // Publish to device-specific topic if available
           if (newAlert.deviceId) {
-            mqttService.publish(`water-quality/devices/${newAlert.deviceId}/alerts`, {
-              alert: newAlert,
-            });
+            // mqttService.publish(`devices/${newAlert.deviceId}/alerts`, {
+            //   alert: newAlert,
+            // });
           }
 
           // Send email notifications to subscribed users
@@ -168,11 +168,11 @@ async function initializeChangeStreams() {
           const updatedFields = change.updateDescription?.updatedFields || {};
 
           // Publish alert update to MQTT
-          mqttService.publish('water-quality/alerts/updated', {
-            alertId: change.documentKey._id,
-            updates: updatedFields,
-            fullDocument: updatedAlert,
-          });
+          // mqttService.publish(MQTT_CONFIG.TOPICS.ALERTS_UPDATED, {
+          //   alertId: change.documentKey._id,
+          //   updates: updatedFields,
+          //   fullDocument: updatedAlert,
+          // });
 
           if (verboseMode) {
             logger.info('[Change Streams] Broadcast alert update:', {
@@ -221,9 +221,9 @@ async function initializeChangeStreams() {
 
         if (change.operationType === 'insert') {
           // New device registered
-          mqttService.publish('water-quality/devices/new', {
-            device,
-          });
+          // mqttService.publish(MQTT_CONFIG.TOPICS.DEVICES_NEW, {
+          //   device,
+          // });
 
           if (verboseMode) {
             logger.info('[Change Streams] Published new device:', {
@@ -237,17 +237,17 @@ async function initializeChangeStreams() {
           const updatedFields = change.updateDescription?.updatedFields || {};
 
           // Publish to devices topic
-          mqttService.publish('water-quality/devices/updated', {
-            deviceId: device.deviceId,
-            updates: updatedFields,
-            fullDocument: device,
-          });
+          // mqttService.publish(MQTT_CONFIG.TOPICS.DEVICES_UPDATED, {
+          //   deviceId: device.deviceId,
+          //   updates: updatedFields,
+          //   fullDocument: device,
+          // });
 
           // Publish to device-specific topic
-          mqttService.publish(`water-quality/devices/${device.deviceId}/updated`, {
-            updates: updatedFields,
-            fullDocument: device,
-          });
+          // mqttService.publish(`devices/${device.deviceId}/updated`, {
+          //   updates: updatedFields,
+          //   fullDocument: device,
+          // });
 
           if (verboseMode) {
             logger.info('[Change Streams] Published device update:', {
@@ -287,31 +287,31 @@ async function initializeChangeStreams() {
           const reading = change.fullDocument;
 
           // Publish to MQTT for real-time client updates
-          mqttService.publish('water-quality/readings/new', {
-            reading,
-          });
+          // mqttService.publish(MQTT_CONFIG.TOPICS.READINGS_NEW, {
+          //   reading,
+          // });
 
           // Publish to device-specific topic
           if (reading.deviceId) {
-            mqttService.publish(`water-quality/devices/${reading.deviceId}/readings`, {
-              reading,
-            });
+            // mqttService.publish(`devices/${reading.deviceId}/readings`, {
+            //   reading,
+            // });
           }
 
           // Check for anomalies and publish warnings
           const hasAnomalies = checkForAnomalies(reading);
           if (hasAnomalies.length > 0) {
-            mqttService.publish('water-quality/readings/anomaly', {
-              deviceId: reading.deviceId,
-              anomalies: hasAnomalies,
-              reading,
-            });
+            // mqttService.publish(MQTT_CONFIG.TOPICS.READINGS_ANOMALY, {
+            //   deviceId: reading.deviceId,
+            //   anomalies: hasAnomalies,
+            //   reading,
+            // });
           }
 
           logger.debug('[Change Streams] Published new reading:', {
             deviceId: reading.deviceId,
             parameters: Object.keys(reading).filter(k => 
-              ['pH', 'turbidity', 'tds', 'temperature'].includes(k)
+              ['pH', 'turbidity', 'tds'].includes(k)
             ),
           });
         }
@@ -348,10 +348,10 @@ async function initializeChangeStreams() {
 
           // Only publish if role or status changed (important updates)
           if (updatedFields.role || updatedFields.status) {
-            mqttService.publish('water-quality/users/updated', {
-              userId: user.uid,
-              updates: updatedFields,
-            });
+            // mqttService.publish(MQTT_CONFIG.TOPICS.USERS_UPDATED, {
+            //   userId: user.uid,
+            //   updates: updatedFields,
+            // });
 
             const isProduction = process.env.NODE_ENV === 'production';
             if (!isProduction) {

@@ -203,7 +203,7 @@ export const AdminDeviceReadings = () => {
           {/* Loading State */}
           {loading && enrichedDevices.length === 0 && (
             <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <Spin size="large" tip="Loading devices..." />
+              <Spin size="large" />
             </div>
           )}
 

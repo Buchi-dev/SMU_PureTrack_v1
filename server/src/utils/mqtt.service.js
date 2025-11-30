@@ -89,7 +89,7 @@ class MQTTService {
   subscribeToDeviceTopics() {
     const topics = [
       MQTT_CONFIG.TOPICS.ALL_DEVICE_DATA,
-      MQTT_CONFIG.TOPICS.ALL_DEVICE_STATUS,
+      // MQTT_CONFIG.TOPICS.ALL_DEVICE_STATUS, // Removed per spec - backend doesn't need status
       MQTT_CONFIG.TOPICS.ALL_DEVICE_REGISTER,
     ];
 
@@ -254,6 +254,31 @@ class MQTTService {
 
     } catch (error) {
       logger.error(`[MQTT Service] Failed to send command to ${deviceId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Publish message to MQTT topic
+   */
+  publish(topic, message, options = {}) {
+    if (!this.connected) {
+      logger.warn(`[MQTT Service] Cannot publish - MQTT not connected`);
+      return false;
+    }
+
+    try {
+      this.client.publish(topic, JSON.stringify(message), {
+        qos: MQTT_CONFIG.QOS.AT_LEAST_ONCE,
+        retain: false,
+        ...options,
+      });
+
+      logger.debug(`[MQTT Service] Published to topic ${topic}`);
+      return true;
+
+    } catch (error) {
+      logger.error(`[MQTT Service] Failed to publish to ${topic}:`, error);
       return false;
     }
   }

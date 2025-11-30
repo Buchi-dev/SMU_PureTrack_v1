@@ -12,7 +12,7 @@ import mqtt from 'mqtt';
 
 // MQTT Broker Configuration for WebSocket connection
 const MQTT_CONFIG = {
-  BROKER_URL: import.meta.env.VITE_MQTT_BROKER_URL || 'ws://broker.hivemq.com:8000/mqtt',
+  BROKER_URL: import.meta.env.VITE_MQTT_BROKER_URL || 'ws://0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud:8884/mqtt',
   CLIENT_ID: `water-quality-client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
   OPTIONS: {
     username: import.meta.env.VITE_MQTT_USERNAME || undefined,
@@ -32,9 +32,8 @@ export const MQTT_TOPICS = {
   DEVICE_DATA: 'devices/+/data',
   DEVICE_STATUS: 'devices/+/status',
 
-  // Server-published topics (if needed for additional updates)
-  DEVICES_UPDATED: 'devices/updated',
-  READINGS_NEW: 'readings/new',
+  // Command topic for publishing
+  DEVICE_COMMANDS: 'devices/+/commands',
 };
 
 // MQTT Client instance
@@ -205,11 +204,32 @@ export function unsubscribeFromTopic(topic: string, callback?: (topic: string, m
 }
 
 /**
- * Get connection status
+ * Publish message to MQTT topic
  */
-export function getMQTTStatus(): { connected: boolean; connecting: boolean } {
-  return {
-    connected: isConnected,
-    connecting: isConnecting,
+export function publishToTopic(topic: string, message: any, options = {}): void {
+  if (!client || !isConnected) {
+    console.warn('[MQTT] Cannot publish - not connected');
+    return;
+  }
+
+  try {
+    client.publish(topic, JSON.stringify(message), options);
+    console.log('[MQTT] Published to topic:', topic);
+  } catch (error) {
+    console.error('[MQTT] Failed to publish to topic:', topic, error);
+  }
+}
+
+/**
+ * Send command to specific device
+ */
+export function sendDeviceCommand(deviceId: string, command: string, data: any = {}): void {
+  const topic = `devices/${deviceId}/commands`;
+  const message = {
+    command,
+    timestamp: new Date().toISOString(),
+    ...data,
   };
+
+  publishToTopic(topic, message, { qos: 1 });
 }

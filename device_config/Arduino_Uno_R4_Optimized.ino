@@ -1,16 +1,16 @@
 /*
- * Water Quality Monitoring System - CALIBRATED & OPTIMIZED
- * Arduino UNO R4 WiFi with Advanced Sensor Calibration + Direct HTTPS Integration
- * EXPRESS.JS OPTIMIZED VERSION
+ * Water Quality Monitoring System - MQTT OPTIMIZED
+ * Arduino UNO R4 WiFi with Advanced Sensor Calibration + MQTT Integration
+ * MQTT v3.1.1 OPTIMIZED VERSION with HiveMQ Broker
  * Sensors: TDS (Calibrated), pH (Calibrated), Turbidity (Calibrated)
  * 
- * Author: IoT Water Quality Project - Calibrated Version
+ * Author: IoT Water Quality Project - MQTT Version
  * Date: 2025
- * Firmware: v5.3.0 - Express.js Optimized with Keep-Alive & Connection Pooling
+ * Firmware: v6.0.0 - MQTT Integration with Command Handling
  */
 
 #include <WiFiS3.h>
-#include <ArduinoHttpClient.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include "Arduino_LED_Matrix.h"
 
@@ -19,37 +19,37 @@
 // ===========================
 
 // USER MODES
-bool sendToServer = false;          // If false, readings are *not* sent to server
-bool isCalibrationMode = true;      // If true, sensor readings every 250ms
+bool sendToServer = true;          // MQTT publishing enabled
+bool isCalibrationMode = false;     // Set to false for normal operation
 
 // WiFi Credentials
 #define WIFI_SSID "Yuzon Only"
 #define WIFI_PASSWORD "Pldtadmin@2024"
 
-// API Server Configuration - HTTPS with Keep-Alive
-#define API_SERVER "puretrack-api.onrender.com"
-#define API_PORT 443
-#define API_ENDPOINT "/api/v1/devices/readings"
-#define API_KEY "6a8d48a00823c869ad23c27cc34a3d446493cf35d6924d8f9d54e17c4565737a"
+// MQTT Broker Configuration - HiveMQ Cloud Cluster
+#define MQTT_BROKER "0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud"
+#define MQTT_PORT 8883
+#define MQTT_CLIENT_ID "arduino_uno_r4_002"
+#define MQTT_USERNAME "Admin"  // Leave empty for anonymous connection
+#define MQTT_PASSWORD "Admin123"  // Leave empty for anonymous connection
 
 // Device Configuration
 #define DEVICE_ID "arduino_uno_r4_002"
-#define DEVICE_NAME "Water Quality Monitor R4 Calibrated"
+#define DEVICE_NAME "Water Quality Monitor R4 MQTT"
 #define DEVICE_TYPE "Arduino UNO R4 WiFi"
-#define FIRMWARE_VERSION "5.3.0"
+#define FIRMWARE_VERSION "6.0.0"
 
 // Sensor Pin Configuration
 #define TDS_PIN A0
 #define PH_PIN A1
 #define TURBIDITY_PIN A2
 
-// Timing Configuration - Optimized for Express.js
+// Timing Configuration - Optimized for MQTT
 #define SENSOR_READ_INTERVAL 2000
-#define HTTP_PUBLISH_INTERVAL 2000
-#define HTTP_TIMEOUT 10000              // Reduced to 10s for faster failover
+#define MQTT_PUBLISH_INTERVAL 2000
 #define REGISTRATION_INTERVAL 5000
-#define SSE_RECONNECT_INTERVAL 10000
-#define CONNECTION_REUSE_TIMEOUT 30000  // Reuse connection for 30 seconds
+#define MQTT_RECONNECT_INTERVAL 5000
+#define STATUS_UPDATE_INTERVAL 30000  // Send status every 30 seconds
 
 // ===========================
 // ADVANCED CALIBRATION DATA
@@ -92,58 +92,57 @@ float fitSlope = 0.0;
 float fitIntercept = 0.0;
 
 // ===========================
-// GLOBAL OBJECTS - OPTIMIZED
+// GLOBAL OBJECTS - MQTT OPTIMIZED
 // ===========================
-WiFiSSLClient wifiClient;
-HttpClient httpClient = HttpClient(wifiClient, API_SERVER, API_PORT);
-WiFiSSLClient sseClient;
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
 ArduinoLEDMatrix matrix;
 
 // ===========================
 // GLOBAL VARIABLES
 // ===========================
 unsigned long lastSensorRead = 0;
-unsigned long lastHttpPublish = 0;
+unsigned long lastMqttPublish = 0;
 unsigned long lastRegistrationAttempt = 0;
-unsigned long lastSSEReconnect = 0;
-unsigned long lastConnectionTime = 0;
-unsigned long sensorReadStartTime = 0;
+unsigned long lastMqttReconnect = 0;
+unsigned long lastStatusUpdate = 0;
 
 bool isRegistered = false;
 bool isApproved = false;
-bool sseConnected = false;
-String sseBuffer = "";
+bool mqttConnected = false;
 
 float turbidity = 0.0;
 float tds = 0.0;
 float ph = 0.0;
 
-bool serverConnected = false;
 int consecutiveFailures = 0;
 const int MAX_FAILURES = 3;
 
-// Connection pooling optimization
-bool connectionActive = false;
-unsigned long connectionStartTime = 0;
+// MQTT Topics
+String topicData = "devices/" + String(DEVICE_ID) + "/data";
+String topicStatus = "devices/" + String(DEVICE_ID) + "/status";
+String topicRegister = "devices/" + String(DEVICE_ID) + "/register";
+String topicCommands = "devices/" + String(DEVICE_ID) + "/commands";
 
 enum MatrixState {
   CONNECTING,
   IDLE,
-  HEARTBEAT
+  HEARTBEAT,
+  MQTT_CONNECTING
 };
 
 MatrixState matrixState = CONNECTING;
 MatrixState previousState = CONNECTING;
 
 // ===========================
-// SETUP FUNCTION
+// SETUP FUNCTION - MQTT OPTIMIZED
 // ===========================
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 3000);
 
-  Serial.println("=== Arduino UNO R4 Express.js Optimized ===");
-  Serial.println("Firmware: v5.3.0 - Connection Pooling Enabled");
+  Serial.println("=== Arduino UNO R4 MQTT Optimized ===");
+  Serial.println("Firmware: v6.0.0 - MQTT Integration with HiveMQ");
   
   // Initialize LED Matrix
   matrix.begin();
@@ -168,40 +167,43 @@ void setup() {
 
   printCalibrationInfo();
 
-  // Optimize HTTP client settings for Express.js
-  httpClient.setTimeout(HTTP_TIMEOUT);
-  httpClient.setHttpResponseTimeout(HTTP_TIMEOUT);
-  
-  Serial.println("HTTP Client optimized for Express.js:");
-  Serial.println("  - Keep-Alive enabled");
-  Serial.println("  - Connection pooling active");
-  Serial.println("  - Timeout: 10 seconds");
+  // Initialize MQTT client
+  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+  mqttClient.setCallback(mqttCallback);
+  mqttClient.setKeepAlive(60);
+  mqttClient.setSocketTimeout(30);
+
+  Serial.println("MQTT Client initialized:");
+  Serial.println("  - Broker: 0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud:8883");
+  Serial.println("  - Client ID: " + String(MQTT_CLIENT_ID));
+  Serial.println("  - Topics configured for device communication");
 
   matrixState = CONNECTING;
   matrix.loadSequence(LEDMATRIX_ANIMATION_WIFI_SEARCH);
   matrix.play(true);
 
   connectWiFi();
-  testServerConnection();
+  connectMQTT();
 
-  if (serverConnected) {
+  if (mqttConnected) {
     matrixState = IDLE;
     matrix.loadFrame(LEDMATRIX_CLOUD_WIFI);
   }
 
   Serial.println("\n=== DEVICE MODES ===");
   Serial.print("Send to Server: ");
-  Serial.println(sendToServer ? "ENABLED" : "DISABLED");
+  Serial.println(sendToServer ? "ENABLED (MQTT)" : "DISABLED");
   Serial.print("Calibration Mode: ");
   Serial.println(isCalibrationMode ? "ENABLED (250ms)" : "DISABLED");
   
   if (!isCalibrationMode && sendToServer) {
-    connectSSE();
+    // Send initial registration
+    sendRegistration();
   }
 }
 
 // ===========================
-// MAIN LOOP - OPTIMIZED
+// MAIN LOOP - MQTT OPTIMIZED
 // ===========================
 void loop() {
   unsigned long currentMillis = millis();
@@ -217,21 +219,21 @@ void loop() {
     return;
   }
 
-  // SSE processing (only if not in calibration mode)
-  if (!isCalibrationMode && sendToServer) {
-    if (sseConnected) {
-      processSSEMessages();
-    } else if (currentMillis - lastSSEReconnect >= SSE_RECONNECT_INTERVAL) {
-      lastSSEReconnect = currentMillis;
-      connectSSE();
+  // MQTT connection management
+  if (!mqttClient.connected()) {
+    if (currentMillis - lastMqttReconnect >= MQTT_RECONNECT_INTERVAL) {
+      lastMqttReconnect = currentMillis;
+      connectMQTT();
     }
+  } else {
+    mqttClient.loop();  // Process incoming MQTT messages
   }
 
   // Registration mode vs Active mode
   if (!isApproved && sendToServer && !isCalibrationMode) {
     if (currentMillis - lastRegistrationAttempt >= REGISTRATION_INTERVAL) {
       lastRegistrationAttempt = currentMillis;
-      sendRegistrationRequest();
+      sendRegistration();
     }
   } else {
     // Sensor reading logic
@@ -249,9 +251,9 @@ void loop() {
 
       readSensors();
 
-      // Publish data with connection pooling optimization
+      // Publish data via MQTT
       if (sendToServer && !isCalibrationMode) {
-        publishSensorDataOptimized();
+        publishSensorDataMQTT();
       } else if (!sendToServer) {
         if (!isCalibrationMode) {
           Serial.println("(!) sendToServer=false, local readings only.");
@@ -260,10 +262,13 @@ void loop() {
         // Minimal output in calibration mode for speed
       }
     }
-  }
 
-  // Close idle connections to free resources
-  manageConnectionPool(currentMillis);
+    // Send periodic status updates
+    if (sendToServer && !isCalibrationMode && currentMillis - lastStatusUpdate >= STATUS_UPDATE_INTERVAL) {
+      lastStatusUpdate = currentMillis;
+      sendStatusUpdate();
+    }
+  }
 
   delay(10);
 }
@@ -307,7 +312,7 @@ void printCalibrationInfo() {
 }
 
 void handleWiFiDisconnection() {
-  serverConnected = false;
+  mqttConnected = false;
   consecutiveFailures++;
   connectionActive = false;
   
@@ -322,97 +327,220 @@ void handleWiFiDisconnection() {
   
   if (WiFi.status() == WL_CONNECTED) {
     consecutiveFailures = 0;
-    sseConnected = false;
-  }
-}
-
-void manageConnectionPool(unsigned long currentMillis) {
-  // Close connection if idle for too long (Express.js best practice)
-  if (connectionActive && (currentMillis - lastConnectionTime > CONNECTION_REUSE_TIMEOUT)) {
-    httpClient.stop();
-    connectionActive = false;
-    if (!isCalibrationMode) {
-      Serial.println("Connection pool: Closed idle connection");
-    }
+    connectMQTT();
   }
 }
 
 // ===========================
-// OPTIMIZED PUBLISH FUNCTION
+// MQTT FUNCTIONS
 // ===========================
 
-void publishSensorDataOptimized() {
+void connectMQTT() {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("✗ WiFi not connected");
+    Serial.println("Cannot connect to MQTT - WiFi not connected");
     return;
   }
 
-  // Reuse connection if still active (Express.js optimization)
-  if (!connectionActive || !wifiClient.connected()) {
-    httpClient.stop();
-    delay(50);  // Minimal delay
-    connectionActive = false;
+  if (mqttClient.connected()) {
+    return;
+  }
+
+  Serial.println("--- Connecting to MQTT Broker ---");
+  Serial.print("Broker: ");
+  Serial.println(MQTT_BROKER);
+  Serial.print("Port: ");
+  Serial.println(MQTT_PORT);
+
+  matrixState = MQTT_CONNECTING;
+  matrix.loadSequence(LEDMATRIX_ANIMATION_WIFI_SEARCH);
+  matrix.play(true);
+
+  // Attempt MQTT connection
+  bool connected = false;
+  if (strlen(MQTT_USERNAME) > 0) {
+    connected = mqttClient.connect(MQTT_CLIENT_ID, MQTT_USERNAME, MQTT_PASSWORD);
+  } else {
+    connected = mqttClient.connect(MQTT_CLIENT_ID);
+  }
+
+  if (connected) {
+    Serial.println("✓ MQTT connected!");
+    mqttConnected = true;
+    consecutiveFailures = 0;
+
+    // Subscribe to commands topic
+    if (mqttClient.subscribe(topicCommands.c_str())) {
+      Serial.println("✓ Subscribed to commands topic");
+    } else {
+      Serial.println("✗ Failed to subscribe to commands");
+    }
+
+    if (matrixState == MQTT_CONNECTING) {
+      matrixState = IDLE;
+      matrix.loadFrame(LEDMATRIX_CLOUD_WIFI);
+    }
+  } else {
+    Serial.print("✗ MQTT connection failed, rc=");
+    Serial.println(mqttClient.state());
+    mqttConnected = false;
+    consecutiveFailures++;
+  }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+  Serial.println("--- MQTT Message Received ---");
+  Serial.print("Topic: ");
+  Serial.println(topic);
+
+  // Convert payload to string
+  char message[length + 1];
+  memcpy(message, payload, length);
+  message[length] = '\0';
+
+  Serial.print("Message: ");
+  Serial.println(message);
+
+  // Parse JSON message
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, message);
+
+  if (!error) {
+    String command = doc["command"] | "";
+
+    if (command == "go") {
+      Serial.println("🎉 GO command received!");
+      isRegistered = true;
+      isApproved = true;
+    } else if (command == "deregister") {
+      Serial.println("⚠️ DEREGISTER command!");
+      isRegistered = false;
+      isApproved = false;
+    } else if (command == "wait") {
+      Serial.println("⏳ WAIT command");
+      isRegistered = true;
+      isApproved = false;
+    } else if (command == "restart") {
+      Serial.println("🔄 RESTART command received!");
+      delay(1000);
+      // Software reset would go here if supported
+    } else {
+      Serial.println("Unknown command: " + command);
+    }
+  } else {
+    Serial.println("Failed to parse JSON message");
+  }
+}
+
+// ===========================
+// MQTT PUBLISH FUNCTIONS
+// ===========================
+
+void publishSensorDataMQTT() {
+  if (!mqttClient.connected()) {
+    Serial.println("✗ MQTT not connected");
+    return;
   }
 
   // Prepare JSON payload (use stack allocation for efficiency)
   StaticJsonDocument<256> doc;
   doc["deviceId"] = DEVICE_ID;
+  doc["timestamp"] = millis();
   doc["tds"] = round(tds * 10) / 10.0;        // Round to 1 decimal
   doc["pH"] = round(ph * 100) / 100.0;        // Round to 2 decimals
   doc["turbidity"] = round(turbidity * 10) / 10.0;
+  doc["messageType"] = "sensor_data";
 
   String payload;
   serializeJson(doc, payload);
 
-  Serial.println("--- Sending to Express.js ---");
+  Serial.println("--- Publishing Sensor Data ---");
   Serial.println(payload);
 
-  // Send request with Keep-Alive headers (Express.js friendly)
-  httpClient.beginRequest();
-  httpClient.post(API_ENDPOINT);
-  httpClient.sendHeader("Host", API_SERVER);
-  httpClient.sendHeader("Content-Type", "application/json");
-  httpClient.sendHeader("x-api-key", API_KEY);
-  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.3.0");
-  httpClient.sendHeader("Content-Length", payload.length());
-  httpClient.sendHeader("Connection", "keep-alive");  // Enable keep-alive
-  httpClient.sendHeader("Keep-Alive", "timeout=30");  // 30 second timeout
-  httpClient.beginBody();
-  httpClient.print(payload);
-  httpClient.endRequest();
-
-  int statusCode = httpClient.responseStatusCode();
-  String response = httpClient.responseBody();
-
-  lastConnectionTime = millis();
-  connectionActive = true;
-
-  if (statusCode == 200 || statusCode == 201) {
-    serverConnected = true;
+  // Publish to MQTT topic
+  if (mqttClient.publish(topicData.c_str(), payload.c_str(), false)) {  // QoS 0
+    Serial.println("✓ Sensor data published!");
     consecutiveFailures = 0;
-    Serial.println("✓ Data published!");
-    Serial.print("Response: ");
-    Serial.println(response.substring(0, min(100, (int)response.length())));
-  } else if (statusCode > 0) {
-    serverConnected = false;
-    Serial.print("✗ HTTP Error: ");
-    Serial.println(statusCode);
-    consecutiveFailures++;
   } else {
-    serverConnected = false;
-    Serial.println("✗ Connection timeout");
+    Serial.println("✗ Failed to publish sensor data");
     consecutiveFailures++;
-    httpClient.stop();
-    connectionActive = false;
   }
 
   // Retry logic
   if (consecutiveFailures >= MAX_FAILURES) {
-    Serial.println("Multiple failures - retesting connection");
-    httpClient.stop();
-    connectionActive = false;
-    testServerConnection();
+    Serial.println("Multiple failures - reconnecting MQTT");
+    mqttClient.disconnect();
+    connectMQTT();
     consecutiveFailures = 0;
+  }
+}
+
+void sendRegistration() {
+  if (!mqttClient.connected()) {
+    Serial.println("✗ MQTT not connected - cannot register");
+    return;
+  }
+
+  Serial.println("--- Sending Registration ---");
+
+  StaticJsonDocument<384> doc;
+  doc["deviceId"] = DEVICE_ID;
+  doc["name"] = DEVICE_NAME;
+  doc["type"] = DEVICE_TYPE;
+  doc["firmwareVersion"] = FIRMWARE_VERSION;
+  doc["timestamp"] = millis();
+  doc["messageType"] = "registration";
+
+  uint8_t macRaw[6];
+  WiFi.macAddress(macRaw);
+  char mac[18];
+  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+           macRaw[0], macRaw[1], macRaw[2], macRaw[3], macRaw[4], macRaw[5]);
+  doc["macAddress"] = mac;
+  doc["ipAddress"] = WiFi.localIP().toString();
+
+  JsonArray sensorsArray = doc.createNestedArray("sensors");
+  sensorsArray.add("pH");
+  sensorsArray.add("turbidity");
+  sensorsArray.add("tds");
+
+  String payload;
+  serializeJson(doc, payload);
+
+  Serial.println(payload);
+
+  if (mqttClient.publish(topicRegister.c_str(), payload.c_str(), true)) {  // QoS 1 for registration
+    Serial.println("✓ Registration sent!");
+  } else {
+    Serial.println("✗ Registration failed!");
+  }
+}
+
+void sendStatusUpdate() {
+  if (!mqttClient.connected()) {
+    Serial.println("✗ MQTT not connected - cannot send status");
+    return;
+  }
+
+  Serial.println("--- Sending Status Update ---");
+
+  StaticJsonDocument<256> doc;
+  doc["deviceId"] = DEVICE_ID;
+  doc["timestamp"] = millis();
+  doc["status"] = "online";
+  doc["uptime"] = millis() / 1000;  // uptime in seconds
+  doc["wifiRSSI"] = WiFi.RSSI();
+  doc["messageType"] = "device_status";
+  doc["firmwareVersion"] = FIRMWARE_VERSION;
+
+  String payload;
+  serializeJson(doc, payload);
+
+  Serial.println(payload);
+
+  if (mqttClient.publish(topicStatus.c_str(), payload.c_str(), false)) {  // QoS 0
+    Serial.println("✓ Status update sent!");
+  } else {
+    Serial.println("✗ Status update failed!");
   }
 }
 
@@ -468,40 +596,14 @@ void connectWiFi() {
   }
 }
 
-void testServerConnection() {
-  Serial.println("Testing Express.js server...");
+void testMQTTConnection() {
+  Serial.println("Testing MQTT connection...");
   
-  httpClient.stop();
-  delay(100);
-
-  httpClient.beginRequest();
-  httpClient.get("/health");
-  httpClient.sendHeader("Host", API_SERVER);
-  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.3.0");
-  httpClient.sendHeader("Connection", "close");
-  httpClient.endRequest();
-
-  int statusCode = httpClient.responseStatusCode();
-  String response = httpClient.responseBody();
-
-  Serial.print("Health check: ");
-  Serial.println(statusCode);
-
-  if (statusCode == 200) {
-    serverConnected = true;
-    Serial.println("✓ Server connected!");
-    
-    if (matrixState == CONNECTING) {
-      matrixState = IDLE;
-      matrix.loadFrame(LEDMATRIX_CLOUD_WIFI);
-    }
+  if (connectMQTT()) {
+    Serial.println("✓ MQTT connection test successful!");
   } else {
-    serverConnected = false;
-    Serial.print("✗ Server error: ");
-    Serial.println(statusCode);
+    Serial.println("✗ MQTT connection test failed!");
   }
-
-  httpClient.stop();
 }
 
 // ===========================
@@ -669,192 +771,13 @@ void readSensors() {
 }
 
 // ===========================
-// REGISTRATION & SSE FUNCTIONS
+// LEGACY HTTP/SSE FUNCTIONS - REPLACED BY MQTT
 // ===========================
 
-void sendRegistrationRequest() {
-  if (WiFi.status() != WL_CONNECTED) return;
-
-  Serial.println("--- Registration Request ---");
-
-  httpClient.stop();
-  delay(100);
-
-  StaticJsonDocument<384> doc;
-  doc["deviceId"] = DEVICE_ID;
-  doc["name"] = DEVICE_NAME;
-  doc["type"] = DEVICE_TYPE;
-  doc["firmwareVersion"] = FIRMWARE_VERSION;
-  
-  uint8_t macRaw[6];
-  WiFi.macAddress(macRaw);
-  char mac[18];
-  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X", 
-           macRaw[0], macRaw[1], macRaw[2], macRaw[3], macRaw[4], macRaw[5]);
-  doc["macAddress"] = mac;
-  doc["ipAddress"] = WiFi.localIP().toString();
-
-  JsonArray sensorsArray = doc.createNestedArray("sensors");
-  sensorsArray.add("pH");
-  sensorsArray.add("turbidity");
-  sensorsArray.add("tds");
-
-  String payload;
-  serializeJson(doc, payload);
-
-  Serial.println(payload);
-
-  httpClient.beginRequest();
-  httpClient.post("/api/v1/devices/register");
-  httpClient.sendHeader("Host", API_SERVER);
-  httpClient.sendHeader("Content-Type", "application/json");
-  httpClient.sendHeader("x-api-key", API_KEY);
-  httpClient.sendHeader("User-Agent", "Arduino-UNO-R4/5.3.0");
-  httpClient.sendHeader("Content-Length", payload.length());
-  httpClient.sendHeader("Connection", "close");
-  httpClient.beginBody();
-  httpClient.print(payload);
-  httpClient.endRequest();
-
-  int statusCode = httpClient.responseStatusCode();
-  String response = httpClient.responseBody();
-
-  Serial.print("Status: ");
-  Serial.println(statusCode);
-
-  if (statusCode == 200 || statusCode == 201) {
-    Serial.println("✓ Registration sent!");
-
-    StaticJsonDocument<512> responseDoc;
-    DeserializationError error = deserializeJson(responseDoc, response);
-
-    if (!error) {
-      bool registered = responseDoc["data"]["isRegistered"] | false;
-      String command = responseDoc["data"]["command"] | "";
-
-      if (registered && command == "go") {
-        Serial.println("🎉 Device APPROVED!");
-        isRegistered = true;
-        isApproved = true;
-      } else {
-        Serial.println("⏳ Awaiting approval...");
-        isRegistered = true;
-        isApproved = false;
-      }
-    }
-  } else {
-    Serial.print("✗ Registration failed: ");
-    Serial.println(statusCode);
-  }
-
-  httpClient.stop();
-}
-
-void connectSSE() {
-  if (WiFi.status() != WL_CONNECTED || sseConnected) return;
-
-  Serial.println("--- Connecting SSE ---");
-
-  sseClient.stop();
-  delay(500);
-
-  if (!sseClient.connect(API_SERVER, API_PORT)) {
-    Serial.println("✗ SSE connection failed");
-    sseConnected = false;
-    return;
-  }
-
-  String sseEndpoint = "/sse/" + String(DEVICE_ID);
-
-  sseClient.println("GET " + sseEndpoint + " HTTP/1.1");
-  sseClient.println("Host: " + String(API_SERVER));
-  sseClient.println("x-api-key: " + String(API_KEY));
-  sseClient.println("Accept: text/event-stream");
-  sseClient.println("Cache-Control: no-cache");
-  sseClient.println("Connection: keep-alive");
-  sseClient.println();
-
-  unsigned long timeout = millis() + 10000;
-  while (sseClient.available() == 0 && millis() < timeout) {
-    delay(100);
-  }
-
-  if (sseClient.available() == 0) {
-    Serial.println("✗ SSE timeout");
-    sseClient.stop();
-    sseConnected = false;
-    return;
-  }
-
-  bool headersValid = false;
-  while (sseClient.available()) {
-    String line = sseClient.readStringUntil('\n');
-    if (line.indexOf("text/event-stream") >= 0) {
-      headersValid = true;
-    }
-    if (line == "\r" || line.length() == 0) break;
-  }
-
-  if (headersValid) {
-    Serial.println("✓ SSE connected!");
-    sseConnected = true;
-    sseBuffer = "";
-  } else {
-    Serial.println("✗ Invalid SSE response");
-    sseClient.stop();
-    sseConnected = false;
-  }
-}
-
-void processSSEMessages() {
-  if (!sseConnected || !sseClient.connected()) {
-    Serial.println("SSE disconnected");
-    sseConnected = false;
-    sseClient.stop();
-    return;
-  }
-
-  while (sseClient.available()) {
-    char c = sseClient.read();
-
-    if (c == '\n') {
-      if (sseBuffer.startsWith("event: ")) {
-        String eventType = sseBuffer.substring(7);
-        eventType.trim();
-        Serial.println("SSE Event: " + eventType);
-      } 
-      else if (sseBuffer.startsWith("data: ")) {
-        String eventData = sseBuffer.substring(6);
-        eventData.trim();
-        Serial.println("SSE Data: " + eventData);
-
-        StaticJsonDocument<512> doc;
-        DeserializationError error = deserializeJson(doc, eventData);
-
-        if (!error) {
-          String command = doc["command"] | "";
-
-          if (command == "go") {
-            Serial.println("🎉 GO command received!");
-            isRegistered = true;
-            isApproved = true;
-          } 
-          else if (command == "deregister") {
-            Serial.println("⚠️ DEREGISTER command!");
-            isRegistered = false;
-            isApproved = false;
-          }
-          else if (command == "wait") {
-            Serial.println("⏳ WAIT command");
-            isRegistered = true;
-            isApproved = false;
-          }
-        }
-      }
-
-      sseBuffer = "";
-    } else {
-      sseBuffer += c;
-    }
-  }
-}
+/*
+ * The following functions have been replaced by MQTT equivalents:
+ * - sendRegistrationRequest() -> sendRegistration()
+ * - connectSSE() & processSSEMessages() -> mqttCallback()
+ *
+ * These legacy functions are kept for reference but are no longer used.
+ */

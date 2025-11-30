@@ -86,7 +86,7 @@ export const ReportPreviewPanel = ({
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       {/* Preview Header */}
-      <Card bordered={false}>
+      <Card variant="borderless">
         <Result
           status="info"
           icon={<FileTextOutlined style={{ color: '#1890ff' }} />}
@@ -271,7 +271,7 @@ export const ReportPreviewPanel = ({
       </Row>
 
       {/* Action Buttons */}
-      <Card bordered={false}>
+      <Card variant="borderless">
         <Row justify="space-between" align="middle">
           <Col>
             <Button 

@@ -59,7 +59,7 @@ export const HistoricalTrends = memo<HistoricalTrendsProps>(({
     return (
       <Card title="Historical Trends">
         <div style={{ textAlign: 'center', padding: '50px 0' }}>
-          <Spin size="large" tip="Loading historical data..." />
+          <Spin size="large" />
         </div>
       </Card>
     );

@@ -145,7 +145,7 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
       setIsChangingRole(false);
       form.resetFields();
     }
-  }, [open, form]);
+  }, [open]);
 
   // Update form when current user changes
   useEffect(() => {

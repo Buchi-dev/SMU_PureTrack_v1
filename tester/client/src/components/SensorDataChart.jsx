@@ -26,14 +26,12 @@ function SensorDataChart({ data, sensors }) {
       tds: '#3b82f6',       // Blue
       ph: '#10b981',        // Green
       turbidity: '#f59e0b', // Orange
-      temperature: '#ef4444' // Red
     };
 
     const sensorNames = {
       tds: 'TDS (ppm)',
       ph: 'pH Level',
       turbidity: 'Turbidity (NTU)',
-      temperature: 'Temperature (°C)'
     };
 
     // Draw background

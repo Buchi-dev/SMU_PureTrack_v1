@@ -55,7 +55,7 @@ const getStatusIcon = (status: string) => {
 export const SystemHealthCard = memo<SystemHealthCardProps>(({ systemHealth, loading }) => {
   if (!systemHealth) {
     return (
-      <Card loading={loading} title="System Health" bordered={false}>
+      <Card loading={loading} title="System Health" variant="borderless">
         <Text type="secondary">No health data available</Text>
       </Card>
     );

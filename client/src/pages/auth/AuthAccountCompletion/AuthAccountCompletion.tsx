@@ -145,7 +145,7 @@ export const AuthAccountCompletion = () => {
       }}
     >
       <Card
-        bordered={false}
+        variant="borderless"
         style={{
           maxWidth: 680,
           width: "100%",

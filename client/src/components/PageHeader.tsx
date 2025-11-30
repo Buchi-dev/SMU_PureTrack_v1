@@ -107,7 +107,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       <Breadcrumb items={breadcrumbs} />
 
       {/* Page Header Card */}
-      <Card bordered={false}>
+      <Card variant="borderless">
         <Space direction="vertical" size="small" style={{ width: '100%' }}>
           <Space
             style={{

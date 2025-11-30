@@ -7,8 +7,8 @@ const mqtt = require('mqtt');
 
 // MQTT Broker Configuration
 const MQTT_CONFIG = {
-  // HiveMQ Configuration (supports both public and cloud brokers)
-  BROKER_URL: process.env.MQTT_BROKER_URL || 'mqtt://broker.hivemq.com:1883',
+  // HiveMQ Cloud Cluster Configuration
+  BROKER_URL: process.env.MQTT_BROKER_URL || 'mqtt://0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud:8883',
   CLIENT_ID: process.env.MQTT_CLIENT_ID || `water-quality-server-${Date.now()}`,
 
   // Connection Options
@@ -41,15 +41,6 @@ const MQTT_CONFIG = {
 
     // Server publishes commands to these topics
     DEVICE_COMMANDS: 'devices/+/commands',   // devices/{deviceId}/commands
-
-    // Server publishes real-time updates to clients (if needed)
-    ALERTS_NEW: 'alerts/new',                // New alerts
-    ALERTS_UPDATED: 'alerts/updated',        // Alert updates
-    DEVICES_NEW: 'devices/new',              // New devices
-    DEVICES_UPDATED: 'devices/updated',      // Device updates
-    READINGS_NEW: 'readings/new',            // New sensor readings
-    READINGS_ANOMALY: 'readings/anomaly',    // Anomaly readings
-    USERS_UPDATED: 'users/updated',          // User updates
 
     // Wildcard subscriptions for server
     ALL_DEVICE_DATA: 'devices/+/data',

@@ -176,7 +176,7 @@ export const OverallHealthCard = memo<OverallHealthCardProps>(({
         <Row gutter={[16, 16]}>
           {/* Server Uptime */}
           <Col xs={12} lg={12}>
-            <Card bordered={false} style={{ height: '100%' }}>
+            <Card variant="borderless" style={{ height: '100%' }}>
               <Statistic
                 title="Server Uptime"
                 value={systemHealth ? Math.floor(systemHealth.uptime / 60) : 0}
@@ -189,7 +189,7 @@ export const OverallHealthCard = memo<OverallHealthCardProps>(({
 
           {/* Response Time */}
           <Col xs={12} lg={12}>
-            <Card bordered={false} style={{ height: '100%' }}>
+            <Card variant="borderless" style={{ height: '100%' }}>
               <Statistic
                 title="API Response"
                 value={systemHealth?.responseTime || 'N/A'}
@@ -200,7 +200,7 @@ export const OverallHealthCard = memo<OverallHealthCardProps>(({
 
           {/* Device Availability */}
           <Col xs={12} lg={12}>
-            <Card bordered={false} style={{ height: '100%' }}>
+            <Card variant="borderless" style={{ height: '100%' }}>
               <Statistic
                 title="Device Availability"
                 value={deviceAvailability}
@@ -224,7 +224,7 @@ export const OverallHealthCard = memo<OverallHealthCardProps>(({
 
           {/* Critical Alerts */}
           <Col xs={12} lg={12}>
-            <Card bordered={false} style={{ height: '100%' }}>
+            <Card variant="borderless" style={{ height: '100%' }}>
               <Statistic
                 title="Critical Alerts"
                 value={alertStats.critical}

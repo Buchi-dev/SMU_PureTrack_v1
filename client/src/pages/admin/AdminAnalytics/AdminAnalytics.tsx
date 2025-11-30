@@ -123,7 +123,7 @@ export const AdminAnalytics = memo(() => {
     return (
       <AdminLayout>
         <div style={{ textAlign: 'center', padding: '100px 0' }}>
-          <Spin size="large" tip="Loading analytics data..." />
+          <Spin size="large" />
         </div>
       </AdminLayout>
     );

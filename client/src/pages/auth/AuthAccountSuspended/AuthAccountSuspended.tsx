@@ -100,7 +100,7 @@ export const AuthAccountSuspended = () => {
           backgroundRepeat: "no-repeat",
         }}
       >
-        <Spin size="large" tip="Checking account status...">
+        <Spin size="large">
           <div style={{ padding: '50px' }} />
         </Spin>
       </div>

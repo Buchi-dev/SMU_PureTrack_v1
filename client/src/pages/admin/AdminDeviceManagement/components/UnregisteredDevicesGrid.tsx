@@ -29,7 +29,7 @@ export const UnregisteredDevicesGrid = ({
           minHeight: '400px',
         }}
       >
-        <Spin size="large" tip="Loading unregistered devices..." />
+        <Spin size="large" />
       </div>
     );
   }

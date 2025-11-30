@@ -207,7 +207,7 @@ export const AdminUserManagement: React.FC = () => {
           minHeight: '100vh',
           background: token.colorBgLayout
         }}>
-          <Spin size="large" tip="Initializing authentication..." />
+          <Spin size="large" />
         </div>
       </AdminLayout>
     );
@@ -242,7 +242,7 @@ export const AdminUserManagement: React.FC = () => {
             />
 
             {/* Page Header */}
-            <Card bordered={false}>
+            <Card variant="borderless">
               <Space
                 direction="vertical"
                 size="small"
@@ -370,7 +370,7 @@ export const AdminUserManagement: React.FC = () => {
             >
               {loading && users.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "60px 0" }}>
-                  <Spin size="large" tip="Loading users..." />
+                  <Spin size="large" />
                 </div>
               ) : users.length === 0 ? (
                 <Empty
