@@ -35,11 +35,11 @@ const options = {
     ],
     components: {
       securitySchemes: {
-        SessionAuth: {
-          type: 'apiKey',
-          in: 'cookie',
-          name: 'connect.sid',
-          description: 'Session-based authentication using Passport.js',
+        FirebaseAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Firebase token-based authentication. Provide Firebase ID token in Authorization header.',
         },
         ApiKeyAuth: {
           type: 'apiKey',
