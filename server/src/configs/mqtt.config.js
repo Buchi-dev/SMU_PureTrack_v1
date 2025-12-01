@@ -23,12 +23,7 @@ const MQTT_CONFIG = {
     protocolVersion: 4, // MQTT v3.1.1
     // SSL/TLS options for HiveMQ Cloud
     rejectUnauthorized: true, // Validate HiveMQ certificates properly
-    will: {
-      topic: 'server/status',
-      payload: JSON.stringify({ status: 'offline', timestamp: new Date().toISOString() }),
-      qos: 1,
-      retain: true
-    }
+    // NO Last Will Testament - Using server polling mode instead
   },
 
   // Quality of Service
@@ -42,20 +37,18 @@ const MQTT_CONFIG = {
   TOPICS: {
     // Device publishes sensor data to these topics
     DEVICE_DATA: 'devices/+/data',           // devices/{deviceId}/data
-    DEVICE_STATUS: 'devices/+/status',       // devices/{deviceId}/status
     DEVICE_REGISTER: 'devices/+/register',   // devices/{deviceId}/register
 
     // Server publishes commands to these topics
     DEVICE_COMMANDS: 'devices/+/commands',   // devices/{deviceId}/commands
 
-    // Presence detection topics
+    // Presence detection topics (ACTIVE - Server Polling Mode)
     PRESENCE_QUERY: 'presence/query',         // Server asks "who is online?"
     PRESENCE_RESPONSE: 'presence/response',   // Devices respond "I'm online"
-    DEVICE_PRESENCE: 'devices/+/presence',    // Individual device presence (retained)
+    DEVICE_PRESENCE: 'devices/+/presence',    // Individual device presence (NOT retained)
 
     // Wildcard subscriptions for server
     ALL_DEVICE_DATA: 'devices/+/data',
-    ALL_DEVICE_STATUS: 'devices/+/status',
     ALL_DEVICE_REGISTER: 'devices/+/register',
     ALL_DEVICE_PRESENCE: 'devices/+/presence',
     ALL_PRESENCE_RESPONSES: 'presence/response',
@@ -83,8 +76,8 @@ const MQTT_CONFIG = {
 const generateTopics = {
   // Topics where devices publish
   deviceData: (deviceId) => `devices/${deviceId}/data`,
-  deviceStatus: (deviceId) => `devices/${deviceId}/status`,
   deviceRegister: (deviceId) => `devices/${deviceId}/register`,
+  devicePresence: (deviceId) => `devices/${deviceId}/presence`,
 
   // Topics where server publishes commands
   deviceCommands: (deviceId) => `devices/${deviceId}/commands`,

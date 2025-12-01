@@ -414,7 +414,10 @@ function generateWaterQualityReportPDF(reportConfig, reportData) {
     margin: { left: SPACING.page.left, right: SPACING.page.right },
   });
   
-  yPos = doc.previousAutoTable.finalY + SPACING.section;
+  // Safely get finalY position after table
+  yPos = doc.previousAutoTable && doc.previousAutoTable.finalY 
+    ? doc.previousAutoTable.finalY + SPACING.section 
+    : yPos + 80; // Fallback if table didn't render
 
   // ============================================================================
   // EXECUTIVE SUMMARY WITH COMPLIANCE METRICS
@@ -798,7 +801,9 @@ function addDeviceAnalysis(doc, reportData, yPos) {
         tableWidth: 'auto',
       });
 
-      yPos = doc.previousAutoTable.finalY + 5;
+      yPos = doc.previousAutoTable && doc.previousAutoTable.finalY 
+        ? doc.previousAutoTable.finalY + 5 
+        : yPos + 40;
     }
 
     // Compliance Analysis sub-table
@@ -892,7 +897,9 @@ function addDeviceAnalysis(doc, reportData, yPos) {
         margin: { left: SPACING.page.left, right: SPACING.page.right },
       });
 
-      yPos = doc.previousAutoTable.finalY + 8;
+      yPos = doc.previousAutoTable && doc.previousAutoTable.finalY 
+        ? doc.previousAutoTable.finalY + 8 
+        : yPos + 50;
     }
 
     // Alerts section
@@ -999,7 +1006,9 @@ function addDeviceAnalysis(doc, reportData, yPos) {
         tableWidth: 'auto',
       });
       
-      yPos = doc.previousAutoTable.finalY;
+      yPos = doc.previousAutoTable && doc.previousAutoTable.finalY 
+        ? doc.previousAutoTable.finalY 
+        : yPos + 60;
       
       if (sortedAlerts.length > 10) {
         yPos += 3;

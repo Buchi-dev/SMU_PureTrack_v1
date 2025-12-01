@@ -103,6 +103,13 @@ export async function initializeMQTT(): Promise<void> {
       client.on('message', (topic, message) => {
         try {
           const messageStr = message.toString();
+          
+          // Validate JSON before parsing
+          if (!messageStr || messageStr.length === 0) {
+            console.warn('[MQTT] Received empty message on topic:', topic);
+            return;
+          }
+
           const data = JSON.parse(messageStr);
 
           console.log('[MQTT] Received message:', { topic, data: messageStr.substring(0, 100) + '...' });
@@ -124,7 +131,20 @@ export async function initializeMQTT(): Promise<void> {
           });
 
         } catch (error) {
-          console.error('[MQTT] Error processing message:', { topic, error: error instanceof Error ? error.message : String(error) });
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const messagePreview = message.toString().substring(0, 150);
+          console.error('[MQTT] Error processing message:', { 
+            topic, 
+            error: errorMessage,
+            messageLength: message.length,
+            messagePreview: messagePreview,
+            truncated: message.length > 150
+          });
+          
+          // Log truncated JSON warning
+          if (errorMessage.includes('Unterminated string')) {
+            console.warn('[MQTT] ⚠️ Message appears to be truncated. Device may need larger buffer size.');
+          }
         }
       });
     });

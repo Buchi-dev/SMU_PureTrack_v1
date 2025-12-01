@@ -22,7 +22,8 @@ import {
   Row,
   Col,
   Statistic,
-  Spin
+  Spin,
+  Popconfirm
 } from 'antd';
 import {
   FileTextOutlined,
@@ -32,6 +33,7 @@ import {
   FilterOutlined,
   DatabaseOutlined,
   ReloadOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -61,6 +63,7 @@ interface ReportHistoryItem {
 
 const ReportHistory: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [reports, setReports] = useState<ReportHistoryItem[]>([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -115,9 +118,18 @@ const ReportHistory: React.FC = () => {
     loadReports(1, pagination.pageSize);
   };
 
-  // Handle manual refresh
-  const handleRefresh = () => {
-    loadReports(pagination.current, pagination.pageSize);
+  // Handle manual refresh with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await loadReports(pagination.current, pagination.pageSize);
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
   };
 
   // Handle download
@@ -146,6 +158,21 @@ const ReportHistory: React.FC = () => {
         content: error instanceof Error ? error.message : 'Download failed', 
         key: 'download' 
       });
+    }
+  };
+
+  // Handle delete
+  const handleDelete = async (record: ReportHistoryItem) => {
+    try {
+      await reportsService.deleteReport(record.id);
+      message.success('Report deleted successfully');
+      // Reload the reports list
+      loadReports(pagination.current, pagination.pageSize);
+    } catch (error) {
+      console.error('Delete failed:', error);
+      message.error(
+        error instanceof Error ? error.message : 'Failed to delete report'
+      );
     }
   };
 
@@ -226,14 +253,32 @@ const ReportHistory: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       render: (record: ReportHistoryItem) => (
-        <Button
-          type="primary"
-          icon={<DownloadOutlined />}
-          onClick={() => handleDownload(record)}
-          size="small"
-        >
-          Download
-        </Button>
+        <Space>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownload(record)}
+            size="small"
+          >
+            Download
+          </Button>
+          <Popconfirm
+            title="Delete Report"
+            description="Are you sure you want to delete this report? This action cannot be undone."
+            onConfirm={() => handleDelete(record)}
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+            >
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -254,9 +299,10 @@ const ReportHistory: React.FC = () => {
             </Col>
             <Col>
               <Button
-                icon={<ReloadOutlined />}
+                icon={<ReloadOutlined spin={isRefreshing} />}
                 onClick={handleRefresh}
-                loading={loading}
+                loading={isRefreshing}
+                disabled={isRefreshing}
               >
                 Refresh
               </Button>

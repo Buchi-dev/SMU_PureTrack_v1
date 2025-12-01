@@ -27,6 +27,8 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   DownloadOutlined,
+  ReloadOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
@@ -57,11 +59,26 @@ export const StaffReadings = () => {
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading } = useDevices({ 
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
     pollInterval: 10000 // Poll every 10 seconds for readings
   });
+
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
+  };
 
   // Transform devices to readings format using utility function
   const readings: Reading[] = useMemo(() => {
@@ -210,14 +227,32 @@ export const StaffReadings = () => {
     <StaffLayout>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
-        <div>
-          <Title level={2}>
-            <LineChartOutlined /> Sensor Readings
-          </Title>
-          <Text type="secondary">
-            Real-time water quality sensor data and measurements
-          </Text>
-        </div>
+        <Card>
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space direction="vertical" size={0}>
+                <Title level={2} style={{ margin: 0 }}>
+                  <LineChartOutlined /> Sensor Readings
+                </Title>
+                <Text type="secondary">
+                  Real-time water quality sensor data and measurements
+                </Text>
+              </Space>
+            </Col>
+            <Col>
+              <Button
+                type="primary"
+                icon={isRefreshing ? <SyncOutlined spin /> : <ReloadOutlined />}
+                onClick={handleRefresh}
+                loading={isRefreshing}
+                disabled={isRefreshing}
+                size="large"
+              >
+                Refresh Data
+              </Button>
+            </Col>
+          </Row>
+        </Card>
 
         {isLoading ? (
           <>
@@ -229,7 +264,7 @@ export const StaffReadings = () => {
             {/* Statistics Skeleton */}
             <Row gutter={[16, 16]}>
               {[1, 2, 3, 4].map((i) => (
-                <Col xs={24} sm={12} lg={6} key={i}>
+                <Col xs={24} sm={12} md={8} lg={6} xl={6} key={i}>
                   <Card>
                     <Skeleton active paragraph={{ rows: 1 }} />
                   </Card>
@@ -263,7 +298,7 @@ export const StaffReadings = () => {
 
         {/* Statistics */}
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Total Readings"
@@ -273,7 +308,7 @@ export const StaffReadings = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Normal"
@@ -283,7 +318,7 @@ export const StaffReadings = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Warnings"
@@ -293,7 +328,7 @@ export const StaffReadings = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Critical"

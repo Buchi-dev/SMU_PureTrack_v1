@@ -27,6 +27,8 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   WarningOutlined,
+  ReloadOutlined,
+  SyncOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
@@ -57,11 +59,26 @@ export const StaffDevices = () => {
   const token = useThemeToken();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading } = useDevices({ 
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
     pollInterval: 15000 // Poll every 15 seconds
   });
+
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
+  };
 
   // Transform devices for display using utility function
   const devices: Device[] = useMemo(() => {
@@ -200,21 +217,39 @@ export const StaffDevices = () => {
     <StaffLayout>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {/* Header */}
-        <div>
-          <Title level={2}>
-            <ApiOutlined /> Devices
-          </Title>
-          <Text type="secondary">
-            View and monitor all water quality monitoring devices
-          </Text>
-        </div>
+        <Card>
+          <Row justify="space-between" align="middle">
+            <Col>
+              <Space direction="vertical" size={0}>
+                <Title level={2} style={{ margin: 0 }}>
+                  <ApiOutlined /> Devices
+                </Title>
+                <Text type="secondary">
+                  View and monitor all water quality monitoring devices
+                </Text>
+              </Space>
+            </Col>
+            <Col>
+              <Button
+                type="primary"
+                icon={isRefreshing ? <SyncOutlined spin /> : <ReloadOutlined />}
+                onClick={handleRefresh}
+                loading={isRefreshing}
+                disabled={isRefreshing}
+                size="large"
+              >
+                Refresh Data
+              </Button>
+            </Col>
+          </Row>
+        </Card>
 
         {isLoading ? (
           <>
             {/* Statistics Skeleton */}
             <Row gutter={[16, 16]}>
               {[1, 2, 3, 4].map((i) => (
-                <Col xs={24} sm={12} lg={6} key={i}>
+                <Col xs={24} sm={12} md={8} lg={6} xl={6} key={i}>
                   <Card>
                     <Skeleton active paragraph={{ rows: 1 }} />
                   </Card>
@@ -243,7 +278,7 @@ export const StaffDevices = () => {
           <>
         {/* Statistics */}
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Total Devices"
@@ -253,7 +288,7 @@ export const StaffDevices = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Online"
@@ -263,7 +298,7 @@ export const StaffDevices = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Warnings"
@@ -273,7 +308,7 @@ export const StaffDevices = () => {
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
             <Card>
               <Statistic
                 title="Offline"

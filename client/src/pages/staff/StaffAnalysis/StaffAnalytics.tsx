@@ -124,7 +124,7 @@ export const StaffAnalytics = () => {
 
         {/* Statistics Cards */}
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
             <StatsCard
               title="Average pH"
               value={stats.avgPh}
@@ -135,7 +135,7 @@ export const StaffAnalytics = () => {
               trend="neutral"
             />
           </Col>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
             <StatsCard
               title="Avg TDS"
               value={stats.avgTds}
@@ -145,7 +145,7 @@ export const StaffAnalytics = () => {
               trend="neutral"
             />
           </Col>
-          <Col xs={24} sm={12} lg={8}>
+          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
             <StatsCard
               title="Avg Turbidity"
               value={stats.avgTurbidity}

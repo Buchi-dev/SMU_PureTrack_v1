@@ -18,6 +18,7 @@ import {
   LineChartOutlined,
   HomeOutlined,
   SettingOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
 import { ROUTES } from '../../router/routes';
 import UserMenu from '../UserMenu';
@@ -47,6 +48,8 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       setSelectedKeys(['readings']);
     } else if (path.includes('/staff/analytics')) {
       setSelectedKeys(['analytics']);
+    } else if (path.includes('/staff/alerts')) {
+      setSelectedKeys(['alerts']);
     } else if (path.includes('/staff/settings')) {
       setSelectedKeys(['settings']);
     } else if (path.includes('/staff/dashboard')) {
@@ -77,6 +80,11 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       label: 'Analytics',
     },
     {
+      key: 'alerts',
+      icon: <BellOutlined style={{ fontSize: '16px' }} />,
+      label: 'Alerts',
+    },
+    {
       key: 'settings',
       icon: <SettingOutlined style={{ fontSize: '16px' }} />,
       label: 'Settings',
@@ -90,6 +98,7 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       devices: ROUTES.STAFF.DEVICES,
       readings: ROUTES.STAFF.READINGS,
       analytics: ROUTES.STAFF.ANALYTICS,
+      alerts: ROUTES.STAFF.ALERTS,
       settings: ROUTES.STAFF.SETTINGS,
     };
 
@@ -119,6 +128,8 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
       items.push({ title: 'Sensor Data' });
     } else if (path.includes('/staff/analytics')) {
       items.push({ title: 'Analytics' });
+    } else if (path.includes('/staff/alerts')) {
+      items.push({ title: 'Alerts' });
     } else if (path.includes('/staff/settings')) {
       items.push({ title: 'Settings' });
     } else if (path.includes('/staff/dashboard')) {

@@ -39,7 +39,7 @@ export const KeyMetrics = memo<KeyMetricsProps>(({
 
   return (
     <Row gutter={[16, 16]}>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card loading={loading}>
           <Statistic
             title="Total Devices"
@@ -52,7 +52,7 @@ export const KeyMetrics = memo<KeyMetricsProps>(({
           </Text>
         </Card>
       </Col>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card loading={loading}>
           <Statistic
             title="System Health"
@@ -74,7 +74,7 @@ export const KeyMetrics = memo<KeyMetricsProps>(({
           </Text>
         </Card>
       </Col>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card loading={loading}>
           <Statistic
             title="Total Readings"
@@ -85,7 +85,7 @@ export const KeyMetrics = memo<KeyMetricsProps>(({
           <Text type="secondary">From {deviceStats.withReadings} devices</Text>
         </Card>
       </Col>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card loading={loading}>
           <Statistic
             title="Active Alerts"

@@ -1,11 +1,13 @@
-import { Card, Statistic, Badge } from 'antd';
+import { Row, Col } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ToolOutlined,
   InfoCircleOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
 import { useThemeToken } from '../../../../theme';
+import { StatsCard } from '../../../../components/staff';
 
 interface DeviceStatsProps {
   stats: {
@@ -22,61 +24,67 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
   const token = useThemeToken();
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-        gap: '16px',
-      }}
-    >
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Total Devices</span>}
+    <Row gutter={[16, 16]}>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Total Devices"
           value={stats.total}
-          valueStyle={{ fontSize: '28px', fontWeight: 600 }}
-          prefix={<Badge status="processing" />}
+          icon={<DashboardOutlined />}
+          color={token.colorInfo}
+          description="All devices"
+          size="small"
         />
-      </Card>
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Online</span>}
+      </Col>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Online"
           value={stats.online}
-          valueStyle={{ color: token.colorSuccess, fontSize: '28px', fontWeight: 600 }}
-          prefix={<CheckCircleOutlined />}
+          icon={<CheckCircleOutlined />}
+          color={token.colorSuccess}
+          description="Active devices"
+          size="small"
         />
-      </Card>
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Offline</span>}
+      </Col>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Offline"
           value={stats.offline}
-          valueStyle={{ color: token.colorTextSecondary, fontSize: '28px', fontWeight: 600 }}
-          prefix={<CloseCircleOutlined />}
+          icon={<CloseCircleOutlined />}
+          color={token.colorTextSecondary}
+          description="Inactive devices"
+          size="small"
         />
-      </Card>
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Maintenance</span>}
+      </Col>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Maintenance"
           value={stats.maintenance}
-          valueStyle={{ color: token.colorWarning, fontSize: '28px', fontWeight: 600 }}
-          prefix={<ToolOutlined />}
+          icon={<ToolOutlined />}
+          color={token.colorWarning}
+          description="Under maintenance"
+          size="small"
         />
-      </Card>
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Registered</span>}
+      </Col>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Registered"
           value={stats.registered}
-          valueStyle={{ color: token.colorSuccess, fontSize: '28px', fontWeight: 600 }}
-          prefix={<CheckCircleOutlined />}
+          icon={<CheckCircleOutlined />}
+          color={token.colorSuccess}
+          description="Fully registered"
+          size="small"
         />
-      </Card>
-      <Card size="small" styles={{ body: { padding: '16px' } }} style={{ borderRadius: '8px' }}>
-        <Statistic
-          title={<span style={{ fontSize: '13px', fontWeight: 500 }}>Unregistered</span>}
+      </Col>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Unregistered"
           value={stats.unregistered}
-          valueStyle={{ color: token.colorWarning, fontSize: '28px', fontWeight: 600 }}
-          prefix={<InfoCircleOutlined />}
+          icon={<InfoCircleOutlined />}
+          color={token.colorWarning}
+          description="Pending registration"
+          size="small"
         />
-      </Card>
-    </div>
+      </Col>
+    </Row>
   );
 };

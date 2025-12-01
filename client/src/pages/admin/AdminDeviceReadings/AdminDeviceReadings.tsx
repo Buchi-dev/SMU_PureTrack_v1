@@ -37,6 +37,7 @@ export const AdminDeviceReadings = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Combine loading and error states
   const loading = devicesLoading || alertsLoading;
@@ -70,11 +71,19 @@ export const AdminDeviceReadings = () => {
     message.success(`Send Now command sent to ${enrichedDevices.filter(d => d.status === 'online').length} online device(s)`);
   };
 
-  // Manual refresh handler
-  const handleRefresh = () => {
-    refetchDevices();
-    refetchAlerts();
-    handleForceDeviceSendData();
+  // Manual refresh handler with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchDevices(), refetchAlerts()]);
+      handleForceDeviceSendData();
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
   };
 
   // Apply filters to enriched devices
@@ -122,14 +131,15 @@ export const AdminDeviceReadings = () => {
             {
               key: 'refresh',
               label: 'Refresh',
-              icon: <ReloadOutlined spin={loading} />,
+              icon: <ReloadOutlined spin={isRefreshing} />,
               onClick: handleRefresh,
-              disabled: loading,
+              disabled: isRefreshing,
+              loading: isRefreshing,
             }
           ]}
         />
 
-        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24, maxWidth: '1800px', margin: '24px auto 0' }}>
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
 
           {/* Info Alert */}
           <Alert

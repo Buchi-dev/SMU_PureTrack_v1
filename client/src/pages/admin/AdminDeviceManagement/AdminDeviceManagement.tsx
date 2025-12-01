@@ -33,6 +33,7 @@ export const AdminDeviceManagement = () => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isViewModalVisible, setIsViewModalVisible] = useState(false);
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ✅ GLOBAL HOOK - Real-time device data
   const {
@@ -118,6 +119,20 @@ export const AdminDeviceManagement = () => {
     }
   };
 
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <Content style={{ padding: '24px' }}>
@@ -132,9 +147,10 @@ export const AdminDeviceManagement = () => {
             {
               key: 'refresh',
               label: 'Refresh',
-              icon: <ReloadOutlined spin={isLoading} />,
-              onClick: refetch,
-              disabled: isLoading,
+              icon: <ReloadOutlined spin={isRefreshing} />,
+              onClick: handleRefresh,
+              disabled: isRefreshing,
+              loading: isRefreshing,
             }
           ]}
         >

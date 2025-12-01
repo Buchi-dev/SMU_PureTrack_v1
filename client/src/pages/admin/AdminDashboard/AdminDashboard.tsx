@@ -34,6 +34,7 @@ const { Content } = Layout;
  */
 export const AdminDashboard = memo(() => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [refreshing, setRefreshing] = useState(false);
   
   // ✅ GLOBAL HOOKS - Real-time data from service layer
   const {
@@ -65,11 +66,20 @@ export const AdminDashboard = memo(() => {
 
   // Refresh all data sources
   const handleRefreshAll = async () => {
-    await Promise.all([
-      healthRefetch(),
-      devicesRefetch(),
-      alertsRefetch()
-    ]);
+    if (refreshing) return; // Prevent spam clicks
+    
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        healthRefetch(),
+        devicesRefetch(),
+        alertsRefetch()
+      ]);
+      setTimeout(() => setRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setRefreshing(false);
+    }
   };
 
   // Combined loading state
@@ -161,9 +171,10 @@ export const AdminDashboard = memo(() => {
             {
               key: 'refresh',
               label: 'Refresh',
-              icon: <ReloadOutlined spin={isLoading} />,
+              icon: <ReloadOutlined spin={refreshing} />,
               onClick: handleRefreshAll,
-              disabled: isLoading,
+              disabled: refreshing,
+              loading: refreshing,
             }
           ]}
         />

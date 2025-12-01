@@ -13,6 +13,7 @@
  */
 import { Layout, Space, Spin, Tabs } from 'antd';
 import { memo, useMemo } from 'react';
+import * as React from 'react';
 import { 
   DashboardOutlined, 
   LineChartOutlined, 
@@ -50,16 +51,19 @@ export const AdminAnalytics = memo(() => {
   const {
     devices,
     isLoading: devicesLoading,
+    refetch: refetchDevices,
   } = useDevices({ pollInterval: 15000 });
 
   const {
     alerts,
     isLoading: alertsLoading,
+    refetch: refetchAlerts,
   } = useAlerts({ pollInterval: 5000 });
 
   const {
     health: systemHealthData,
     isLoading: healthLoading,
+    refetch: refetchHealth,
   } = useSystemHealth({ pollInterval: 30000 });
 
   // Enrich devices with required properties for analytics
@@ -117,6 +121,22 @@ export const AdminAnalytics = memo(() => {
 
   // Combined loading state
   const loading = devicesLoading || alertsLoading || healthLoading;
+
+  // Refresh handler with loading state
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchDevices(), refetchAlerts(), refetchHealth()]);
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
+  };
 
   // Initial loading state
   if (loading && enrichedDevices.length === 0) {
@@ -242,9 +262,10 @@ export const AdminAnalytics = memo(() => {
             {
               key: 'refresh',
               label: 'Refresh',
-              icon: <ReloadOutlined spin={loading} />,
-              onClick: () => window.location.reload(),
-              disabled: loading,
+              icon: <ReloadOutlined spin={isRefreshing} />,
+              onClick: handleRefresh,
+              disabled: isRefreshing,
+              loading: isRefreshing,
             }
           ]}
         />

@@ -89,8 +89,19 @@ deviceSchema.index({ deviceId: 1, isRegistered: 1 });
 
 /**
  * Instance method to get public device data
+ * Converts dates to Firebase Timestamp format for frontend compatibility
  */
 deviceSchema.methods.toPublicProfile = function () {
+  // Helper function to convert Date to Firebase Timestamp-like object
+  const toTimestamp = (date) => {
+    if (!date) return null;
+    const timestamp = date instanceof Date ? date : new Date(date);
+    return {
+      seconds: Math.floor(timestamp.getTime() / 1000),
+      nanoseconds: (timestamp.getTime() % 1000) * 1000000,
+    };
+  };
+
   return {
     id: this._id,
     deviceId: this.deviceId,
@@ -104,7 +115,8 @@ deviceSchema.methods.toPublicProfile = function () {
     status: this.status,
     registrationStatus: this.registrationStatus,
     isRegistered: this.isRegistered,
-    lastSeen: this.lastSeen,
+    registeredAt: toTimestamp(this.createdAt), // Map createdAt to registeredAt
+    lastSeen: toTimestamp(this.lastSeen),
     metadata: this.metadata,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,

@@ -40,7 +40,7 @@ export default function DeviceStatsCards({ stats }: DeviceStatsCardsProps) {
   return (
     <Row gutter={[16, 16]}>
       {/* Total Devices */}
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card
           hoverable
           onClick={() => navigate('/staff/devices')}
@@ -73,7 +73,7 @@ export default function DeviceStatsCards({ stats }: DeviceStatsCardsProps) {
       </Col>
 
       {/* Online Devices */}
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card
           hoverable
           style={{
@@ -108,7 +108,7 @@ export default function DeviceStatsCards({ stats }: DeviceStatsCardsProps) {
       </Col>
 
       {/* Warnings */}
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card
           hoverable
           onClick={() => navigate('/staff/readings')}
@@ -143,7 +143,7 @@ export default function DeviceStatsCards({ stats }: DeviceStatsCardsProps) {
       </Col>
 
       {/* Offline Devices */}
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <Card
           hoverable
           style={{

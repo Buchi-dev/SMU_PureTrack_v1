@@ -16,7 +16,9 @@ import {
   Row,
   Col,
   Dropdown,
-  Tooltip
+  Tooltip,
+  Modal,
+  message
 } from 'antd';
 import type { GlobalToken } from 'antd/es/theme/interface';
 import {
@@ -27,15 +29,18 @@ import {
   EyeOutlined,
   DeleteOutlined,
   MoreOutlined,
-  RightOutlined
+  RightOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import type { ReportHistory } from '../../../../schemas';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import { reportsService } from '../../../../services/reports.Service';
 
 dayjs.extend(relativeTime);
 
 const { Text, Paragraph } = Typography;
+const { confirm } = Modal;
 
 interface ReportHistorySidebarProps {
   reportHistory: ReportHistory[];
@@ -44,6 +49,7 @@ interface ReportHistorySidebarProps {
   showViewAll?: boolean;
   onViewAll?: () => void;
   fullView?: boolean;
+  onDelete?: (reportId: string) => void;
 }
 
 /**
@@ -63,6 +69,7 @@ export const ReportHistorySidebar = ({
   showViewAll = false,
   onViewAll,
   fullView = false,
+  onDelete,
 }: ReportHistorySidebarProps) => {
   const getReportTypeColor = (/* _type?: string */) => {
     return 'blue';
@@ -70,6 +77,36 @@ export const ReportHistorySidebar = ({
 
   const getReportTypeLabel = (/* _type?: string */) => {
     return 'Water Quality';
+  };
+
+  const handleDeleteReport = (report: ReportHistory) => {
+    confirm({
+      title: 'Delete Report',
+      icon: <ExclamationCircleOutlined />,
+      content: `Are you sure you want to delete "${report.title}"? This action cannot be undone.`,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      async onOk() {
+        try {
+          await reportsService.deleteReport(report.id);
+          message.success('Report deleted successfully');
+          if (onDelete) {
+            onDelete(report.id);
+          }
+        } catch (error) {
+          message.error('Failed to delete report');
+          console.error('Delete report error:', error);
+        }
+      },
+    });
+  };
+
+  const handleMenuClick = (key: string, report: ReportHistory) => {
+    if (key === 'delete') {
+      handleDeleteReport(report);
+    }
+    // Add other menu actions here (view, download) if needed
   };
 
   if (fullView) {
@@ -162,6 +199,7 @@ export const ReportHistorySidebar = ({
                             danger: true,
                           },
                         ],
+                        onClick: ({ key }) => handleMenuClick(key, item),
                       }}
                     >
                       <Button type="text" icon={<MoreOutlined />} />
@@ -256,13 +294,24 @@ export const ReportHistorySidebar = ({
             renderItem={item => (
               <List.Item
                 extra={
-                  <Tooltip title="Download PDF">
-                    <Button 
-                      type="text" 
-                      icon={<DownloadOutlined />} 
-                      size="small"
-                    />
-                  </Tooltip>
+                  <Space>
+                    <Tooltip title="Download PDF">
+                      <Button 
+                        type="text" 
+                        icon={<DownloadOutlined />} 
+                        size="small"
+                      />
+                    </Tooltip>
+                    <Tooltip title="Delete Report">
+                      <Button 
+                        type="text" 
+                        icon={<DeleteOutlined />} 
+                        size="small"
+                        danger
+                        onClick={() => handleDeleteReport(item)}
+                      />
+                    </Tooltip>
+                  </Space>
                 }
               >
                 <List.Item.Meta

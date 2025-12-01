@@ -1,4 +1,4 @@
-import { Card, Statistic, Row, Col } from 'antd';
+import { Row, Col } from 'antd';
 import {
   DashboardOutlined,
   CheckCircleOutlined,
@@ -7,6 +7,8 @@ import {
   DisconnectOutlined,
 } from '@ant-design/icons';
 import { memo } from 'react';
+import { StatsCard } from '../../../../components/staff';
+import { useThemeToken } from '../../../../theme';
 
 interface StatsOverviewProps {
   stats: {
@@ -20,67 +22,69 @@ interface StatsOverviewProps {
 }
 
 export const StatsOverview = memo(({ stats }: StatsOverviewProps) => {
+  const token = useThemeToken();
+  
   return (
     <Row gutter={[16, 16]}>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card>
-          <Statistic
-            title="Total Devices"
-            value={stats.total}
-            prefix={<DashboardOutlined />}
-            valueStyle={{ color: '#1890ff' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Total Devices"
+          value={stats.total}
+          icon={<DashboardOutlined />}
+          color={token.colorInfo}
+          description="All devices"
+          size="small"
+        />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card>
-          <Statistic
-            title="Online"
-            value={stats.online}
-            prefix={<CheckCircleOutlined />}
-            valueStyle={{ color: '#52c41a' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Online"
+          value={stats.online}
+          icon={<CheckCircleOutlined />}
+          color={token.colorSuccess}
+          description="Active devices"
+          size="small"
+        />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card>
-          <Statistic
-            title="Offline"
-            value={stats.offline}
-            prefix={<DisconnectOutlined />}
-            valueStyle={{ color: '#8c8c8c' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Offline"
+          value={stats.offline}
+          icon={<DisconnectOutlined />}
+          color={token.colorTextSecondary}
+          description="Inactive devices"
+          size="small"
+        />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card style={{ borderLeft: '4px solid #ff4d4f' }}>
-          <Statistic
-            title="Critical"
-            value={stats.critical}
-            prefix={<CloseCircleOutlined />}
-            valueStyle={{ color: '#ff4d4f', fontWeight: 'bold' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Critical"
+          value={stats.critical}
+          icon={<CloseCircleOutlined />}
+          color={token.colorError}
+          description="Requires attention"
+          size="small"
+        />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card style={{ borderLeft: '4px solid #faad14' }}>
-          <Statistic
-            title="Warning"
-            value={stats.warning}
-            prefix={<WarningOutlined />}
-            valueStyle={{ color: '#faad14', fontWeight: 'bold' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Warning"
+          value={stats.warning}
+          icon={<WarningOutlined />}
+          color={token.colorWarning}
+          description="Monitor closely"
+          size="small"
+        />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4}>
-        <Card style={{ borderLeft: '4px solid #52c41a' }}>
-          <Statistic
-            title="Normal"
-            value={stats.normal}
-            prefix={<CheckCircleOutlined />}
-            valueStyle={{ color: '#52c41a' }}
-          />
-        </Card>
+      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+        <StatsCard
+          title="Normal"
+          value={stats.normal}
+          icon={<CheckCircleOutlined />}
+          color={token.colorSuccess}
+          description="Operating well"
+          size="small"
+        />
       </Col>
     </Row>
   );

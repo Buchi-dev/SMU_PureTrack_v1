@@ -40,7 +40,7 @@ export const QuickStatsCard = memo<QuickStatsProps>(({ deviceStats, alertStats }
   return (
     <Row gutter={[16, 16]}>
       {/* Devices Card */}
-      <Col xs={24} sm={12} lg={12}>
+      <Col xs={24} sm={24} md={12} lg={12} xl={12}>
         <Card
           bordered={false}
           style={{
@@ -116,7 +116,7 @@ export const QuickStatsCard = memo<QuickStatsProps>(({ deviceStats, alertStats }
       </Col>
 
       {/* Alerts Card */}
-      <Col xs={24} sm={12} lg={12}>
+      <Col xs={24} sm={24} md={12} lg={12} xl={12}>
         <Card
           bordered={false}
           style={{

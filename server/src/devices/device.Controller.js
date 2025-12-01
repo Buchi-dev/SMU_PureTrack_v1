@@ -74,6 +74,27 @@ const getAllDevices = asyncHandler(async (req, res) => {
       $addFields: {
         id: '$_id', // Add id field mapping from _id
         latestReading: { $arrayElemAt: ['$readings', 0] },
+        // Convert dates to Firebase Timestamp format for frontend compatibility
+        registeredAt: {
+          $cond: {
+            if: { $ne: ['$createdAt', null] },
+            then: {
+              seconds: { $toLong: { $divide: [{ $toLong: '$createdAt' }, 1000] } },
+              nanoseconds: { $multiply: [{ $mod: [{ $toLong: '$createdAt' }, 1000] }, 1000000] }
+            },
+            else: null
+          }
+        },
+        lastSeen: {
+          $cond: {
+            if: { $ne: ['$lastSeen', null] },
+            then: {
+              seconds: { $toLong: { $divide: [{ $toLong: '$lastSeen' }, 1000] } },
+              nanoseconds: { $multiply: [{ $mod: [{ $toLong: '$lastSeen' }, 1000] }, 1000000] }
+            },
+            else: null
+          }
+        }
       },
     },
     {
@@ -779,6 +800,16 @@ const getDeviceStatus = asyncHandler(async (req, res) => {
     );
   }
 
+  // Helper function to convert Date to Firebase Timestamp-like object
+  const toTimestamp = (date) => {
+    if (!date) return null;
+    const timestamp = date instanceof Date ? date : new Date(date);
+    return {
+      seconds: Math.floor(timestamp.getTime() / 1000),
+      nanoseconds: (timestamp.getTime() % 1000) * 1000000,
+    };
+  };
+
   // Return device status for MQTT polling
   const status = {
     deviceId: trimmedDeviceId,
@@ -786,7 +817,8 @@ const getDeviceStatus = asyncHandler(async (req, res) => {
     isApproved: device.isRegistered, // Same as isRegistered for backward compatibility
     status: device.status,
     registrationStatus: device.registrationStatus,
-    lastSeen: device.lastSeen,
+    registeredAt: toTimestamp(device.createdAt),
+    lastSeen: toTimestamp(device.lastSeen),
     command: device.isRegistered ? 'go' : 'wait',
     message: device.isRegistered
       ? 'Device is registered. You can send sensor data via MQTT.'

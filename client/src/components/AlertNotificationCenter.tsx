@@ -21,15 +21,17 @@ import {
   WarningOutlined,
   EyeOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAlerts } from '../hooks';
 import { getSeverityColor } from '../schemas';
+import { ROUTES } from '../router/routes';
 
 const { Text } = Typography;
 
 export default function AlertNotificationCenter() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Use the SWR-based hook for real-time alerts
   // Removed custom pollInterval - rely on global SWR cache shared across all components
@@ -50,7 +52,12 @@ export default function AlertNotificationCenter() {
 
   const viewAllAlerts = () => {
     setDropdownOpen(false);
-    navigate('/admin/alerts');
+    // Navigate to appropriate alerts page based on current route
+    if (location.pathname.includes('/staff')) {
+      navigate(ROUTES.STAFF.ALERTS);
+    } else {
+      navigate(ROUTES.ADMIN.ALERTS);
+    }
   };
 
   const getTimeSince = (timestamp: Date | string): string => {
@@ -141,7 +148,12 @@ export default function AlertNotificationCenter() {
                 }}
                 onClick={() => {
                   setDropdownOpen(false);
-                  navigate('/admin/alerts');
+                  // Navigate to appropriate alerts page based on current route
+                  if (location.pathname.includes('/staff')) {
+                    navigate(ROUTES.STAFF.ALERTS);
+                  } else {
+                    navigate(ROUTES.ADMIN.ALERTS);
+                  }
                 }}
               >
                 <List.Item.Meta

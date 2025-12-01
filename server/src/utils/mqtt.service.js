@@ -114,14 +114,14 @@ class MQTTService {
   }
 
   /**
-   * Subscribe to all device topics
+   * Subscribe to all device topics (ACTIVE TOPICS ONLY)
    */
   subscribeToDeviceTopics() {
     const topics = [
-      MQTT_CONFIG.TOPICS.ALL_DEVICE_DATA,
-      MQTT_CONFIG.TOPICS.ALL_DEVICE_REGISTER,
-      MQTT_CONFIG.TOPICS.ALL_PRESENCE_RESPONSES,
-      MQTT_CONFIG.TOPICS.ALL_DEVICE_PRESENCE,
+      MQTT_CONFIG.TOPICS.ALL_DEVICE_DATA,        // Sensor readings
+      MQTT_CONFIG.TOPICS.ALL_DEVICE_REGISTER,    // Device registrations
+      MQTT_CONFIG.TOPICS.ALL_PRESENCE_RESPONSES, // "i_am_online" responses
+      MQTT_CONFIG.TOPICS.ALL_DEVICE_PRESENCE,    // Presence announcements
     ];
 
     topics.forEach(topic => {
@@ -129,7 +129,7 @@ class MQTTService {
         if (err) {
           logger.error(`[MQTT Service] Failed to subscribe to ${topic}:`, err);
         } else {
-          logger.info(`[MQTT Service] Subscribed to ${topic}`);
+          logger.info(`[MQTT Service] ✓ Subscribed to ${topic}`);
         }
       });
     });

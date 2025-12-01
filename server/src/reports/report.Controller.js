@@ -7,6 +7,10 @@ const logger = require('../utils/logger');
 const gridFSService = require('../utils/gridfs.service');
 const { generateWaterQualityReportPDF } = require('../utils/pdfGenerator');
 const crypto = require('crypto');
+const asyncHandler = require('../middleware/asyncHandler');
+const { NotFoundError } = require('../errors');
+const ResponseHelper = require('../utils/responses');
+const CacheService = require('../utils/cache.service');
 
 /**
  * Generate Water Quality Report
@@ -623,33 +627,40 @@ const getReportById = async (req, res) => {
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const deleteReport = async (req, res) => {
-  try {
-    const report = await Report.findByIdAndDelete(req.params.id);
+const deleteReport = asyncHandler(async (req, res) => {
+  const report = await Report.findById(req.params.id);
 
-    if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: 'Report not found',
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Report deleted successfully',
-    });
-  } catch (error) {
-    logger.error('[Report Controller] Error deleting report', {
-      error: error.message,
-      reportId: req.params.id,
-    });
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting report',
-      error: error.message,
-    });
+  if (!report) {
+    throw new NotFoundError('Report', req.params.id);
   }
-};
+
+  // Delete PDF from GridFS if it exists
+  if (report.fileId) {
+    try {
+      await gridFSService.deleteFile(report.fileId);
+      logger.info('[Report Controller] PDF deleted from GridFS', { 
+        reportId: report._id,
+        fileId: report.fileId 
+      });
+    } catch (gridFSError) {
+      logger.warn('[Report Controller] Failed to delete PDF from GridFS', { 
+        reportId: report._id,
+        fileId: report.fileId,
+        error: gridFSError.message 
+      });
+      // Continue with report deletion even if GridFS deletion fails
+    }
+  }
+
+  // Delete the report document
+  await Report.findByIdAndDelete(req.params.id);
+
+  // Invalidate cache
+  await CacheService.delPattern('reports:*');
+  logger.debug('[Report Controller] Cache invalidated for reports');
+
+  ResponseHelper.success(res, null, 'Report deleted successfully');
+});
 
 /**
  * Helper function to calculate device health score

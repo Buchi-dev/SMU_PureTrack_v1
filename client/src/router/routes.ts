@@ -23,6 +23,7 @@ export const ROUTES = {
     DEVICES: '/staff/devices',
     READINGS: '/staff/readings',
     ANALYTICS: '/staff/analytics',
+    ALERTS: '/staff/alerts',
     SETTINGS: '/staff/settings',
   },
   AUTH: {

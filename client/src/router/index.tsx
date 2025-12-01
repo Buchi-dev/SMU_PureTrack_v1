@@ -23,6 +23,7 @@ import {
   StaffDevices, 
   StaffReadings, 
   StaffAnalytics,
+  StaffAlerts,
   StaffSettings
 } from '../pages/staff';
 
@@ -226,6 +227,14 @@ const router = createBrowserRouter([
     element: (
       <ApprovedRoute>
         <StaffAnalytics />
+      </ApprovedRoute>
+    ),
+  },
+  {
+    path: '/staff/alerts',
+    element: (
+      <ApprovedRoute>
+        <StaffAlerts />
       </ApprovedRoute>
     ),
   },

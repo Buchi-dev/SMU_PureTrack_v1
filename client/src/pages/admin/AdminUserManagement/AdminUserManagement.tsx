@@ -14,22 +14,21 @@
 import React, { useState } from "react";
 import {
   Layout,
-  Typography,
   Space,
   Button,
   Card,
   Alert,
   Spin,
   Empty,
-  Breadcrumb,
-  theme,
   message,
+  Typography,
 } from "antd";
+
+const { Text } = Typography;
 import {
   UserOutlined,
   ReloadOutlined,
   PlusOutlined,
-  HomeOutlined,
   BugOutlined,
 } from "@ant-design/icons";
 import { useUsers, useUserMutations } from "../../../hooks";
@@ -39,15 +38,14 @@ import { UsersStatistics } from "./components/UsersStatistics";
 import type { UserListData, UserRole, UserStatus } from "../../../schemas";
 
 import { AdminLayout } from "../../../components/layouts/AdminLayout";
+import { PageHeader } from "../../../components/PageHeader";
 import { useAuth } from "../../../contexts";
 import { diagnoseAndPrint } from "../../../utils/authDiagnostics";
 import { getErrorMessage } from "../../../utils/errorHelpers";
 
-const { Title, Text } = Typography;
 const { Content } = Layout;
 
 export const AdminUserManagement: React.FC = () => {
-  const { token } = theme.useToken();
   const { user: userProfile, refetchUser, loading: authLoading } = useAuth();
   
   // Global READ hook - Real-time user data
@@ -76,6 +74,7 @@ export const AdminUserManagement: React.FC = () => {
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserListData | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   /**
    * Auto-logout handler when user changes their own role/status
@@ -196,211 +195,180 @@ export const AdminUserManagement: React.FC = () => {
     }
   };
 
+  // Handle refresh with loading state
+  const handleRefresh = async () => {
+    if (isRefreshing) return; // Prevent spam clicks
+    
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setTimeout(() => setIsRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setIsRefreshing(false);
+    }
+  };
+
   // Show loading screen while auth is initializing
   if (authLoading) {
     return (
       <AdminLayout>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '100vh',
-          background: token.colorBgLayout
-        }}>
-          <Spin size="large" />
-        </div>
+        <Content style={{ padding: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            minHeight: 'calc(100vh - 48px)'
+          }}>
+            <Spin size="large" />
+          </div>
+        </Content>
       </AdminLayout>
     );
   }
 
   return (
     <AdminLayout>
-      <Layout style={{ minHeight: "100vh", background: token.colorBgLayout }}>
-        <Content style={{ padding: "24px 24px" }}>
-          <Space direction="vertical" size="large" style={{ width: "100%" }}>
-            {/* Breadcrumb */}
-            <Breadcrumb
-              items={[
-                {
-                  href: "/",
-                  title: (
-                    <>
-                      <HomeOutlined />
-                      <span>Home</span>
-                    </>
-                  ),
-                },
-                {
-                  title: (
-                    <>
-                      <UserOutlined />
-                      <span>User Management</span>
-                    </>
-                  ),
-                },
-              ]}
-            />
+      <Content style={{ padding: '24px' }}>
+        <PageHeader
+          title="User Management"
+          icon={<UserOutlined />}
+          description="Manage user accounts, roles, and permissions"
+          breadcrumbItems={[
+            { title: 'User Management', icon: <UserOutlined /> }
+          ]}
+          actions={[
+            ...(import.meta.env.DEV ? [{
+              key: 'debug',
+              label: 'Debug Auth',
+              icon: <BugOutlined />,
+              onClick: () => void handleRunDiagnostics(),
+            }] : []),
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={isRefreshing} />,
+              onClick: () => void handleRefresh(),
+              disabled: loading || isRefreshing,
+              loading: isRefreshing,
+            },
+            {
+              key: 'add',
+              label: 'Add User',
+              icon: <PlusOutlined />,
+              type: 'primary',
+              disabled: true,
+              onClick: () => message.info('Users are created through registration'),
+            }
+          ]}
+        />
 
-            {/* Page Header */}
-            <Card variant="borderless">
-              <Space
-                direction="vertical"
-                size="small"
-                style={{ width: "100%" }}
-              >
-                <Space
-                  style={{
-                    width: "100%",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    <Title level={2} style={{ margin: 0 }}>
-                      <UserOutlined style={{ marginRight: 12 }} />
-                      User Management
-                    </Title>
-                    <Text type="secondary">
-                      Manage user accounts, roles, and permissions
-                    </Text>
-                  </div>
-                  <Space size="middle">
-                    {import.meta.env.DEV && (
-                      <Button
-                        icon={<BugOutlined />}
-                        onClick={handleRunDiagnostics}
-                        title="Run authentication diagnostics"
-                      >
-                        Debug Auth
-                      </Button>
-                    )}
-                    <Button
-                      icon={<ReloadOutlined spin={refreshing} />}
-                      onClick={() => refetch()}
-                      disabled={loading || refreshing}
-                    >
-                      Refresh
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      disabled
-                      title="Users are created through registration"
-                    >
-                      Add User
-                    </Button>
-                  </Space>
-                </Space>
-              </Space>
-            </Card>
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
 
-            {/* Error Alert */}
-            {error && (
-              <Alert
-                message={
-                  error.includes('Authentication') || error.includes('401') || error.includes('Unauthorized')
-                    ? "🔐 Session Expired"
-                    : "Error Loading Users"
-                }
-                description={
-                  <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text>{error}</Text>
-                    {(error.includes('Authentication') || error.includes('401') || error.includes('Unauthorized')) && (
-                      <>
-                        <Text type="secondary">
-                          Your authentication token has expired. Firebase tokens expire after 1 hour for security.
-                        </Text>
-                        <Text strong style={{ color: '#1890ff' }}>
-                          Please refresh your session by clicking the button below:
-                        </Text>
-                        <Space>
-                          <Button 
-                            size="small" 
-                            type="primary"
-                            onClick={async () => {
-                              message.loading('Refreshing your session...', 0.5);
-                              await refetchUser();
-                              await refetch();
-                              message.success('Authentication refreshed');
-                            }}
-                          >
-                            Refresh Authentication
-                          </Button>
+          {/* Error Alert */}
+          {error && (
+            <Alert
+              message={
+                error.includes('Authentication') || error.includes('401') || error.includes('Unauthorized')
+                  ? "🔐 Session Expired"
+                  : "Error Loading Users"
+              }
+              description={
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text>{error}</Text>
+                  {(error.includes('Authentication') || error.includes('401') || error.includes('Unauthorized')) && (
+                    <>
+                      <Text type="secondary">
+                        Your authentication token has expired. Firebase tokens expire after 1 hour for security.
+                      </Text>
+                      <Text strong style={{ color: '#1890ff' }}>
+                        Please refresh your session by clicking the button below:
+                      </Text>
+                      <Space>
+                        <Button 
+                          size="small" 
+                          type="primary"
+                          onClick={async () => {
+                            message.loading('Refreshing your session...', 0.5);
+                            await refetchUser();
+                            await refetch();
+                            message.success('Authentication refreshed');
+                          }}
+                        >
+                          Refresh Authentication
+                        </Button>
+                        <Button 
+                          size="small"
+                          onClick={() => {
+                            window.location.reload();
+                          }}
+                        >
+                          Reload Page
+                        </Button>
+                        {import.meta.env.DEV && (
                           <Button 
                             size="small"
-                            onClick={() => {
-                              window.location.reload();
-                            }}
+                            icon={<BugOutlined />}
+                            onClick={handleRunDiagnostics}
                           >
-                            Reload Page
+                            Debug
                           </Button>
-                          {import.meta.env.DEV && (
-                            <Button 
-                              size="small"
-                              icon={<BugOutlined />}
-                              onClick={handleRunDiagnostics}
-                            >
-                              Debug
-                            </Button>
-                          )}
-                        </Space>
-                      </>
-                    )}
-                  </Space>
-                }
-                type="error"
-                showIcon
-                closable
-              />
-            )}
-
-            {/* Statistics Cards */}
-            <UsersStatistics users={users} loading={loading} />
-
-            {/* Users Table */}
-            <Card
-              variant="borderless"
-              styles={{ body: { padding: 24 } }}
-              title={
-                <Space>
-                  <UserOutlined />
-                  <span>All Users ({users.length})</span>
+                        )}
+                      </Space>
+                    </>
+                  )}
                 </Space>
               }
-            >
-              {loading && users.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "60px 0" }}>
-                  <Spin size="large" />
-                </div>
-              ) : users.length === 0 ? (
-                <Empty
-                  description="No users found"
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                />
-              ) : (
-                <UsersTable
-                  users={users}
-                  loading={refreshing}
-                  onViewUser={handleViewUser}
-                />
-              )}
-            </Card>
-          </Space>
+              type="error"
+              showIcon
+              closable
+            />
+          )}
 
-          {/* User Actions Drawer */}
-          <UserActionsDrawer
-            open={drawerVisible}
-            user={selectedUser}
-            currentUserId={userProfile?.id || ''}
-            onClose={handleCloseDrawer}
-            onSaveProfile={handleSaveUser}
-            onQuickStatusChange={handleQuickStatusChange}
-            onQuickRoleChange={handleQuickRoleChange}
-            onDelete={handleDeleteUser}
-            loading={refreshing}
-          />
-        </Content>
-      </Layout>
+          {/* Statistics Cards */}
+          <UsersStatistics users={users} loading={loading} />
+
+          {/* Users Table */}
+          <Card
+            title={
+              <Space>
+                <UserOutlined />
+                <span>All Users ({users.length})</span>
+              </Space>
+            }
+          >
+            {loading && users.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "60px 0" }}>
+                <Spin size="large" />
+              </div>
+            ) : users.length === 0 ? (
+              <Empty
+                description="No users found"
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+              />
+            ) : (
+              <UsersTable
+                users={users}
+                loading={refreshing}
+                onViewUser={handleViewUser}
+              />
+            )}
+          </Card>
+        </Space>
+
+        {/* User Actions Drawer */}
+        <UserActionsDrawer
+          open={drawerVisible}
+          user={selectedUser}
+          currentUserId={userProfile?.id || ''}
+          onClose={handleCloseDrawer}
+          onSaveProfile={handleSaveUser}
+          onQuickStatusChange={handleQuickStatusChange}
+          onQuickRoleChange={handleQuickRoleChange}
+          onDelete={handleDeleteUser}
+          loading={refreshing}
+        />
+      </Content>
     </AdminLayout>
   );
 };

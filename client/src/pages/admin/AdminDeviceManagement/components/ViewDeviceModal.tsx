@@ -23,7 +23,6 @@ import {
   DashboardOutlined,
   ReloadOutlined,
   SettingOutlined,
-  PauseCircleOutlined,
 } from '@ant-design/icons';
 import type { Device, DeviceStatus } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
@@ -56,21 +55,6 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
     message.success(`Restart command sent to ${device.name}`);
   };
 
-  const handleCalibrateDevice = () => {
-    sendDeviceCommand(device.deviceId, 'calibrate');
-    message.success(`Calibration command sent to ${device.name}`);
-  };
-
-  const handleStopCalibrateDevice = () => {
-    sendDeviceCommand(device.deviceId, 'stop_calibrate');
-    message.success(`Stop calibration command sent to ${device.name}`);
-  };
-
-  const handleDeregisterDevice = () => {
-    sendDeviceCommand(device.deviceId, 'deregister');
-    message.success(`Deregister command sent to ${device.name}`);
-  };
-
   return (
     <Modal
       title={
@@ -93,34 +77,6 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
           >
             <Button icon={<ReloadOutlined />} danger>
               Restart
-            </Button>
-          </Popconfirm>
-
-          <Popconfirm
-            title="Start Calibration"
-            description="Put device in calibration mode?"
-            onConfirm={handleCalibrateDevice}
-            okText="Start"
-            cancelText="Cancel"
-          >
-            <Button icon={<SettingOutlined />}>
-              Calibrate
-            </Button>
-          </Popconfirm>
-
-          <Button icon={<PauseCircleOutlined />} onClick={handleStopCalibrateDevice}>
-            Stop Calibrate
-          </Button>
-
-          <Popconfirm
-            title="Deregister Device"
-            description="This will remove the device registration. Are you sure?"
-            onConfirm={handleDeregisterDevice}
-            okText="Deregister"
-            cancelText="Cancel"
-          >
-            <Button icon={<CloseCircleOutlined />} danger>
-              Deregister
             </Button>
           </Popconfirm>
 
@@ -245,15 +201,6 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
             <Space wrap size="small">
               <Tag color="red">
                 <ReloadOutlined /> Restart - Reboot the device
-              </Tag>
-              <Tag color="blue">
-                <SettingOutlined /> Calibrate - Enter calibration mode
-              </Tag>
-              <Tag color="orange">
-                <PauseCircleOutlined /> Stop Calibrate - Exit calibration mode
-              </Tag>
-              <Tag color="volcano">
-                <CloseCircleOutlined /> Deregister - Remove device registration
               </Tag>
             </Space>
             <Alert

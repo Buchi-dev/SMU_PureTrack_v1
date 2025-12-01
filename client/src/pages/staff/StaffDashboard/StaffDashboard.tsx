@@ -76,9 +76,16 @@ export const StaffDashboard = () => {
 
   // Refresh handler using hooks' refetch functions
   const handleRefresh = async () => {
+    if (refreshing) return; // Prevent spam clicks
+    
     setRefreshing(true);
-    await Promise.all([refetchDevices(), refetchAlerts()]);
-    setTimeout(() => setRefreshing(false), 1000);
+    try {
+      await Promise.all([refetchDevices(), refetchAlerts()]);
+      setTimeout(() => setRefreshing(false), 500);
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setRefreshing(false);
+    }
   };
 
   // Calculate device statistics using utility function

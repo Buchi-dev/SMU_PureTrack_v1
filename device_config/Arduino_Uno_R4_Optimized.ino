@@ -113,19 +113,18 @@ const float TDS_OFFSET = 0.0;
 
 
 // ===========================
-// MQTT TOPICS (Pre-computed)
+// MQTT TOPICS (Pre-computed) - ACTIVE ONLY
 // ===========================
 
 
-char topicData[50];
-char topicStatus[50];
-char topicRegister[50];
-char topicCommands[50];
-char topicPresence[50];
+char topicData[50];          // devices/{deviceId}/data - Sensor readings
+char topicRegister[50];      // devices/{deviceId}/register - Registration
+char topicCommands[50];      // devices/{deviceId}/commands - Server commands
+char topicPresence[50];      // devices/{deviceId}/presence - Presence status
 
 
-const char PRESENCE_QUERY_TOPIC[] PROGMEM = "presence/query";
-const char PRESENCE_RESPONSE_TOPIC[] PROGMEM = "presence/response";
+const char PRESENCE_QUERY_TOPIC[] PROGMEM = "presence/query";      // Server polls
+const char PRESENCE_RESPONSE_TOPIC[] PROGMEM = "presence/response"; // Device responds
 
 
 // ===========================
@@ -224,10 +223,9 @@ void publishPresenceOnline();
 // ===========================
 
 
-// Build MQTT topics once
+// Build MQTT topics once (ACTIVE TOPICS ONLY)
 void buildTopics() {
   snprintf(topicData, sizeof(topicData), "devices/%s/data", DEVICE_ID);
-  snprintf(topicStatus, sizeof(topicStatus), "devices/%s/status", DEVICE_ID);
   snprintf(topicRegister, sizeof(topicRegister), "devices/%s/register", DEVICE_ID);
   snprintf(topicCommands, sizeof(topicCommands), "devices/%s/commands", DEVICE_ID);
   snprintf(topicPresence, sizeof(topicPresence), "devices/%s/presence", DEVICE_ID);
@@ -458,9 +456,8 @@ void checkMidnightRestart() {
       Serial.println(F("Registration status will be preserved"));
       Serial.println(F("=========================================\n"));
       
-      if (mqttConnected) {
-        sendShutdownStatus();
-      }
+      // No shutdown status needed - server will detect offline via polling
+      mqttClient.disconnect();
       
       delay(5000);
       NVIC_SystemReset();
@@ -769,7 +766,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     if (mqttConnected && isApproved && !isCalibrationMode) {
       Serial.println(F("\n=== MANUAL TX (send_now) ==="));
       publishSensorData();
-      sendStatusUpdate();
+      publishPresenceOnline(); // Announce presence instead of status
       transmissionCount++;
       Serial.println(F("=== TX COMPLETE ===\n"));
     } else if (isCalibrationMode) {
@@ -964,63 +961,13 @@ void sendRegistration() {
 }
 
 
-void sendStatusUpdate() {
-  if (!mqttClient.connected()) {
-    return;
-  }
+// REMOVED: sendStatusUpdate() - Status topic replaced by presence polling
+// Status information is now communicated through presence responses
+// when server queries "who_is_online"
 
 
-  StaticJsonDocument<300> doc;
-  doc["deviceId"] = DEVICE_ID;
-  doc["timestamp"] = timeInitialized ? timeClient.getEpochTime() : (millis() / 1000);
-  doc["status"] = "online";
-  doc["uptime"] = (millis() - bootTime) / 1000;
-  doc["wifiRSSI"] = WiFi.RSSI();
-  doc["firmwareVersion"] = FIRMWARE_VERSION;
-  doc["messageType"] = "device_status";
-  doc["isApproved"] = isApproved;
-  doc["transmissionCount"] = transmissionCount;
-  doc["bootCount"] = bootCount;
-  doc["calibrationMode"] = isCalibrationMode;
-  
-  if (timeInitialized) {
-    doc["utcTime"] = timeClient.getFormattedTime();
-    
-    char phTimeStr[9];
-    getPhilippineTimeString(phTimeStr, sizeof(phTimeStr));
-    doc["phTime"] = phTimeStr;
-    
-    char nextTxStr[15];
-    getNextTransmissionPHTime(nextTxStr, sizeof(nextTxStr));
-    doc["nextTransmission"] = nextTxStr;
-  }
-
-
-  char payload[300];
-  serializeJson(doc, payload, sizeof(payload));
-
-
-  mqttClient.publish(topicStatus, payload, false);
-}
-
-
-void sendShutdownStatus() {
-  StaticJsonDocument<200> doc;
-  doc["deviceId"] = DEVICE_ID;
-  doc["timestamp"] = timeInitialized ? timeClient.getEpochTime() : (millis() / 1000);
-  doc["status"] = "restarting";
-  doc["reason"] = "scheduled_midnight_ph_time";
-  doc["uptime"] = (millis() - bootTime) / 1000;
-  doc["messageType"] = "device_status";
-  doc["bootCount"] = bootCount;
-  
-  char payload[200];
-  serializeJson(doc, payload, sizeof(payload));
-
-
-  mqttClient.publish(topicStatus, payload, true);
-  delay(500);
-}
+// REMOVED: sendShutdownStatus() - Not needed with polling mode
+// Device simply stops responding to presence queries when offline
 
 
 // ===========================
@@ -1643,7 +1590,7 @@ void loop() {
       
       if (mqttConnected) {
         publishSensorData();
-        sendStatusUpdate();
+        publishPresenceOnline(); // Update presence instead of status
         transmissionCount++;
         
         lastTransmissionMinute = timeClient.getMinutes();
