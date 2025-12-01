@@ -30,12 +30,15 @@ import {
   SearchOutlined,
   CalendarOutlined,
   FilterOutlined,
-  ReloadOutlined,
   DatabaseOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { AdminLayout } from '../../../components/layouts';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { reportsService } from '../../../services/reports.Service';
+
+// Extend dayjs with relativeTime plugin for fromNow() function
+dayjs.extend(relativeTime);
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
@@ -112,10 +115,19 @@ const ReportHistory: React.FC = () => {
     loadReports(1, pagination.pageSize);
   };
 
+  // Handle manual refresh
+  const handleRefresh = () => {
+    loadReports(pagination.current, pagination.pageSize);
+  };
+
   // Handle download
   const handleDownload = async (record: ReportHistoryItem) => {
     try {
-      const blob = await reportsService.downloadReport(record.id);
+      message.loading({ content: 'Downloading report...', key: 'download', duration: 0 });
+      
+      // Extract fileId from downloadUrl or use it directly
+      const fileId = record.downloadUrl.split('/').pop() || record.id;
+      const blob = await reportsService.downloadReport(fileId);
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
@@ -127,10 +139,13 @@ const ReportHistory: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      message.success('Download started');
+      message.success({ content: 'Download completed successfully', key: 'download' });
     } catch (error) {
       console.error('Download failed:', error);
-      message.error('Download failed');
+      message.error({ 
+        content: error instanceof Error ? error.message : 'Download failed', 
+        key: 'download' 
+      });
     }
   };
 
@@ -224,7 +239,6 @@ const ReportHistory: React.FC = () => {
   ];
 
   return (
-    <AdminLayout>
       <Content style={{ padding: '24px' }}>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Header */}
@@ -241,7 +255,7 @@ const ReportHistory: React.FC = () => {
             <Col>
               <Button
                 icon={<ReloadOutlined />}
-                onClick={() => loadReports(pagination.current, pagination.pageSize)}
+                onClick={handleRefresh}
                 loading={loading}
               >
                 Refresh
@@ -362,7 +376,6 @@ const ReportHistory: React.FC = () => {
           </Card>
         </Space>
       </Content>
-    </AdminLayout>
   );
 };
 

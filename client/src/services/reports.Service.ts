@@ -59,12 +59,22 @@ export interface Report {
   error?: string;
   createdAt: string;
   updatedAt: string;
+  // GridFS file information
+  gridFsFileId?: string;
+  fileSize?: number;
+  fileChecksum?: string;
+  downloadCount?: number;
+  lastDownloadedAt?: string;
 }
 
 export interface ReportResponse {
   success: boolean;
   data: Report;
   message?: string;
+  // Optional PDF blob for instant download
+  pdfBlob?: string;
+  pdfContentType?: string;
+  pdfFilename?: string;
 }
 
 export interface ReportListResponse {

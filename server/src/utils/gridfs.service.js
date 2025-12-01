@@ -92,12 +92,19 @@ class GridFSService {
     }
 
     try {
-      const fileInfo = await this.bucket.find({ _id: fileId }).next();
+      const mongoose = require('mongoose');
+      
+      // Ensure fileId is an ObjectId
+      const objectId = fileId instanceof mongoose.Types.ObjectId 
+        ? fileId 
+        : new mongoose.Types.ObjectId(fileId);
+
+      const fileInfo = await this.bucket.find({ _id: objectId }).next();
       if (!fileInfo) {
         throw new Error('File not found');
       }
 
-      const downloadStream = this.bucket.openDownloadStream(fileId);
+      const downloadStream = this.bucket.openDownloadStream(objectId);
 
       return {
         fileInfo,

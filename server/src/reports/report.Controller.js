@@ -2,6 +2,7 @@ const Report = require('./report.Model');
 const { Device, SensorReading } = require('../devices/device.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 const gridFSService = require('../utils/gridfs.service');
 const { generateWaterQualityReportPDF } = require('../utils/pdfGenerator');
@@ -180,7 +181,27 @@ const generateWaterQualityReport = async (req, res) => {
     try {
       logger.info('[Report Controller] Generating PDF for report', { reportId: report.reportId });
 
-      // Prepare data for PDF generation (transform to match client-side format)
+      // Calculate overall summary values from device reports
+      const totalDeviceReadings = deviceReports.reduce((sum, d) => sum + d.readingCount, 0);
+      const avgTurbidity = totalDeviceReadings > 0 
+        ? deviceReports.reduce((sum, d) => sum + (d.parameters.turbidity.avg * d.readingCount), 0) / totalDeviceReadings
+        : 0;
+      const avgTDS = totalDeviceReadings > 0
+        ? deviceReports.reduce((sum, d) => sum + (d.parameters.tds.avg * d.readingCount), 0) / totalDeviceReadings
+        : 0;
+      const avgPH = totalDeviceReadings > 0
+        ? deviceReports.reduce((sum, d) => sum + (d.parameters.pH.avg * d.readingCount), 0) / totalDeviceReadings
+        : 0;
+
+      // Calculate min/max across all devices
+      const minTurbidity = Math.min(...deviceReports.map(d => d.parameters.turbidity.min));
+      const maxTurbidity = Math.max(...deviceReports.map(d => d.parameters.turbidity.max));
+      const minTDS = Math.min(...deviceReports.map(d => d.parameters.tds.min));
+      const maxTDS = Math.max(...deviceReports.map(d => d.parameters.tds.max));
+      const minPH = Math.min(...deviceReports.map(d => d.parameters.pH.min));
+      const maxPH = Math.max(...deviceReports.map(d => d.parameters.pH.max));
+
+      // Prepare data for PDF generation (transform to match PDF generator expectations)
       const pdfReportData = {
         devices: deviceReports.map(device => ({
           device: { deviceId: device.deviceId, name: device.deviceName },
@@ -207,12 +228,18 @@ const generateWaterQualityReport = async (req, res) => {
         })),
         summary: {
           totalReadings: summary.totalReadings,
-          avgTurbidity: summary.avgTurbidity,
-          avgTDS: summary.avgTDS,
-          avgPH: summary.avgPH,
-          averageTurbidity: summary.avgTurbidity,
-          averageTDS: summary.avgTDS,
-          averagePH: summary.avgPH,
+          avgTurbidity: parseFloat(avgTurbidity.toFixed(2)),
+          avgTDS: parseFloat(avgTDS.toFixed(2)),
+          avgPH: parseFloat(avgPH.toFixed(2)),
+          averageTurbidity: parseFloat(avgTurbidity.toFixed(2)),
+          averageTDS: parseFloat(avgTDS.toFixed(2)),
+          averagePH: parseFloat(avgPH.toFixed(2)),
+          minTurbidity: parseFloat(minTurbidity.toFixed(2)),
+          maxTurbidity: parseFloat(maxTurbidity.toFixed(2)),
+          minTDS: parseFloat(minTDS.toFixed(2)),
+          maxTDS: parseFloat(maxTDS.toFixed(2)),
+          minPH: parseFloat(minPH.toFixed(2)),
+          maxPH: parseFloat(maxPH.toFixed(2)),
         }
       };
 
@@ -276,11 +303,44 @@ const generateWaterQualityReport = async (req, res) => {
     // Populate generatedBy
     await report.populate('generatedBy', 'displayName email');
 
-    res.json({
+    // Prepare response with report data
+    const responseData = {
       success: true,
       message: 'Water quality report generated successfully',
       data: report.toPublicProfile(),
-    });
+    };
+
+    // If PDF was generated successfully, include it in the response for instant download
+    if (report.gridFsFileId && !report.error) {
+      try {
+        const { fileInfo, stream } = await gridFSService.getFile(report.gridFsFileId);
+        
+        // Convert stream to buffer
+        const chunks = [];
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+        const pdfBuffer = Buffer.concat(chunks);
+        
+        // Add PDF to response
+        responseData.pdfBlob = pdfBuffer.toString('base64');
+        responseData.pdfContentType = 'application/pdf';
+        responseData.pdfFilename = `water_quality_report_${report.reportId}.pdf`;
+        
+        logger.info('[Report Controller] PDF included in response for instant download', {
+          reportId: report.reportId,
+          fileSize: pdfBuffer.length
+        });
+      } catch (streamError) {
+        logger.warn('[Report Controller] Could not include PDF in response', {
+          reportId: report.reportId,
+          error: streamError.message
+        });
+        // Continue without PDF in response - user can still download from history
+      }
+    }
+
+    res.json(responseData);
   } catch (error) {
     logger.error('[Report Controller] Error generating water quality report', {
       error: error.message,
@@ -289,17 +349,20 @@ const generateWaterQualityReport = async (req, res) => {
     });
     
     // Try to update report status to failed if it exists
-    try {
-      const failedReport = await Report.findOne({ reportId: req.body.reportId || '' });
-      if (failedReport) {
-        failedReport.status = 'failed';
-        failedReport.error = error.message;
-        await failedReport.save();
+    // Note: reportId is only available if report was created before error
+    if (typeof reportId !== 'undefined') {
+      try {
+        const failedReport = await Report.findOne({ reportId });
+        if (failedReport) {
+          failedReport.status = 'failed';
+          failedReport.error = error.message;
+          await failedReport.save();
+        }
+      } catch (updateError) {
+        logger.error('[Report Controller] Error updating failed report', {
+          error: updateError.message,
+        });
       }
-    } catch (updateError) {
-      logger.error('[Report Controller] Error updating failed report', {
-        error: updateError.message,
-      });
     }
 
     res.status(500).json({
@@ -693,21 +756,41 @@ const downloadReport = async (req, res) => {
       });
     }
 
+    // Convert string fileId to ObjectId
+    let gridFsFileObjectId;
+    try {
+      gridFsFileObjectId = new mongoose.Types.ObjectId(fileId);
+    } catch (conversionError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file ID format',
+      });
+    }
+
     // Find the report to verify ownership and get metadata
-    const report = await Report.findOne({
-      gridFsFileId: fileId,
+    let report = await Report.findOne({
+      gridFsFileId: gridFsFileObjectId,
       generatedBy: req.user._id,
     });
 
     if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: 'Report not found or access denied',
-      });
+      // Also check if user is admin (admins can download all reports)
+      const isAdmin = req.user.role === 'admin';
+      const reportAdmin = isAdmin ? await Report.findOne({ gridFsFileId: gridFsFileObjectId }) : null;
+      
+      if (!reportAdmin) {
+        return res.status(404).json({
+          success: false,
+          message: 'Report not found or access denied',
+        });
+      }
+      
+      // Use admin report for download
+      report = reportAdmin;
     }
 
-    // Get file from GridFS
-    const { fileInfo, stream } = await gridFSService.getFile(fileId);
+    // Get file from GridFS using ObjectId
+    const { fileInfo, stream } = await gridFSService.getFile(gridFsFileObjectId);
 
     // Set response headers
     const filename = `report_${report.reportId}.pdf`;
@@ -725,7 +808,7 @@ const downloadReport = async (req, res) => {
 
     logger.info('[Report Controller] Report downloaded', {
       reportId: report.reportId,
-      fileId,
+      fileId: fileId,
       userId: req.user._id,
     });
 
@@ -739,7 +822,7 @@ const downloadReport = async (req, res) => {
     if (error.message === 'File not found') {
       return res.status(404).json({
         success: false,
-        message: 'Report file not found',
+        message: 'Report file not found in GridFS',
       });
     }
 

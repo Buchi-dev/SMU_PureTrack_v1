@@ -10,8 +10,7 @@
  * 
  * @module pages/admin/AdminReports
  */
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { 
   Row, 
@@ -29,18 +28,21 @@ import {
   Alert,
   Tag,
   message,
-  Layout
+  Layout,
+  Tabs,
+  Progress
 } from 'antd';
 import {
   FileTextOutlined,
   HistoryOutlined,
-  ReloadOutlined,
   ExperimentOutlined,
   CheckCircleOutlined,
   CalendarOutlined,
   DatabaseOutlined,
   DownloadOutlined
 } from '@ant-design/icons';
+import { Typography } from 'antd';
+const { Text } = Typography;
 
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
@@ -56,6 +58,7 @@ import { reportsService } from '../../../services/reports.Service';
 // Components
 import { AdminLayout } from '../../../components/layouts';
 import { PageHeader } from '../../../components';
+import ReportHistory from './ReportHistory';
 
 // Types
 import type { Device, DeviceWithReadings } from '../../../schemas';
@@ -64,9 +67,23 @@ import type { Device, DeviceWithReadings } from '../../../schemas';
  * Simplified Water Quality Report Generation Interface
  */
 export const AdminReports = () => {
-  const navigate = useNavigate();
   const token = useThemeToken();
   const [form] = Form.useForm();
+
+  // State for triggering history refresh
+  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0);
+  const [activeTab, setActiveTab] = useState('generation');
+
+  // Backup progress state
+  const [backupProgress, setBackupProgress] = useState<{
+    status: 'idle' | 'saving' | 'completed' | 'failed';
+    message: string;
+    percent: number;
+  }>({
+    status: 'idle',
+    message: '',
+    percent: 0
+  });
 
   // Global hooks
   const { devices: devicesWithReadings, isLoading: devicesLoading } = useDevices({ pollInterval: 0 });
@@ -92,15 +109,6 @@ export const AdminReports = () => {
     }));
   }, [devicesWithReadings]);
 
-  // Set default values for form
-  useMemo(() => {
-    form.setFieldsValue({
-      dateRange: [dayjs().subtract(7, 'days'), dayjs()],
-      includeStatistics: true,
-      includeCharts: true,
-    });
-  }, [form]);
-
   interface ReportFormValues {
     dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
     devices?: string[];
@@ -117,6 +125,7 @@ export const AdminReports = () => {
       const endDate = dateRange?.[1]?.format('YYYY-MM-DD') || '';
 
       message.loading({ content: 'Generating report...', key: 'report', duration: 0 });
+      setBackupProgress({ status: 'idle', message: '', percent: 0 });
 
       console.log('[AdminReports] Generating report with params:', {
         startDate,
@@ -133,20 +142,185 @@ export const AdminReports = () => {
       });
 
       if (response.success) {
-        message.success({
-          content: 'Report generated successfully! You can download it from the Report History page.',
-          key: 'report',
-          duration: 5
+        // Update progress - report generated
+        setBackupProgress({ 
+          status: 'saving', 
+          message: 'Saving to database...', 
+          percent: 50 
         });
 
-        // Optionally redirect to history page or show download link
-        // For now, just show success message
+        // Check if PDF blob is included in response for instant download
+        if (response.pdfBlob) {
+          try {
+            // Convert base64 to blob
+            const pdfBlob = new Blob(
+              [Uint8Array.from(atob(response.pdfBlob), c => c.charCodeAt(0))],
+              { type: response.pdfContentType || 'application/pdf' }
+            );
+
+            // Create download link and trigger download
+            const url = window.URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = response.pdfFilename || `water_quality_report_${response.data.reportId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            // Update progress - download completed
+            setBackupProgress({ 
+              status: 'completed', 
+              message: 'Report downloaded and saved to database successfully!', 
+              percent: 100 
+            });
+
+            message.success({
+              content: 'Report generated, downloaded, and saved to database!',
+              key: 'report',
+              duration: 5
+            });
+
+            // Trigger history refresh
+            setRefreshHistoryKey(prev => prev + 1);
+          } catch (downloadError) {
+            console.error('[AdminReports] Instant download failed:', downloadError);
+            // Fallback to separate download call
+            if (response.data.gridFsFileId) {
+              try {
+                const blob = await reportsService.downloadReport(response.data.gridFsFileId);
+                
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `water_quality_report_${response.data.reportId}.pdf`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                setBackupProgress({ 
+                  status: 'completed', 
+                  message: 'Report downloaded and saved to database successfully!', 
+                  percent: 100 
+                });
+
+                message.success({
+                  content: 'Report generated, downloaded, and saved to database!',
+                  key: 'report',
+                  duration: 5
+                });
+
+                // Trigger history refresh
+                setRefreshHistoryKey(prev => prev + 1);
+              } catch (fallbackError) {
+                console.error('[AdminReports] Fallback download failed:', fallbackError);
+                setBackupProgress({ 
+                  status: 'completed', 
+                  message: 'Report saved to database successfully! Download from Report History.', 
+                  percent: 100 
+                });
+                
+                message.success({
+                  content: 'Report saved to database successfully! You can download it from Report History.',
+                  key: 'report',
+                  duration: 5
+                });
+
+                // Trigger history refresh
+                setRefreshHistoryKey(prev => prev + 1);
+              }
+            } else {
+              setBackupProgress({ 
+                status: 'completed', 
+                message: 'Report saved to database successfully! Download from Report History.', 
+                percent: 100 
+              });
+
+              message.success({
+                content: 'Report saved to database successfully! You can download it from Report History.',
+                key: 'report',
+                duration: 5
+              });
+
+              // Trigger history refresh
+              setRefreshHistoryKey(prev => prev + 1);
+            }
+          }
+        } else if (response.data.gridFsFileId) {
+          // Fallback: PDF not included in response, download separately
+          try {
+            const blob = await reportsService.downloadReport(response.data.gridFsFileId);
+            
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `water_quality_report_${response.data.reportId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            setBackupProgress({ 
+              status: 'completed', 
+              message: 'Report downloaded and saved to database successfully!', 
+              percent: 100 
+            });
+
+            message.success({
+              content: 'Report generated, downloaded, and saved to database!',
+              key: 'report',
+              duration: 5
+            });
+
+            // Trigger history refresh
+            setRefreshHistoryKey(prev => prev + 1);
+          } catch (downloadError) {
+            console.error('[AdminReports] Download failed:', downloadError);
+            setBackupProgress({ 
+              status: 'failed', 
+              message: 'Report saved to database but download failed', 
+              percent: 100 
+            });
+            
+            message.warning({
+              content: 'Report saved to database successfully, but instant download failed. You can download it from Report History.',
+              key: 'report',
+              duration: 5
+            });
+
+            // Trigger history refresh
+            setRefreshHistoryKey(prev => prev + 1);
+          }
+        } else {
+          // No PDF available, but report was generated
+          setBackupProgress({ 
+            status: 'completed', 
+            message: 'Report generated and saved to database successfully!', 
+            percent: 100 
+          });
+
+          message.success({
+            content: 'Report generated and saved to database successfully! You can download it from Report History.',
+            key: 'report',
+            duration: 5
+          });
+
+          // Trigger history refresh
+          setRefreshHistoryKey(prev => prev + 1);
+        }
 
         form.resetFields();
       } else {
         throw new Error(response.message || 'Failed to generate report');
       }
     } catch (error) {
+      setBackupProgress({ 
+        status: 'failed', 
+        message: 'Report generation failed', 
+        percent: 0 
+      });
+      
       message.error({
         content: error instanceof Error ? error.message : 'Failed to generate report',
         key: 'report'
@@ -167,210 +341,249 @@ export const AdminReports = () => {
           breadcrumbItems={[
             { title: 'Reports', icon: <FileTextOutlined /> }
           ]}
-          actions={[
-            {
-              key: 'history',
-              label: 'View Report History',
-              icon: <HistoryOutlined />,
-              onClick: () => navigate('/admin/reports/history'),
-              type: 'default',
-            },
-            {
-              key: 'refresh',
-              label: 'Refresh',
-              icon: <ReloadOutlined spin={devicesLoading} />,
-              onClick: () => window.location.reload(),
-              disabled: devicesLoading,
-            }
-          ]}
+          
         />
 
-        <Row gutter={16}>
-          {/* Main Form Section */}
-          <Col xs={24} lg={24}>
-            <Card
-              title={
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          type="card"
+          size="large"
+          items={[
+            {
+              key: 'generation',
+              label: (
                 <Space>
-                  <ExperimentOutlined style={{ color: token.colorPrimary }} />
-                  <span>Generate Report</span>
+                  <ExperimentOutlined />
+                  Report Generation
                 </Space>
-              }
-              extra={
-                <Tag color="blue" icon={<CheckCircleOutlined />}>
-                  Includes Compliance Assessment
-                </Tag>
-              }
-              bodyStyle={{ padding: '20px' }}
-            >
-              <Alert
-                message="Water Quality & Compliance Report"
-                description="This report includes comprehensive water quality analysis (pH, TDS, Turbidity) and WHO standards compliance assessment for the selected devices and time period."
-                type="info"
-                showIcon
-                style={{ marginBottom: 20 }}
-              />
-
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleGenerateReport}
-                initialValues={{
-                  dateRange: [dayjs().subtract(7, 'days'), dayjs()],
-                  includeStatistics: true,
-                  includeCharts: true,
-                }}
-                size="middle"
-              >
+              ),
+              children: (
                 <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      label={
+                  {/* Main Form Section */}
+                  <Col xs={24} lg={24}>
+                    <Card
+                      title={
                         <Space>
-                          <CalendarOutlined />
-                          <span>Date Range</span>
+                          <ExperimentOutlined style={{ color: token.colorPrimary }} />
+                          <span>Generate Report</span>
                         </Space>
                       }
-                      name="dateRange"
-                      rules={[{ required: true, message: 'Please select a date range' }]}
-                    >
-                      <RangePicker 
-                        style={{ width: '100%' }}
-                        format="YYYY-MM-DD"
-                        disabled={generating}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      label={
-                        <Space>
-                          <DatabaseOutlined />
-                          <span>Select Devices</span>
-                        </Space>
+                      extra={
+                        <Tag color="blue" icon={<CheckCircleOutlined />}>
+                          Includes Compliance Assessment
+                        </Tag>
                       }
-                      name="devices"
-                      rules={[{ required: true, message: 'Please select at least one device' }]}
+                      bodyStyle={{ padding: '20px' }}
                     >
-                      <Select
-                        mode="multiple"
-                        placeholder="Select devices to include"
-                        loading={devicesLoading}
-                        disabled={generating}
-                        options={devices.map(d => ({
-                          label: `${d.name} (${d.deviceId})`,
-                          value: d.deviceId,
-                        }))}
-                        maxTagCount="responsive"
+                      <Alert
+                        message="Water Quality & Compliance Report"
+                        description="This report includes comprehensive water quality analysis (pH, TDS, Turbidity) and WHO standards compliance assessment for the selected devices and time period."
+                        type="info"
+                        showIcon
+                        style={{ marginBottom: 20 }}
                       />
-                    </Form.Item>
-                  </Col>
-                </Row>
 
-                <Row gutter={16}>
-                  <Col xs={24} md={12}>
-                    <Form.Item
-                      label="Report Title (Optional)"
-                      name="title"
-                    >
-                      <Input 
-                        placeholder="e.g., Weekly Water Quality Report"
-                        disabled={generating}
-                      />
-                    </Form.Item>
-                  </Col>
+                      {/* Backup Progress Indicator */}
+                      {backupProgress.status !== 'idle' && (
+                        <Card size="small" style={{ marginBottom: 20 }}>
+                          <Space direction="vertical" style={{ width: '100%' }}>
+                            <Text strong>Backup Progress</Text>
+                            <Progress 
+                              percent={backupProgress.percent} 
+                              status={
+                                backupProgress.status === 'failed' ? 'exception' :
+                                backupProgress.status === 'completed' ? 'success' : 'active'
+                              }
+                              strokeColor={
+                                backupProgress.status === 'completed' ? token.colorSuccess :
+                                backupProgress.status === 'failed' ? token.colorError : token.colorPrimary
+                              }
+                            />
+                            <Text type={
+                              backupProgress.status === 'failed' ? 'danger' :
+                              backupProgress.status === 'completed' ? 'success' : 'secondary'
+                            }>
+                              {backupProgress.message}
+                            </Text>
+                          </Space>
+                        </Card>
+                      )}
 
-                  <Col xs={24} md={12}>
-                    <Form.Item label="Options">
-                      <Space size="large">
-                        <Form.Item
-                          name="includeStatistics"
-                          valuePropName="checked"
-                          noStyle
-                        >
-                          <Switch 
-                            checkedChildren="Statistics" 
-                            unCheckedChildren="Statistics"
-                            disabled={generating}
-                          />
-                        </Form.Item>
-                        <Form.Item
-                          name="includeCharts"
-                          valuePropName="checked"
-                          noStyle
-                        >
-                          <Switch 
-                            checkedChildren="Charts" 
-                            unCheckedChildren="Charts"
-                            disabled={generating}
-                          />
-                        </Form.Item>
-                      </Space>
-                    </Form.Item>
-                  </Col>
-                </Row>
-
-                <Form.Item
-                  label="Notes (Optional)"
-                  name="notes"
-                >
-                  <TextArea 
-                    rows={2}
-                    placeholder="Add any notes or observations to include in the report..."
-                    disabled={generating}
-                  />
-                </Form.Item>
-
-                <Divider style={{ margin: '16px 0' }} />
-
-                <Row gutter={16} align="middle">
-                  <Col xs={24} sm={12}>
-                    <Form.Item style={{ marginBottom: 0 }}>
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        size="large"
-                        icon={<DownloadOutlined />}
-                        loading={generating}
-                        disabled={devicesLoading}
-                        block
+                      <Form
+                        form={form}
+                        layout="vertical"
+                        onFinish={handleGenerateReport}
+                        initialValues={{
+                          dateRange: [dayjs().subtract(7, 'days'), dayjs()],
+                          includeStatistics: true,
+                          includeCharts: true,
+                        }}
+                        size="middle"
                       >
-                        {generating ? 'Generating Report...' : 'Generate & Download Report'}
-                      </Button>
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12}>
-                    <Row gutter={8}>
-                      <Col span={8}>
-                        <Statistic
-                          title="Devices"
-                          value={devices.filter(d => d.status === 'online').length}
-                          suffix={`/${devices.length}`}
-                          valueStyle={{ color: token.colorSuccess, fontSize: 18 }}
-                        />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic
-                          title="Reports"
-                          value={0}
-                          valueStyle={{ color: token.colorPrimary, fontSize: 18 }}
-                        />
-                      </Col>
-                      <Col span={8}>
-                        <Statistic
-                          title="Sensors"
-                          value={devices.reduce((acc, d) => acc + (d.sensors?.length || 0), 0)}
-                          valueStyle={{ color: token.colorInfo, fontSize: 18 }}
-                        />
-                      </Col>
-                    </Row>
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              label={
+                                <Space>
+                                  <CalendarOutlined />
+                                  <span>Date Range</span>
+                                </Space>
+                              }
+                              name="dateRange"
+                              rules={[{ required: true, message: 'Please select a date range' }]}
+                            >
+                              <RangePicker 
+                                style={{ width: '100%' }}
+                                format="YYYY-MM-DD"
+                                disabled={generating}
+                              />
+                            </Form.Item>
+                          </Col>
+
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              label={
+                                <Space>
+                                  <DatabaseOutlined />
+                                  <span>Select Devices</span>
+                                </Space>
+                              }
+                              name="devices"
+                              rules={[{ required: true, message: 'Please select at least one device' }]}
+                            >
+                              <Select
+                                mode="multiple"
+                                placeholder="Select devices to include"
+                                loading={devicesLoading}
+                                disabled={generating}
+                                options={devices.map(d => ({
+                                  label: `${d.name} (${d.deviceId})`,
+                                  value: d.deviceId,
+                                }))}
+                                maxTagCount="responsive"
+                              />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+
+                        <Row gutter={16}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              label="Report Title (Optional)"
+                              name="title"
+                            >
+                              <Input 
+                                placeholder="e.g., Weekly Water Quality Report"
+                                disabled={generating}
+                              />
+                            </Form.Item>
+                          </Col>
+
+                          <Col xs={24} md={12}>
+                            <Form.Item label="Options">
+                              <Space size="large">
+                                <Form.Item
+                                  name="includeStatistics"
+                                  valuePropName="checked"
+                                  noStyle
+                                >
+                                  <Switch 
+                                    checkedChildren="Statistics" 
+                                    unCheckedChildren="Statistics"
+                                    disabled={generating}
+                                  />
+                                </Form.Item>
+                                <Form.Item
+                                  name="includeCharts"
+                                  valuePropName="checked"
+                                  noStyle
+                                >
+                                  <Switch 
+                                    checkedChildren="Charts" 
+                                    unCheckedChildren="Charts"
+                                    disabled={generating}
+                                  />
+                                </Form.Item>
+                              </Space>
+                            </Form.Item>
+                          </Col>
+                        </Row>
+
+                        <Form.Item
+                          label="Notes (Optional)"
+                          name="notes"
+                        >
+                          <TextArea 
+                            rows={2}
+                            placeholder="Add any notes or observations to include in the report..."
+                            disabled={generating}
+                          />
+                        </Form.Item>
+
+                        <Divider style={{ margin: '16px 0' }} />
+
+                        <Row gutter={16} align="middle">
+                          <Col xs={24} sm={12}>
+                            <Form.Item style={{ marginBottom: 0 }}>
+                              <Button
+                                type="primary"
+                                htmlType="submit"
+                                size="large"
+                                icon={<DownloadOutlined />}
+                                loading={generating}
+                                disabled={devicesLoading}
+                                block
+                              >
+                                {generating ? 'Generating Report...' : 'Generate & Download Report'}
+                              </Button>
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} sm={12}>
+                            <Row gutter={8}>
+                              <Col span={8}>
+                                <Statistic
+                                  title="Devices"
+                                  value={devices.filter(d => d.status === 'online').length}
+                                  suffix={`/${devices.length}`}
+                                  valueStyle={{ color: token.colorSuccess, fontSize: 18 }}
+                                />
+                              </Col>
+                              <Col span={8}>
+                                <Statistic
+                                  title="Reports"
+                                  value={0}
+                                  valueStyle={{ color: token.colorPrimary, fontSize: 18 }}
+                                />
+                              </Col>
+                              <Col span={8}>
+                                <Statistic
+                                  title="Sensors"
+                                  value={devices.reduce((acc, d) => acc + (d.sensors?.length || 0), 0)}
+                                  valueStyle={{ color: token.colorInfo, fontSize: 18 }}
+                                />
+                              </Col>
+                            </Row>
+                          </Col>
+                        </Row>
+                      </Form>
+                    </Card>
                   </Col>
                 </Row>
-              </Form>
-            </Card>
-          </Col>
-
-        </Row>
+              ),
+            },
+            {
+              key: 'history',
+              label: (
+                <Space>
+                  <HistoryOutlined />
+                  Report History
+                </Space>
+              ),
+              children: <ReportHistory key={refreshHistoryKey} />,
+            },
+          ]}
+        />
       </Content>
     </AdminLayout>
   );
