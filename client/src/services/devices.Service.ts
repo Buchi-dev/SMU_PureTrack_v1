@@ -353,6 +353,36 @@ export class DevicesService {
       throw new Error(message);
     }
   }
+
+  /**
+   * Send command to device (admin only)
+   * Sends commands like 'restart' or 'send_now' through backend API
+   * 
+   * @param deviceId - Device ID to send command to
+   * @param command - Command to send ('restart', 'send_now')
+   * @param data - Optional additional data
+   * @throws {Error} If command fails
+   * @example
+   * await devicesService.sendDeviceCommand('WQ-001', 'restart');
+   * await devicesService.sendDeviceCommand('WQ-001', 'send_now');
+   */
+  async sendDeviceCommand(
+    deviceId: string,
+    command: 'restart' | 'send_now',
+    data?: Record<string, any>
+  ): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
+        DEVICE_ENDPOINTS.SEND_COMMAND(deviceId),
+        { command, data }
+      );
+      return response.data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Send command error:', message);
+      throw new Error(message);
+    }
+  }
 }
 
 // ============================================================================

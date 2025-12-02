@@ -10,6 +10,7 @@ const {
   deviceRegister,
   approveDeviceRegistration,
   deviceSSEConnection,
+  sendDeviceCommand,
 } = require('./device.Controller');
 const { ensureAuthenticated, ensureAdmin } = require('../auth/auth.Middleware');
 const { ensureApiKey } = require('../middleware/apiKey.middleware');
@@ -99,5 +100,13 @@ router.get('/status/:deviceId', ensureApiKey, deviceSSEConnection);
  * @note    Admin approves device registration, server sends 'go' command via SSE
  */
 router.post('/:deviceId/approve', ensureAdmin, approveDeviceRegistration);
+
+/**
+ * @route   POST /api/v1/devices/:deviceId/command
+ * @desc    Send command to device (restart, send_now, etc.)
+ * @access  Admin only
+ * @note    Sends commands to devices via MQTT through backend (proper authorization & logging)
+ */
+router.post('/:deviceId/command', ensureAdmin, sendDeviceCommand);
 
 module.exports = router;

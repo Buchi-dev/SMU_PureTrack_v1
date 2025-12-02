@@ -27,7 +27,7 @@ import {
 import type { Device, DeviceStatus } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 import { useThemeToken } from '../../../../theme';
-import { sendDeviceCommand } from '../../../../utils/mqtt';
+import { devicesService } from '../../../../services/devices.Service';
 
 const { Text } = Typography;
 
@@ -50,9 +50,13 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
   if (!device) return null;
 
   // Command handlers
-  const handleRestartDevice = () => {
-    sendDeviceCommand(device.deviceId, 'restart');
-    message.success(`Restart command sent to ${device.name}`);
+  const handleRestartDevice = async () => {
+    try {
+      await devicesService.sendDeviceCommand(device.deviceId, 'restart');
+      message.success(`Restart command sent to ${device.name}`);
+    } catch (error) {
+      message.error(`Failed to send restart command: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   return (
@@ -205,7 +209,7 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
             </Space>
             <Alert
               message="Command Execution"
-              description="Commands are sent directly to the device via MQTT. The device must be online to receive commands."
+              description="Commands are sent through the backend API to ensure proper authorization and logging. The device must be online to receive commands."
               type="info"
               showIcon
               style={{ marginTop: 8 }}

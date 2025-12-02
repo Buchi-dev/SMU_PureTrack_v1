@@ -643,26 +643,9 @@ const deviceRegister = asyncHandler(async (req, res) => {
       id: device._id 
     });
 
-    // Send "wait" command to device via MQTT if connected
-    if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(trimmedDeviceId)) {
-      const commandSent = mqttService.sendCommandToDevice(trimmedDeviceId, 'wait', {
-        message: 'Device registration received. Waiting for admin approval.',
-        device: device.toPublicProfile(),
-      });
-      
-      if (commandSent) {
-        logger.info('[Device Controller] "wait" command sent to device', {
-          deviceId: trimmedDeviceId,
-        });
-      }
-    } else {
-      logger.warn('[Device Controller] MQTT service not available or device not connected, "wait" command not sent', {
-        deviceId: trimmedDeviceId,
-        mqttServiceAvailable: !!mqttService,
-        isDeviceConnectedAvailable: !!(mqttService && mqttService.isDeviceConnected),
-      });
-    }
-
+    // Device will remain in pending state until admin approves
+    // No need to send command - device checks registration status via polling
+    
     return ResponseHelper.success(res, {
       device: device.toPublicProfile(),
       message: 'Device registration pending admin approval',
@@ -701,26 +684,9 @@ const deviceRegister = asyncHandler(async (req, res) => {
         command: 'go', // Tell device it can start sending sensor data
       }, 'Device registration approved');
     } else {
-      // Send "wait" command to device via MQTT if connected
-      if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(trimmedDeviceId)) {
-        const commandSent = mqttService.sendCommandToDevice(trimmedDeviceId, 'wait', {
-          message: 'Device registration pending admin approval.',
-          device: device.toPublicProfile(),
-        });
-        
-        if (commandSent) {
-          logger.info('[Device Controller] "wait" command sent to device', {
-            deviceId: trimmedDeviceId,
-          });
-        }
-      } else {
-        logger.warn('[Device Controller] MQTT service not available or device not connected, "wait" command not sent', {
-          deviceId: trimmedDeviceId,
-          mqttServiceAvailable: !!mqttService,
-          isDeviceConnectedAvailable: !!(mqttService && mqttService.isDeviceConnected),
-        });
-      }
-
+      // Device will remain in pending state until admin approves
+      // No need to send command - device checks registration status via polling
+      
       return ResponseHelper.success(res, {
         device: device.toPublicProfile(),
         message: 'Device registration pending admin approval',
@@ -861,6 +827,78 @@ const getDeviceStatus = asyncHandler(async (req, res) => {
   ResponseHelper.success(res, status, 'Device status retrieved');
 });
 
+/**
+ * Send command to device (Admin only)
+ * Handles restart, send_now, and other device commands
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const sendDeviceCommand = asyncHandler(async (req, res) => {
+  const { deviceId } = req.params;
+  const { command, data = {} } = req.body;
+
+  // Validate command
+  const validCommands = ['restart', 'send_now'];
+  if (!command || !validCommands.includes(command)) {
+    throw new ValidationError(`Invalid command. Valid commands: ${validCommands.join(', ')}`);
+  }
+
+  // Check if device exists
+  const device = await Device.findOne({ deviceId });
+  if (!device) {
+    throw new NotFoundError('Device', deviceId);
+  }
+
+  // Check if device is online for send_now command
+  if (command === 'send_now' && device.status !== 'online') {
+    return ResponseHelper.error(
+      res,
+      'Device must be online to receive send_now command',
+      400,
+      'DEVICE_OFFLINE'
+    );
+  }
+
+  // Send command via MQTT
+  if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(deviceId)) {
+    const commandSent = mqttService.sendCommandToDevice(deviceId, command, {
+      message: `${command} command from admin`,
+      timestamp: new Date().toISOString(),
+      requestedBy: req.user.email,
+      ...data,
+    });
+
+    if (commandSent) {
+      logger.info('[Device Controller] Command sent to device', {
+        deviceId,
+        command,
+        requestedBy: req.user.email,
+        userId: req.user._id,
+      });
+
+      return ResponseHelper.success(res, {
+        deviceId,
+        command,
+        status: 'sent',
+        timestamp: new Date().toISOString(),
+      }, `${command} command sent successfully to device ${device.name}`);
+    }
+  }
+
+  logger.warn('[Device Controller] Failed to send command - device not connected', {
+    deviceId,
+    command,
+    deviceStatus: device.status,
+  });
+
+  return ResponseHelper.error(
+    res,
+    'Device is not connected to MQTT broker. Command could not be sent.',
+    503,
+    'DEVICE_NOT_CONNECTED'
+  );
+});
+
 module.exports = {
   getAllDevices,
   getDeviceById,
@@ -872,4 +910,5 @@ module.exports = {
   deviceRegister,
   approveDeviceRegistration,
   deviceSSEConnection: getDeviceStatus,
+  sendDeviceCommand,
 };

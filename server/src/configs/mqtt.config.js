@@ -1,6 +1,12 @@
 /**
- * MQTT Configuration for HiveMQ
- * Handles connection settings and topic definitions
+ * MQTT Configuration for HiveMQ (Backend Server)
+ * 
+ * SECURITY ARCHITECTURE:
+ * - Backend: FULL ACCESS (read all topics, write commands)
+ * - Frontend: READ ONLY (subscribes to data/presence, NO publish rights)
+ * - Devices: LIMITED (publish data, subscribe to commands for own deviceId)
+ * 
+ * See MQTT_PERMISSIONS.md for complete security setup guide
  */
 
 const mqtt = require('mqtt');
@@ -62,13 +68,16 @@ const MQTT_CONFIG = {
     COMMAND: 'command',
   },
 
-  // Commands that server can send to devices
+  // Commands that backend server can send to devices via MQTT
+  // ✅ SECURITY: Frontend calls REST API, backend validates & sends commands
+  // ✅ All commands are logged and require admin authentication
   COMMANDS: {
-    GO: 'go',
-    WAIT: 'wait',
-    DEREGISTER: 'deregister',
-    UPDATE_CONFIG: 'update_config',
-    RESTART: 'restart',
+    GO: 'go',                 // Approve device - sent by backend during device approval
+    DEREGISTER: 'deregister', // Revoke approval - sent by backend during device deletion
+    RESTART: 'restart',       // Restart device - sent by backend via /api/v1/devices/:id/command
+    SEND_NOW: 'send_now',     // Force data transmission - sent by backend via /api/v1/devices/:id/command
+    // REMOVED: 'wait' - Device has no handler
+    // REMOVED: 'update_config' - Never implemented
   },
 };
 

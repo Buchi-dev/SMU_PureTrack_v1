@@ -20,7 +20,7 @@ import { PageHeader } from '../../../components/PageHeader';
 import { useDevices, useAlerts } from '../../../hooks';
 import { useDeviceSeverityCalculator } from './hooks/useDeviceSeverityCalculator';
 import { StatsOverview, DeviceTable, FilterControls } from './components';
-import { sendDeviceCommand } from '../../../utils/mqtt';
+import { devicesService } from '../../../services/devices.Service';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -61,14 +61,19 @@ export const AdminDeviceReadings = () => {
     };
   }, [enrichedDevices]);
 
-  const handleForceDeviceSendData = () => {
-    // Send "send_now" command to all online devices
-    enrichedDevices.forEach((device) => {
-      if (device.status === 'online') {
-        sendDeviceCommand(device.deviceId, 'send_now');
-      }
-    });
-    message.success(`Send Now command sent to ${enrichedDevices.filter(d => d.status === 'online').length} online device(s)`);
+  const handleForceDeviceSendData = async () => {
+    // Send "send_now" command to all online devices through backend API
+    const onlineDevices = enrichedDevices.filter(d => d.status === 'online');
+    try {
+      await Promise.all(
+        onlineDevices.map(device => 
+          devicesService.sendDeviceCommand(device.deviceId, 'send_now')
+        )
+      );
+      message.success(`Send Now command sent to ${onlineDevices.length} online device(s)`);
+    } catch (error) {
+      message.error(`Failed to send commands: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   // Manual refresh handler with loading state
