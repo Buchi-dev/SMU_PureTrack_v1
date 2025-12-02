@@ -123,13 +123,14 @@ export default function UserMenu() {
     >
       <Space style={{ cursor: "pointer", padding: "8px 12px", borderRadius: "8px" }}>
         <Avatar
+          src={userProfile?.profilePicture}
           style={{
             backgroundColor: isAdmin ? "#1890ff" : "#52c41a",
             cursor: "pointer",
           }}
-          icon={<UserOutlined />}
+          icon={!userProfile?.profilePicture && <UserOutlined />}
         >
-          {getUserInitials(userProfile)}
+          {!userProfile?.profilePicture && getUserInitials(userProfile)}
         </Avatar>
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
           <Text strong style={{ fontSize: "14px" }}>

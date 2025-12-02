@@ -2,9 +2,13 @@ import { Table, Tag, Badge, Tooltip, Space, Typography } from 'antd';
 import {
   EnvironmentOutlined,
   ClockCircleOutlined,
+  CheckCircleOutlined,
+  WarningOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { memo } from 'react';
 import type { DeviceWithReadings } from '../../../../schemas';
+import { getDetailedQualityStatus } from '../../../../constants/waterQualityStandards';
 
 const { Text } = Typography;
 
@@ -12,28 +16,34 @@ interface DeviceTableProps {
   devices: DeviceWithReadings[];
 }
 
-// Helper to get quality status for a parameter
+// Helper to get quality status for a parameter with icon
 const getQualityStatus = (
   param: 'ph' | 'tds' | 'turbidity',
   value: number
-): { status: 'success' | 'warning' | 'error'; text: string } => {
-  switch (param) {
-    case 'ph':
-      if (value >= 6.5 && value <= 8.5) return { status: 'success', text: 'Optimal' };
-      if (value >= 6.0 && value <= 9.0) return { status: 'warning', text: 'Acceptable' };
-      return { status: 'error', text: 'Critical' };
-    case 'tds':
-      if (value <= 300) return { status: 'success', text: 'Excellent' };
-      if (value <= 500) return { status: 'warning', text: 'Good' };
-      if (value <= 1000) return { status: 'warning', text: 'Fair' };
-      return { status: 'error', text: 'Poor' };
-    case 'turbidity':
-      if (value <= 1) return { status: 'success', text: 'Excellent' };
-      if (value <= 5) return { status: 'warning', text: 'Good' };
-      return { status: 'error', text: 'Poor' };
+): { status: 'success' | 'warning' | 'error'; text: string; icon: React.ReactNode; color: string } => {
+  const qualityStatus = getDetailedQualityStatus(param, value);
+  
+  let icon: React.ReactNode;
+  switch (qualityStatus.status) {
+    case 'success':
+      icon = <CheckCircleOutlined />;
+      break;
+    case 'warning':
+      icon = <WarningOutlined />;
+      break;
+    case 'error':
+      icon = <CloseCircleOutlined />;
+      break;
     default:
-      return { status: 'success', text: 'Normal' };
+      icon = <CheckCircleOutlined />;
   }
+  
+  return {
+    status: qualityStatus.status,
+    text: qualityStatus.text,
+    icon,
+    color: qualityStatus.color,
+  };
 };
 
 export const DeviceTable = memo(({ devices }: DeviceTableProps) => {
@@ -97,14 +107,14 @@ export const DeviceTable = memo(({ devices }: DeviceTableProps) => {
 
         const quality = getQualityStatus('ph', device.latestReading.ph);
         return (
-          <div>
-            <div>
-              <Text strong>{device.latestReading.ph.toFixed(2)}</Text>
-            </div>
-            <Tag color={quality.status}>
-              {quality.text}
-            </Tag>
-          </div>
+          <Space>
+            <span style={{ color: quality.color, fontSize: '16px' }}>
+              {quality.icon}
+            </span>
+            <Text strong style={{ color: quality.color }}>
+              {device.latestReading.ph.toFixed(2)}
+            </Text>
+          </Space>
         );
       },
     },
@@ -119,14 +129,14 @@ export const DeviceTable = memo(({ devices }: DeviceTableProps) => {
 
         const quality = getQualityStatus('tds', device.latestReading.tds);
         return (
-          <div>
-            <div>
-              <Text strong>{device.latestReading.tds.toFixed(0)}</Text>
-            </div>
-            <Tag color={quality.status}>
-              {quality.text}
-            </Tag>
-          </div>
+          <Space>
+            <span style={{ color: quality.color, fontSize: '16px' }}>
+              {quality.icon}
+            </span>
+            <Text strong style={{ color: quality.color }}>
+              {device.latestReading.tds.toFixed(0)}
+            </Text>
+          </Space>
         );
       },
     },
@@ -141,14 +151,14 @@ export const DeviceTable = memo(({ devices }: DeviceTableProps) => {
 
         const quality = getQualityStatus('turbidity', device.latestReading.turbidity);
         return (
-          <div>
-            <div>
-              <Text strong>{device.latestReading.turbidity.toFixed(2)}</Text>
-            </div>
-            <Tag color={quality.status}>
-              {quality.text}
-            </Tag>
-          </div>
+          <Space>
+            <span style={{ color: quality.color, fontSize: '16px' }}>
+              {quality.icon}
+            </span>
+            <Text strong style={{ color: quality.color }}>
+              {device.latestReading.turbidity.toFixed(2)}
+            </Text>
+          </Space>
         );
       },
     },

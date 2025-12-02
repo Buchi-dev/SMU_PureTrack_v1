@@ -3,6 +3,8 @@
  * Centralized configuration values to avoid magic numbers
  */
 
+const { WATER_QUALITY_THRESHOLDS } = require('../configs/waterQualityStandards');
+
 // Time constants (in milliseconds)
 const TIME = {
   ONE_SECOND: 1000,
@@ -18,24 +20,8 @@ const TIME = {
 };
 
 // Sensor thresholds (WHO/EPA Guidelines)
-const SENSOR_THRESHOLDS = {
-  pH: {
-    min: 6.5,
-    max: 8.5,
-    critical: {
-      min: 6.0,
-      max: 9.0,
-    },
-  },
-  turbidity: {
-    warning: 5, // NTU
-    critical: 10, // NTU
-  },
-  tds: {
-    warning: 500, // ppm
-    critical: 1000, // ppm
-  },
-};
+// NOTE: Imported from centralized waterQualityStandards.js
+const SENSOR_THRESHOLDS = WATER_QUALITY_THRESHOLDS;
 
 // Pagination defaults
 const PAGINATION = {

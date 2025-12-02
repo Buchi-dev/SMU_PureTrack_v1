@@ -421,8 +421,13 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
               style={{ marginRight: 8 }}
             />
           )}
-          <Avatar size={40} icon={<UserOutlined />} style={{ backgroundColor: '#1890ff' }}>
-            {(currentUser.firstName?.[0] || '')}{(currentUser.lastName?.[0] || '')}
+          <Avatar 
+            size={40} 
+            src={currentUser.profilePicture}
+            icon={!currentUser.profilePicture && <UserOutlined />} 
+            style={{ backgroundColor: '#1890ff' }}
+          >
+            {!currentUser.profilePicture && (currentUser.firstName?.[0] || '')}{!currentUser.profilePicture && (currentUser.lastName?.[0] || '')}
           </Avatar>
           <div>
             <Title level={5} style={{ margin: 0 }}>

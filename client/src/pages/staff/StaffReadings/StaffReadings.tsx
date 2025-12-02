@@ -29,11 +29,13 @@ import {
   DownloadOutlined,
   ReloadOutlined,
   SyncOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
 import { useDevices } from '../../../hooks';
 import { calculateReadingStatus } from '../../../utils/waterQualityUtils';
+import { WATER_QUALITY_THRESHOLDS } from '../../../constants/waterQualityStandards';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 
@@ -135,18 +137,85 @@ export const StaffReadings = () => {
     critical: readings.filter(r => r.status === 'critical').length,
   }), [readings]);
 
-  // Get parameter status color
-  const getParamColor = (value: number, type: 'ph' | 'tds' | 'turbidity') => {
-    const ranges = {
-      ph: { min: 6.5, max: 8.5 },
-      tds: { min: 0, max: 500 },
-      turbidity: { min: 0, max: 5 },
-    };
+  // Get parameter status (color, icon, and text)
+  const getParamStatus = (value: number, type: 'ph' | 'tds' | 'turbidity') => {
+    // Import from centralized constants
+    const { WATER_QUALITY_THRESHOLDS } = require('../../../constants/waterQualityStandards');
     
-    const range = ranges[type];
-    if (value < range.min || value > range.max) return token.colorError;
-    if (value < range.min + 0.5 || value > range.max - 50) return token.colorWarning;
-    return token.colorSuccess;
+    // Check pH status
+    if (type === 'ph') {
+      if (value < WATER_QUALITY_THRESHOLDS.pH.critical_min || value > WATER_QUALITY_THRESHOLDS.pH.critical_max) {
+        return {
+          icon: <CloseCircleOutlined />,
+          color: token.colorError,
+          status: 'critical',
+        };
+      }
+      if (value < WATER_QUALITY_THRESHOLDS.pH.min || value > WATER_QUALITY_THRESHOLDS.pH.max) {
+        return {
+          icon: <WarningOutlined />,
+          color: token.colorWarning,
+          status: 'warning',
+        };
+      }
+      return {
+        icon: <CheckCircleOutlined />,
+        color: token.colorSuccess,
+        status: 'normal',
+      };
+    }
+    
+    // Check TDS status
+    if (type === 'tds') {
+      if (value > WATER_QUALITY_THRESHOLDS.tds.critical) {
+        return {
+          icon: <CloseCircleOutlined />,
+          color: token.colorError,
+          status: 'critical',
+        };
+      }
+      if (value > WATER_QUALITY_THRESHOLDS.tds.warning) {
+        return {
+          icon: <WarningOutlined />,
+          color: token.colorWarning,
+          status: 'warning',
+        };
+      }
+      return {
+        icon: <CheckCircleOutlined />,
+        color: token.colorSuccess,
+        status: 'normal',
+      };
+    }
+    
+    // Check Turbidity status
+    if (type === 'turbidity') {
+      if (value > WATER_QUALITY_THRESHOLDS.turbidity.critical) {
+        return {
+          icon: <CloseCircleOutlined />,
+          color: token.colorError,
+          status: 'critical',
+        };
+      }
+      if (value > WATER_QUALITY_THRESHOLDS.turbidity.warning) {
+        return {
+          icon: <WarningOutlined />,
+          color: token.colorWarning,
+          status: 'warning',
+        };
+      }
+      return {
+        icon: <CheckCircleOutlined />,
+        color: token.colorSuccess,
+        status: 'normal',
+      };
+    }
+    
+    return {
+      icon: <CheckCircleOutlined />,
+      color: token.colorSuccess,
+      status: 'normal',
+    };
   };
 
   const columns: ColumnsType<Reading> = [
@@ -174,33 +243,57 @@ export const StaffReadings = () => {
       title: 'pH',
       dataIndex: 'ph',
       key: 'ph',
-      render: (value: number) => (
-        <Tag color={getParamColor(value, 'ph') === token.colorSuccess ? 'success' : 'error'}>
-          {value.toFixed(2)}
-        </Tag>
-      ),
+      render: (value: number) => {
+        const paramStatus = getParamStatus(value, 'ph');
+        return (
+          <Space>
+            <span style={{ color: paramStatus.color, fontSize: '16px' }}>
+              {paramStatus.icon}
+            </span>
+            <Text strong style={{ color: paramStatus.color }}>
+              {value.toFixed(2)}
+            </Text>
+          </Space>
+        );
+      },
       sorter: (a, b) => a.ph - b.ph,
     },
     {
       title: 'TDS (ppm)',
       dataIndex: 'tds',
       key: 'tds',
-      render: (value: number) => (
-        <Tag color={getParamColor(value, 'tds') === token.colorSuccess ? 'success' : 'warning'}>
-          {value.toFixed(1)}
-        </Tag>
-      ),
+      render: (value: number) => {
+        const paramStatus = getParamStatus(value, 'tds');
+        return (
+          <Space>
+            <span style={{ color: paramStatus.color, fontSize: '16px' }}>
+              {paramStatus.icon}
+            </span>
+            <Text strong style={{ color: paramStatus.color }}>
+              {value.toFixed(1)}
+            </Text>
+          </Space>
+        );
+      },
       sorter: (a, b) => a.tds - b.tds,
     },
     {
       title: 'Turbidity (NTU)',
       dataIndex: 'turbidity',
       key: 'turbidity',
-      render: (value: number) => (
-        <Tag color={getParamColor(value, 'turbidity') === token.colorSuccess ? 'success' : 'warning'}>
-          {value.toFixed(2)}
-        </Tag>
-      ),
+      render: (value: number) => {
+        const paramStatus = getParamStatus(value, 'turbidity');
+        return (
+          <Space>
+            <span style={{ color: paramStatus.color, fontSize: '16px' }}>
+              {paramStatus.icon}
+            </span>
+            <Text strong style={{ color: paramStatus.color }}>
+              {value.toFixed(2)}
+            </Text>
+          </Space>
+        );
+      },
       sorter: (a, b) => a.turbidity - b.turbidity,
     },
     {
@@ -400,15 +493,15 @@ export const StaffReadings = () => {
             <Col xs={24} sm={12} md={8}>
               <Space direction="vertical" size={0}>
                 <Text strong>TDS (Total Dissolved Solids)</Text>
-                <Text type="secondary">Normal: 0 - 500 ppm</Text>
-                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>1000 ppm`}</Text>
+                <Text type="secondary">Normal: 0 - {WATER_QUALITY_THRESHOLDS.tds.warning} ppm</Text>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>${WATER_QUALITY_THRESHOLDS.tds.critical} ${WATER_QUALITY_THRESHOLDS.tds.unit}`}</Text>
               </Space>
             </Col>
             <Col xs={24} sm={12} md={8}>
               <Space direction="vertical" size={0}>
                 <Text strong>Turbidity</Text>
-                <Text type="secondary">Normal: 0 - 5 NTU</Text>
-                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>10 NTU`}</Text>
+                <Text type="secondary">Normal: 0 - {WATER_QUALITY_THRESHOLDS.turbidity.warning} {WATER_QUALITY_THRESHOLDS.turbidity.unit}</Text>
+                <Text type="secondary" style={{ fontSize: '12px' }}>Critical: {`>${WATER_QUALITY_THRESHOLDS.turbidity.critical} ${WATER_QUALITY_THRESHOLDS.turbidity.unit}`}</Text>
               </Space>
             </Col>
           </Row>

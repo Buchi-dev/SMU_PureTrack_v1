@@ -115,13 +115,14 @@ export const UsersTable: React.FC<UsersTableProps> = ({
       render: (_, record) => (
         <Space size="middle">
           <Avatar
+            src={record.profilePicture}
             style={{
               backgroundColor: record.role === 'admin' ? '#ff4d4f' : '#1890ff',
               verticalAlign: 'middle',
             }}
             size="large"
           >
-            {getInitials(record.firstName || '', record.lastName || '')}
+            {!record.profilePicture && getInitials(record.firstName || '', record.lastName || '')}
           </Avatar>
           <div>
             <div>
