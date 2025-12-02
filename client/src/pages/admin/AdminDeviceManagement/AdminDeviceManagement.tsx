@@ -12,6 +12,7 @@ import {
 import { useDeviceFilter } from './hooks';
 import { useDevices, useDeviceMutations } from '../../../hooks';
 import type { Device } from '../../../schemas';
+import { sendDeregisterCommand } from '../../../utils/mqtt';
 import './DeviceManagement.css';
 
 const { Content } = Layout;
