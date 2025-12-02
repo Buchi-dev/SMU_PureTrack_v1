@@ -119,22 +119,6 @@ const validateEnvironmentSettings = () => {
     console.warn(`[WARNING] Invalid NODE_ENV value: ${nodeEnv}. Using 'development'.`);
     process.env.NODE_ENV = 'development';
   }
-
-  // Validate Firebase configuration
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_PATH && !process.env.FIREBASE_SERVICE_ACCOUNT) {
-    console.error('[ERROR] Either FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT must be set');
-    console.error('       See QUICKSTART-FIREBASE.md for setup instructions');
-    process.exit(1);
-  }
-
-  // Production-specific validations (suppress non-critical warnings in production)
-  if (nodeEnv === 'production') {
-    // Only show critical warnings in production
-    // Optional: Uncomment if you want to see these warnings
-    // if (!process.env.PORT || process.env.PORT === '5000') {
-    //   console.warn('[WARNING] Using default PORT 5000 in production.');
-    // }
-  }
 };
 
 /**
