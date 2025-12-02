@@ -218,6 +218,12 @@
 #define MAX_UPTIME_HOURS 25                 // Safety fallback restart
 
 // ───────────────────────────────────────────────────────────────────────────
+// Transmission Jitter (Prevents Thundering Herd)
+// ───────────────────────────────────────────────────────────────────────────
+#define TRANSMISSION_JITTER_WINDOW 300      // 5 minutes (300 seconds) window
+#define ENABLE_TRANSMISSION_JITTER true     // Enable random delay to prevent simultaneous transmissions
+
+// ───────────────────────────────────────────────────────────────────────────
 // Reliability & Error Handling
 // ───────────────────────────────────────────────────────────────────────────
 #define MAX_MQTT_FAILURES 10                // Max consecutive MQTT failures
@@ -351,6 +357,7 @@ int consecutiveWifiFailures = 0;
 unsigned long transmissionCount = 0;                       // Total data transmissions
 unsigned long bootCount = 0;                               // Total device reboots (EEPROM)
 int lastTransmissionMinute = -1;                           // Prevent duplicate TX in same minute
+int transmissionJitterOffset = 0;                          // Random delay (0-300 seconds) to prevent thundering herd
 
 // Dynamic sensor read interval (changes with calibration mode)
 unsigned long sensorReadInterval = CALIBRATION_MODE ? CALIBRATION_INTERVAL : SENSOR_READ_INTERVAL;
@@ -1051,18 +1058,57 @@ void clearEEPROM() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ───────────────────────────────────────────────────────────────────────────
-// Check if it's time for scheduled transmission (:00 or :30 minutes)
+// Check if it's time for scheduled transmission (:00 or :30 minutes + jitter)
+// ───────────────────────────────────────────────────────────────────────────
+// This function prevents "thundering herd" problem where all devices transmit
+// simultaneously at :00 and :30. Each device adds a random offset (0-5 min)
+// to stagger transmissions, reducing server load spikes.
 // ───────────────────────────────────────────────────────────────────────────
 bool isTransmissionTime() {
   if (!timeInitialized) return false;
   
   timeClient.update();
-  int currentMinute = timeClient.getMinutes();
+  unsigned long currentEpoch = timeClient.getEpochTime();
   
-  bool isScheduledTime = (currentMinute == 0 || currentMinute == 30);
+  // Calculate current time with timezone offset
+  unsigned long phTime = currentEpoch + TIMEZONE_OFFSET_SECONDS;
+  int currentMinute = (phTime % 3600) / 60;
+  int currentSecond = phTime % 60;
+  
+  // Calculate total seconds since last scheduled time (either :00 or :30)
+  int minutesSinceScheduled;
+  if (currentMinute >= 30) {
+    minutesSinceScheduled = currentMinute - 30;
+  } else {
+    minutesSinceScheduled = currentMinute;
+  }
+  int totalSecondsSinceScheduled = (minutesSinceScheduled * 60) + currentSecond;
+  
+  // Check if we're within the transmission window
+  // Window: [scheduled time] to [scheduled time + jitter window]
+  bool withinTransmissionWindow = (totalSecondsSinceScheduled >= transmissionJitterOffset) && 
+                                   (totalSecondsSinceScheduled < TRANSMISSION_JITTER_WINDOW);
+  
+  // Check if we've already transmitted in this window
   bool notYetTransmitted = (currentMinute != lastTransmissionMinute);
   
-  return isScheduledTime && notYetTransmitted;
+  // Transmit if:
+  // 1. We're within the transmission window
+  // 2. Our specific jitter time has been reached
+  // 3. We haven't transmitted yet in this window
+  bool shouldTransmit = withinTransmissionWindow && 
+                        (totalSecondsSinceScheduled >= transmissionJitterOffset) &&
+                        notYetTransmitted;
+  
+  if (shouldTransmit && ENABLE_TRANSMISSION_JITTER) {
+    Serial.print(F("Transmission time! Jitter offset: "));
+    Serial.print(transmissionJitterOffset);
+    Serial.print(F("s, Elapsed: "));
+    Serial.print(totalSecondsSinceScheduled);
+    Serial.println(F("s"));
+  }
+  
+  return shouldTransmit;
 }
 
 
@@ -1805,6 +1851,7 @@ void connectMQTT() {
 
 
     // Announce we're online (will be validated by server polls)
+    // Server will automatically send any pending commands stored in Redis
     publishPresenceOnline();
     
     setModuleStatus(&moduleReadiness.mqtt, MODULE_READY, "MQTT");
@@ -2247,8 +2294,10 @@ void publishPresenceOnline() {
 
 
   // Publish WITHOUT retained flag - server will poll to verify
+  // Server will automatically send any pending commands (deregister, restart, etc.)
   if (mqttClient.publish(topicPresence, presencePayload, false)) {
     Serial.println(F("✓ Presence status: online (NOT retained)"));
+    Serial.println(F("  Server will send any pending commands via MQTT..."));
   } else {
     Serial.println(F("✗ Failed to publish presence status"));
     Serial.print(F("MQTT state: "));
@@ -2646,6 +2695,22 @@ void setup() {
           Serial.print(F("✓ Epoch Time: "));
           Serial.println(epochTime);
           printCurrentTime();
+          
+          // Initialize transmission jitter to prevent thundering herd
+          if (ENABLE_TRANSMISSION_JITTER) {
+            // Use epoch time as seed for randomness
+            randomSeed(epochTime + bootCount);
+            transmissionJitterOffset = random(0, TRANSMISSION_JITTER_WINDOW);
+            Serial.print(F("✓ Transmission jitter: "));
+            Serial.print(transmissionJitterOffset);
+            Serial.print(F(" seconds ("));
+            Serial.print(transmissionJitterOffset / 60);
+            Serial.print(F(" min "));
+            Serial.print(transmissionJitterOffset % 60);
+            Serial.println(F(" sec)"));
+            Serial.println(F("  This prevents all devices from transmitting simultaneously"));
+          }
+          
           setModuleStatus(&moduleReadiness.ntp, MODULE_READY, "NTP");
           break;
         } else {

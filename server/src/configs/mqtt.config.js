@@ -15,17 +15,18 @@ const mqtt = require('mqtt');
 const MQTT_CONFIG = {
   // HiveMQ Cloud Cluster Configuration
   BROKER_URL: process.env.MQTT_BROKER_URL,
-  CLIENT_ID: process.env.MQTT_CLIENT_ID,
+  // Generate unique client ID with timestamp to prevent conflicts
+  CLIENT_ID: `water-quality-server-${Date.now()}`,
 
-  // Connection Options
+  // Connection Options (Optimized for HiveMQ Cloud stability)
   OPTIONS: {
     // Only include username/password if they are actually set
     ...(process.env.MQTT_USERNAME && { username: process.env.MQTT_USERNAME }),
     ...(process.env.MQTT_PASSWORD && { password: process.env.MQTT_PASSWORD }),
     clean: true, // Clean session - start fresh each time
     connectTimeout: 30000, // 30 second timeout for cloud connection
-    reconnectPeriod: 10000,  // 10 second reconnect period (increased to avoid rapid reconnects)
-    keepalive: 30, // 30 second keepalive - shorter interval for faster detection
+    reconnectPeriod: 5000,  // 5 second reconnect period (faster recovery)
+    keepalive: 60, // 60 second keepalive (HiveMQ Cloud recommended: longer is more stable)
     protocolVersion: 4, // MQTT v3.1.1
     // SSL/TLS options for HiveMQ Cloud
     rejectUnauthorized: true, // Validate HiveMQ certificates properly

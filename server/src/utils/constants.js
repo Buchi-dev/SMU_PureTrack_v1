@@ -84,12 +84,14 @@ const EMAIL = {
   RETRY_DELAY: TIME.FIVE_MINUTES,
 };
 
-// MongoDB connection pool (optimized for MongoDB Atlas cloud)
+// MongoDB connection pool (optimized for MongoDB Atlas cloud + jittered device transmissions)
 const MONGO_POOL = {
-  MIN_POOL_SIZE: 5,
-  MAX_POOL_SIZE: 10,
+  MIN_POOL_SIZE: 10,               // Increased from 5 to handle baseline load
+  MAX_POOL_SIZE: 50,               // Increased from 10 to handle 100+ devices with jitter
   SERVER_SELECTION_TIMEOUT: 30000,  // 30 seconds for cloud MongoDB Atlas
-  SOCKET_TIMEOUT: 60000,             // 60 seconds for long-running queries
+  SOCKET_TIMEOUT: 60000,            // 60 seconds for long-running queries
+  MAX_IDLE_TIME_MS: 300000,         // 5 minutes - close idle connections
+  WAIT_QUEUE_TIMEOUT_MS: 10000,     // 10 seconds - max wait for connection from pool
 };
 
 // API versioning

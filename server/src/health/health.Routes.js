@@ -158,7 +158,77 @@ router.get('/', async (req, res) => {
     isHealthy = false;
   }
 
-  // 7. API Key Configuration Check
+  // 7. MQTT Service Health Check (for jittered device transmissions)
+  try {
+    const mqttService = require('../utils/mqtt.service');
+    const mqttStats = mqttService.getMessageStats();
+    const mqttConnected = mqttService.connected;
+
+    health.checks.mqtt = {
+      status: mqttConnected ? 'OK' : 'DISCONNECTED',
+      message: mqttConnected ? 'MQTT broker connected' : 'MQTT broker disconnected',
+      stats: {
+        totalMessages: mqttStats.total,
+        messagesLastMinute: mqttStats.lastMinute,
+        byType: mqttStats.byType,
+      },
+    };
+
+    if (!mqttConnected) {
+      isHealthy = false;
+    }
+  } catch (error) {
+    health.checks.mqtt = {
+      status: 'ERROR',
+      message: error.message,
+    };
+  }
+
+  // 8. Sensor Data Queue Health Check (Bull queue for async processing)
+  try {
+    const { getQueueStats: getSensorQueueStats } = require('../utils/sensorDataQueue');
+    const sensorQueueStats = await getSensorQueueStats();
+
+    if (sensorQueueStats) {
+      health.checks.sensorDataQueue = {
+        status: 'OK',
+        message: 'Sensor data processing queue operational',
+        stats: {
+          waiting: sensorQueueStats.waiting,
+          active: sensorQueueStats.active,
+          completed: sensorQueueStats.completed,
+          failed: sensorQueueStats.failed,
+          delayed: sensorQueueStats.delayed,
+          total: sensorQueueStats.total,
+        },
+      };
+
+      // Warn if queue is backing up (more than 50 waiting)
+      if (sensorQueueStats.waiting > 50) {
+        health.checks.sensorQueueStatus = 'WARNING';
+        health.checks.sensorQueue.message = `Queue backing up: ${sensorQueueStats.waiting} waiting jobs`;
+      }
+
+      // Critical if queue is severely backed up (more than 200 waiting)
+      if (sensorQueueStats.waiting > 200) {
+        health.checks.sensorQueue.status = 'CRITICAL';
+        health.checks.sensorQueue.message = `Queue critically backed up: ${sensorQueueStats.waiting} waiting jobs`;
+        isHealthy = false;
+      }
+    } else {
+      health.checks.sensorDataQueue = {
+        status: 'ERROR',
+        message: 'Failed to get sensor queue stats',
+      };
+    }
+  } catch (error) {
+    health.checks.sensorDataQueue = {
+      status: 'ERROR',
+      message: error.message,
+    };
+  }
+
+  // 9. API Key Configuration Check
   health.checks.apiKey = {
     status: process.env.DEVICE_API_KEY ? 'OK' : 'NOT_CONFIGURED',
     message: process.env.DEVICE_API_KEY

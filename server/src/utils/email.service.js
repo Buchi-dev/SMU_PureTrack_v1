@@ -149,7 +149,7 @@ async function sendAlertEmail(user, alert) {
       Advisory: '[INFO]',
     };
 
-    const appUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    const appUrl = process.env.CLIENT_URL;
 
     logger.debug('[Email Service] Preparing email template', {
       severity: alert.severity,

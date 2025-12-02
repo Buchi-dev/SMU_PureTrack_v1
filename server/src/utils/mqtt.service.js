@@ -36,12 +36,22 @@ class MQTTService {
       });
 
       return new Promise((resolve, reject) => {
+        // Set a connection timeout to prevent hanging
+        const connectionTimeout = setTimeout(() => {
+          if (!this.connected) {
+            logger.error('[MQTT Service] Connection timeout after 30 seconds');
+            reject(new Error('MQTT connection timeout'));
+          }
+        }, 30000);
+
         this.client.on('connect', () => {
+          clearTimeout(connectionTimeout);
           this.reconnectCount = 0;
           this.lastReconnectTime = new Date();
-          logger.info('[MQTT Service] Connected to HiveMQ successfully', {
+          logger.info('[MQTT Service] ✓ Connected to HiveMQ successfully', {
             clientId: MQTT_CONFIG.CLIENT_ID,
-            keepalive: MQTT_CONFIG.OPTIONS.keepalive
+            keepalive: MQTT_CONFIG.OPTIONS.keepalive,
+            broker: MQTT_CONFIG.BROKER_URL
           });
           this.connected = true;
 
@@ -52,10 +62,12 @@ class MQTTService {
         });
 
         this.client.on('error', (error) => {
+          clearTimeout(connectionTimeout);
           logger.error('[MQTT Service] Connection error:', {
             error: error.message,
             code: error.code,
-            stack: error.stack
+            errno: error.errno,
+            syscall: error.syscall
           });
           this.connected = false;
           
@@ -67,15 +79,33 @@ class MQTTService {
 
         this.client.on('offline', () => {
           this.reconnectCount++;
-          logger.warn(`[MQTT Service] MQTT client went offline (reconnect attempt #${this.reconnectCount})`, {
-            lastConnected: this.lastReconnectTime,
-            secondsConnected: this.lastReconnectTime ? Math.floor((Date.now() - this.lastReconnectTime.getTime()) / 1000) : 'N/A'
-          });
+          const secondsConnected = this.lastReconnectTime ? Math.floor((Date.now() - this.lastReconnectTime.getTime()) / 1000) : 'N/A';
+          
+          // Only log warning if connection was stable (more than 30 seconds)
+          if (secondsConnected === 'N/A' || secondsConnected < 30) {
+            logger.error(`[MQTT Service] ⚠️ Connection unstable - disconnected after ${secondsConnected}s (attempt #${this.reconnectCount})`, {
+              lastConnected: this.lastReconnectTime,
+              possibleCauses: [
+                'Client ID conflict (another server instance running?)',
+                'Authentication failure',
+                'Keepalive timeout (broker expecting faster pings)',
+                'Network instability'
+              ]
+            });
+          } else {
+            logger.warn(`[MQTT Service] MQTT client went offline (reconnect attempt #${this.reconnectCount})`, {
+              lastConnected: this.lastReconnectTime,
+              secondsConnected
+            });
+          }
           this.connected = false;
         });
 
         this.client.on('close', () => {
-          logger.warn('[MQTT Service] MQTT connection closed');
+          if (this.connected) {
+            logger.warn('[MQTT Service] MQTT connection closed unexpectedly');
+          }
+          this.connected = false;
         });
 
         this.client.on('end', () => {
@@ -136,10 +166,31 @@ class MQTTService {
   }
 
   /**
-   * Handle incoming MQTT messages
+   * Handle incoming MQTT messages with rate tracking
    */
   handleMessage(topic, message) {
     try {
+      // Track message rate for monitoring
+      if (!this.messageStats) {
+        this.messageStats = {
+          total: 0,
+          lastMinute: 0,
+          lastMinuteTimestamp: Date.now(),
+          byType: { data: 0, register: 0, presence: 0, other: 0 }
+        };
+      }
+      
+      this.messageStats.total++;
+      this.messageStats.lastMinute++;
+      
+      // Reset per-minute counter every minute
+      const now = Date.now();
+      if (now - this.messageStats.lastMinuteTimestamp >= 60000) {
+        logger.debug(`[MQTT Service] Messages in last minute: ${this.messageStats.lastMinute}`);
+        this.messageStats.lastMinute = 0;
+        this.messageStats.lastMinuteTimestamp = now;
+      }
+
       const messageStr = message.toString();
       const data = JSON.parse(messageStr);
 
@@ -154,13 +205,19 @@ class MQTTService {
 
       // Route message based on topic type
       if (topic.includes('/data')) {
+        this.messageStats.byType.data++;
         this.handleSensorData(deviceId, data);
       } else if (topic.includes('/register')) {
+        this.messageStats.byType.register++;
         this.handleDeviceRegistration(deviceId, data);
       } else if (topic.includes('/presence')) {
+        this.messageStats.byType.presence++;
         this.handleDevicePresence(deviceId, data);
       } else if (topic === MQTT_CONFIG.TOPICS.PRESENCE_RESPONSE) {
+        this.messageStats.byType.presence++;
         this.handlePresenceResponse(data);
+      } else {
+        this.messageStats.byType.other++;
       }
 
     } catch (error) {
@@ -173,41 +230,54 @@ class MQTTService {
   }
 
   /**
+   * Get message statistics for monitoring
+   */
+  getMessageStats() {
+    return this.messageStats || {
+      total: 0,
+      lastMinute: 0,
+      lastMinuteTimestamp: Date.now(),
+      byType: { data: 0, register: 0, presence: 0, other: 0 }
+    };
+  }
+
+  /**
    * Handle sensor data messages from devices
+   * Uses async queue to prevent blocking during high load (jittered transmissions)
    */
   async handleSensorData(deviceId, data) {
     // Only log in verbose mode - sensor data processing happens frequently
     if (process.env.VERBOSE_LOGGING === 'true') {
-      logger.info(`[MQTT Service] Processing sensor data from device: ${deviceId}`);
+      logger.info(`[MQTT Service] Received sensor data from device: ${deviceId}`);
     }
 
-    // Import device controller dynamically to avoid circular dependencies
-    const { processSensorData } = require('../devices/device.Controller');
-
     try {
-      // Create mock request/response objects for the existing controller
-      const mockReq = {
-        body: {
-          deviceId,
-          ...data,
-        },
-        headers: {
-          'x-api-key': process.env.API_KEY, // Use environment API key
-        },
-      };
-
-      const mockRes = {
-        status: (code) => ({
-          json: (data) => data,
-        }),
-        json: (data) => data,
-      };
-
-      // Process the sensor data using existing controller logic
-      await processSensorData(mockReq, mockRes);
-
+      // Queue the sensor data for async processing instead of blocking
+      const { queueSensorData } = require('./sensorDataQueue');
+      await queueSensorData(deviceId, data);
+      
+      logger.debug(`[MQTT Service] Sensor data queued for processing: ${deviceId}`);
     } catch (error) {
-      logger.error(`[MQTT Service] Error processing sensor data from ${deviceId}:`, error);
+      logger.error(`[MQTT Service] Error queueing sensor data from ${deviceId}:`, error);
+      
+      // Fallback: process immediately if queue fails
+      logger.warn(`[MQTT Service] Queue failed, processing ${deviceId} immediately`);
+      try {
+        const { processSensorData } = require('../devices/device.Controller');
+        
+        const mockReq = {
+          body: { deviceId, ...data },
+          headers: { 'x-api-key': process.env.API_KEY },
+        };
+        const mockRes = {
+          status: (code) => ({ json: (data) => data }),
+          json: (data) => data,
+        };
+        
+        await processSensorData(mockReq, mockRes);
+      } catch (fallbackError) {
+        logger.error(`[MQTT Service] Fallback processing failed for ${deviceId}:`, fallbackError);
+      }
     }
   }
 
@@ -273,6 +343,8 @@ class MQTTService {
    * NOTE: Presence messages are NOT trusted automatically.
    * Only responses to presence queries actually update device status.
    * This handler just logs the announcement for debugging.
+   * 
+   * IMPORTANT: When device comes online, check for pending commands in Redis
    */
   async handleDevicePresence(deviceId, data) {
     try {
@@ -285,6 +357,12 @@ class MQTTService {
       // ⚠️ DO NOT UPDATE DATABASE HERE
       // This would create duplicate updates since handlePresenceResponse() already handles it
       // Presence announcements are just for logging/debugging
+
+      // If device is announcing "online", check for pending commands
+      if (status === 'online') {
+        logger.info(`[MQTT Presence] Device ${deviceId} came online - checking for pending commands`);
+        await this.sendPendingCommandsToDevice(deviceId);
+      }
 
     } catch (error) {
       logger.error(`[MQTT Presence] Error processing device ${deviceId} presence announcement:`, error);
@@ -513,6 +591,124 @@ class MQTTService {
     };
 
     return this.publish(topic, message, { qos: 1 });
+  }
+
+  /**
+   * Queue command in Redis for offline device (will be delivered on reconnection)
+   */
+  async queueCommandForDevice(deviceId, command, data = {}) {
+    try {
+      const { getRedisClient } = require('../configs/redis.Config');
+      const redisClient = getRedisClient();
+
+      if (!redisClient) {
+        logger.warn('[MQTT Service] Redis not available - cannot queue command', {
+          deviceId,
+          command,
+        });
+        return false;
+      }
+
+      const queueKey = `pending_commands:${deviceId}`;
+      const commandData = {
+        command,
+        data,
+        timestamp: new Date().toISOString(),
+        queuedAt: Date.now()
+      };
+
+      // Add command to Redis list (queue)
+      await redisClient.rPush(queueKey, JSON.stringify(commandData));
+      
+      // Set expiration to 7 days (604800 seconds)
+      await redisClient.expire(queueKey, 604800);
+
+      logger.info('[MQTT Service] Command queued in Redis for offline device', {
+        deviceId,
+        command,
+        queueKey,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('[MQTT Service] Failed to queue command in Redis:', {
+        deviceId,
+        command,
+        error: error.message,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Send pending commands to device (called when device reconnects)
+   */
+  async sendPendingCommandsToDevice(deviceId) {
+    try {
+      const { getRedisClient } = require('../configs/redis.Config');
+      const redisClient = getRedisClient();
+
+      if (!redisClient) {
+        return;
+      }
+
+      const queueKey = `pending_commands:${deviceId}`;
+      
+      // Get all pending commands
+      const pendingCommands = await redisClient.lRange(queueKey, 0, -1);
+
+      if (!pendingCommands || pendingCommands.length === 0) {
+        logger.debug('[MQTT Service] No pending commands for device', { deviceId });
+        return;
+      }
+
+      logger.info('[MQTT Service] Sending pending commands to reconnected device', {
+        deviceId,
+        commandCount: pendingCommands.length,
+      });
+
+      // Send each command via MQTT
+      for (const cmdStr of pendingCommands) {
+        try {
+          const cmd = JSON.parse(cmdStr);
+          
+          logger.info('[MQTT Service] Delivering queued command', {
+            deviceId,
+            command: cmd.command,
+            queuedAt: cmd.timestamp,
+          });
+
+          // Send command via MQTT with special flag indicating it's a pending command
+          this.sendCommandToDevice(deviceId, cmd.command, {
+            ...cmd.data,
+            _pending: true,
+            _queuedAt: cmd.timestamp,
+          });
+
+          // Small delay between commands
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (parseError) {
+          logger.error('[MQTT Service] Failed to parse queued command', {
+            deviceId,
+            error: parseError.message,
+          });
+        }
+      }
+
+      // Clear the queue after sending
+      await redisClient.del(queueKey);
+      
+      logger.info('[MQTT Service] Cleared pending commands queue', {
+        deviceId,
+        commandsDelivered: pendingCommands.length,
+      });
+
+    } catch (error) {
+      logger.error('[MQTT Service] Failed to send pending commands:', {
+        deviceId,
+        error: error.message,
+      });
+    }
   }
 
   /**

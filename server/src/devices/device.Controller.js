@@ -303,11 +303,18 @@ const deleteDevice = asyncHandler(async (req, res) => {
       // Give device a moment to receive the command
       await new Promise(resolve => setTimeout(resolve, 1000));
     } else {
-      logger.warn('[Device Controller] MQTT service not available or device not connected, cannot send deregister command', {
+      logger.warn('[Device Controller] Device offline - queuing deregister command in Redis', {
         deviceId: device.deviceId,
-        mqttServiceAvailable: !!mqttService,
-        isDeviceConnectedAvailable: !!(mqttService && mqttService.isDeviceConnected),
       });
+      
+      // Queue command in Redis for device to receive when it reconnects via MQTT
+      if (mqttService && mqttService.queueCommandForDevice) {
+        await mqttService.queueCommandForDevice(device.deviceId, 'deregister', {
+          message: 'Device has been removed from the system',
+          reason: 'admin_deletion',
+          timestamp: new Date().toISOString()
+        });
+      }
     }
 
     // Delete device and all associated data
