@@ -353,6 +353,50 @@ export class DevicesService {
       throw new Error(message);
     }
   }
+
+  // ==========================================================================
+  // DEVICE COMMANDS
+  // ==========================================================================
+
+  /**
+   * Send command to device via MQTT (Admin only)
+   * Backend handles MQTT publishing to device
+   * 
+   * @param deviceId - Device ID to send command to
+   * @param command - Command type (send_now, restart, go, deregister)
+   * @param data - Optional command data
+   * @returns Promise with command status
+   * @example
+   * await devicesService.sendDeviceCommand('WQ-001', 'restart');
+   * await devicesService.sendDeviceCommand('WQ-001', 'send_now');
+   */
+  async sendDeviceCommand(
+    deviceId: string,
+    command: 'send_now' | 'restart' | 'go' | 'deregister',
+    data: Record<string, any> = {}
+  ): Promise<{
+    success: boolean;
+    data: {
+      deviceId: string;
+      command: string;
+      status: string;
+      timestamp: string;
+      deviceStatus: string;
+    };
+    message: string;
+  }> {
+    try {
+      const response = await apiClient.post(
+        `${DEVICE_ENDPOINTS.BY_ID(deviceId)}/commands`,
+        { command, data }
+      );
+      return response.data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('[DevicesService] Send command error:', message);
+      throw new Error(message);
+    }
+  }
 }
 
 // ============================================================================

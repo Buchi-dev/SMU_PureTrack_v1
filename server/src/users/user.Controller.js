@@ -3,8 +3,6 @@ const logger = require('../utils/logger');
 const { NotFoundError, ValidationError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
 const asyncHandler = require('../middleware/asyncHandler');
-const CacheService = require('../utils/cache.service');
-const { CACHE_TTL } = require('../utils/constants');
 
 /**
  * Get user by ID
@@ -12,15 +10,6 @@ const { CACHE_TTL } = require('../utils/constants');
  * @param {Object} res - Express response object
  */
 const getUserById = asyncHandler(async (req, res) => {
-  // Try to get from cache
-  const cacheKey = `user:${req.params.id}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug(`[User Controller] Returning cached user: ${req.params.id}`);
-    return ResponseHelper.success(res, cached);
-  }
-
   const user = await User.findById(req.params.id)
     .select('-googleId')
     .lean();
@@ -33,9 +22,6 @@ const getUserById = asyncHandler(async (req, res) => {
     ...user,
     id: user._id,
   };
-
-  // Cache the result
-  await CacheService.set(cacheKey, userData, CACHE_TTL.USERS);
 
   ResponseHelper.success(res, userData);
 });
@@ -51,15 +37,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
   const filter = {};
   if (role) filter.role = role;
   if (status) filter.status = status;
-
-  // Try to get from cache
-  const cacheKey = `users:all:${JSON.stringify(filter)}:page${page}:limit${limit}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug('[User Controller] Returning cached users list');
-    return ResponseHelper.paginated(res, cached.data, cached.pagination);
-  }
 
   // Use lean() and select to optimize query
   const users = await User.find(filter)
@@ -83,9 +60,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
     pages: Math.ceil(count / limit),
     limit: parseInt(limit),
   };
-
-  // Cache the result
-  await CacheService.set(cacheKey, { data: usersWithId, pagination }, CACHE_TTL.USERS);
 
   ResponseHelper.paginated(res, usersWithId, pagination);
 });
@@ -111,11 +85,6 @@ const updateUserRole = asyncHandler(async (req, res) => {
   if (!user) {
     throw new NotFoundError('User', req.params.id);
   }
-
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for user: ${req.params.id}`);
 
   // Check if admin is modifying their own role (requires logout)
   const requiresLogout = req.user._id.toString() === req.params.id;
@@ -148,11 +117,6 @@ const updateUserStatus = asyncHandler(async (req, res) => {
   if (!user) {
     throw new NotFoundError('User', req.params.id);
   }
-
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for user: ${req.params.id}`);
 
   // Check if admin is modifying their own status (requires logout)
   const requiresLogout = req.user._id.toString() === req.params.id;
@@ -193,11 +157,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   if (!user) {
     throw new NotFoundError('User', req.params.id);
   }
-
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for user: ${req.params.id}`);
 
   ResponseHelper.success(
     res,
@@ -266,9 +225,6 @@ const completeUserProfile = asyncHandler(async (req, res) => {
     throw new NotFoundError('User', req.params.id);
   }
 
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
 
   ResponseHelper.success(
     res,
@@ -288,11 +244,6 @@ const deleteUser = asyncHandler(async (req, res) => {
   if (!user) {
     throw new NotFoundError('User', req.params.id);
   }
-
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for deleted user: ${req.params.id}`);
 
   ResponseHelper.success(res, { userId: req.params.id }, 'User deleted successfully');
 });
@@ -371,11 +322,6 @@ const updateUserPreferences = asyncHandler(async (req, res) => {
     throw new NotFoundError('User', req.params.id);
   }
 
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for user preferences: ${req.params.id}`);
-
   ResponseHelper.success(res, user.notificationPreferences, 'Notification preferences updated successfully');
 });
 
@@ -414,11 +360,6 @@ const resetUserPreferences = asyncHandler(async (req, res) => {
   if (!user) {
     throw new NotFoundError('User', req.params.id);
   }
-
-  // Invalidate cache
-  await CacheService.del(`user:${req.params.id}`);
-  await CacheService.delPattern('users:all:*');
-  logger.debug(`[User Controller] Cache invalidated for user preferences reset: ${req.params.id}`);
 
   ResponseHelper.success(res, user.notificationPreferences, 'Notification preferences reset to defaults');
 });

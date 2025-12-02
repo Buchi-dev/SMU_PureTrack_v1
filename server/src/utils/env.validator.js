@@ -22,8 +22,6 @@ const optionalEnvVars = [
   'SMTP_PASS',
   'SMTP_FROM_NAME',
   'SMTP_SECURE',
-  'REDIS_URL',
-
 ];
 
 /**
@@ -146,7 +144,6 @@ const getEnvironmentSummary = () => {
     nodeEnv: process.env.NODE_ENV || 'development',
     port: process.env.PORT || 5000,
     mongoConfigured: !!process.env.MONGO_URI,
-    redisConfigured: !!process.env.REDIS_URL,
     smtpConfigured: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
     firebaseConfigured: !!(process.env.FIREBASE_PROJECT_ID && (process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.FIREBASE_SERVICE_ACCOUNT)),
     apiKeyConfigured: !!process.env.DEVICE_API_KEY,

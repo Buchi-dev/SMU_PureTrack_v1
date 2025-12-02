@@ -20,7 +20,7 @@ import { PageHeader } from '../../../components/PageHeader';
 import { useDevices, useAlerts } from '../../../hooks';
 import { useDeviceSeverityCalculator } from './hooks/useDeviceSeverityCalculator';
 import { StatsOverview, DeviceTable, FilterControls } from './components';
-import { sendDeviceCommand } from '../../../utils/mqtt';
+import { devicesService } from '../../../services/devices.Service';
 
 const { Content } = Layout;
 const { Text } = Typography;
@@ -61,14 +61,29 @@ export const AdminDeviceReadings = () => {
     };
   }, [enrichedDevices]);
 
-  const handleForceDeviceSendData = () => {
-    // Send "send_now" command to all online devices
-    enrichedDevices.forEach((device) => {
-      if (device.status === 'online') {
-        sendDeviceCommand(device.deviceId, 'send_now');
-      }
-    });
-    message.success(`Send Now command sent to ${enrichedDevices.filter(d => d.status === 'online').length} online device(s)`);
+  const handleForceDeviceSendData = async () => {
+    const onlineDevices = enrichedDevices.filter(d => d.status === 'online');
+    
+    if (onlineDevices.length === 0) {
+      message.warning('No online devices available to send command');
+      return;
+    }
+
+    try {
+      const promises = onlineDevices.map(device => 
+        devicesService.sendDeviceCommand(device.deviceId, 'send_now')
+      );
+      
+      await Promise.all(promises);
+      message.success(`Send Now command sent to ${onlineDevices.length} online device(s)`);
+      
+      // Refresh data after a short delay to see updated readings
+      setTimeout(() => {
+        refetchDevices();
+      }, 2000);
+    } catch (error) {
+      message.error(`Failed to send command: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   };
 
   // Manual refresh handler with loading state

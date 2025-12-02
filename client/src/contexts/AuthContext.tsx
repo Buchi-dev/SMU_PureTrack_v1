@@ -9,7 +9,6 @@ import type { ReactNode } from "react";
 import { authService, type AuthUser } from "../services/auth.Service";
 import { auth } from "../config/firebase.config";
 import { onAuthStateChanged } from "firebase/auth";
-import { initializeMQTT, disconnectMQTT } from "../utils/mqtt";
 import { AuthContext, type AuthContextType } from "./auth.context";
 
 // User status types (mapped from MongoDB model)
@@ -28,7 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   // Track if listener has been initialized to prevent duplicates
   const listenerInitialized = useRef(false);
-  const mqttInitialized = useRef(false);
 
   /**
    * Fetch current user from backend
@@ -104,33 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // User is signed in with Firebase AND has valid domain
         setFirebaseReady(true);
         
-        // Initialize MQTT connection once
-        if (!mqttInitialized.current) {
-          mqttInitialized.current = true;
-          if (import.meta.env.DEV) {
-            console.log('[AuthContext] User authenticated, connecting to MQTT...');
-          }
-          try {
-            await initializeMQTT();
-            if (import.meta.env.DEV) {
-              console.log('[AuthContext] MQTT connected successfully');
-            }
-          } catch (mqttError) {
-            console.error('[AuthContext] Failed to connect to MQTT:', mqttError);
-            mqttInitialized.current = false; // Allow retry on error
-            // Non-fatal error, app can still work with HTTP polling
-          }
-        }
-        
         // Fetch user data from backend
         fetchUser();
       } else {
         // User is signed out
         if (import.meta.env.DEV) {
-          console.log('[AuthContext] User logged out, disconnecting MQTT...');
+          console.log('[AuthContext] User logged out');
         }
-        disconnectMQTT();
-        mqttInitialized.current = false;
         
         setFirebaseReady(true);
         setUser(null);

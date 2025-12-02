@@ -2,8 +2,7 @@ const { Device, SensorReading } = require('./device.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
-const { SENSOR_THRESHOLDS, CACHE_TTL } = require('../utils/constants');
-const CacheService = require('../utils/cache.service');
+const { SENSOR_THRESHOLDS } = require('../utils/constants');
 const { NotFoundError, ValidationError, AppError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
 const asyncHandler = require('../middleware/asyncHandler');
@@ -21,15 +20,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (registrationStatus) filter.registrationStatus = registrationStatus;
-
-  // Try to get from cache
-  const cacheKey = `devices:all:${JSON.stringify(filter)}:page${page}:limit${limit}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug('[Device Controller] Returning cached devices list');
-    return ResponseHelper.paginated(res, cached.data, cached.pagination);
-  }
 
   // Use aggregation to fix N+1 query problem
   const devicesAggregation = await Device.aggregate([
@@ -116,9 +106,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
     },
   };
 
-  // Cache the result
-  await CacheService.set(cacheKey, responseData, CACHE_TTL.DEVICES);
-
   ResponseHelper.paginated(res, devicesAggregation, responseData.pagination);
 });
 
@@ -128,15 +115,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const getDeviceById = asyncHandler(async (req, res) => {
-  // Try to get from cache
-  const cacheKey = `device:${req.params.deviceId}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug(`[Device Controller] Returning cached device: ${req.params.deviceId}`);
-    return ResponseHelper.success(res, cached);
-  }
-
   const device = await Device.findOne({ deviceId: req.params.deviceId });
 
   if (!device) {
@@ -162,9 +140,6 @@ const getDeviceById = asyncHandler(async (req, res) => {
     ...device.toPublicProfile(),
     latestReading: mappedReading,
   };
-
-  // Cache the result
-  await CacheService.set(cacheKey, responseData, CACHE_TTL.DEVICES);
 
   ResponseHelper.success(res, responseData);
 });
@@ -266,11 +241,6 @@ const updateDevice = asyncHandler(async (req, res) => {
     throw new NotFoundError('Device', req.params.deviceId);
   }
 
-  // Invalidate cache
-  await CacheService.del(`device:${req.params.deviceId}`);
-  await CacheService.delPattern('devices:all:*');
-  logger.debug(`[Device Controller] Cache invalidated for device: ${req.params.deviceId}`);
-
   ResponseHelper.success(res, device.toPublicProfile(), 'Device updated successfully');
 });
 
@@ -321,11 +291,6 @@ const deleteDevice = asyncHandler(async (req, res) => {
       deviceId: device.deviceId,
       deviceMongoId: req.params.id,
     });
-
-    // Invalidate cache
-    await CacheService.del(`device:${req.params.deviceId}`);
-    await CacheService.delPattern('devices:all:*');
-    logger.debug(`[Device Controller] Cache invalidated for deleted device: ${req.params.deviceId}`);
 
   ResponseHelper.success(res, null, 'Device and all associated data deleted successfully');
 });
@@ -861,6 +826,75 @@ const getDeviceStatus = asyncHandler(async (req, res) => {
   ResponseHelper.success(res, status, 'Device status retrieved');
 });
 
+/**
+ * Send command to device via MQTT
+ * @route POST /api/v1/devices/:deviceId/commands
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const sendDeviceCommand = asyncHandler(async (req, res) => {
+  const { deviceId } = req.params;
+  const { command, data = {} } = req.body;
+
+  // Validate command
+  const validCommands = ['send_now', 'restart', 'go', 'deregister'];
+  if (!command || !validCommands.includes(command)) {
+    throw new ValidationError(`Invalid command. Must be one of: ${validCommands.join(', ')}`);
+  }
+
+  // Check if device exists
+  const device = await Device.findOne({ deviceId });
+  if (!device) {
+    throw new NotFoundError('Device', deviceId);
+  }
+
+  // Log command request
+  logger.info('[Device Controller] Sending command to device', {
+    deviceId,
+    command,
+    deviceName: device.name,
+    deviceStatus: device.status,
+    requestedBy: req.user?.email || 'unknown',
+  });
+
+  // Send command via MQTT
+  try {
+    const commandSent = mqttService.sendCommandToDevice(deviceId, command, data);
+    
+    if (!commandSent) {
+      throw new AppError('Failed to send command - MQTT service unavailable', 503);
+    }
+
+    // Update device status based on command
+    if (command === 'deregister') {
+      device.registrationStatus = 'pending';
+      device.isRegistered = false;
+      await device.save();
+      
+      logger.info('[Device Controller] Device deregistered', {
+        deviceId,
+        command,
+      });
+    }
+
+    ResponseHelper.success(res, {
+      deviceId,
+      command,
+      status: 'sent',
+      timestamp: new Date().toISOString(),
+      deviceStatus: device.status,
+    }, `Command '${command}' sent to device successfully`);
+
+  } catch (error) {
+    logger.error('[Device Controller] Failed to send command', {
+      deviceId,
+      command,
+      error: error.message,
+    });
+    throw new AppError(`Failed to send command: ${error.message}`, 500);
+  }
+});
+
 module.exports = {
   getAllDevices,
   getDeviceById,
@@ -872,4 +906,5 @@ module.exports = {
   deviceRegister,
   approveDeviceRegistration,
   deviceSSEConnection: getDeviceStatus,
+  sendDeviceCommand,
 };

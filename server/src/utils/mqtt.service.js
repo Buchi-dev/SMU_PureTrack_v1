@@ -186,6 +186,14 @@ class MQTTService {
    * Handle sensor data messages from devices
    */
   async handleSensorData(deviceId, data) {
+    // Track device as connected when it sends data
+    this.deviceSubscriptions.add(deviceId);
+    
+    // Remove from subscriptions after 5 minutes of inactivity
+    setTimeout(() => {
+      this.deviceSubscriptions.delete(deviceId);
+    }, 5 * 60 * 1000);
+
     // Only log in verbose mode - sensor data processing happens frequently
     if (process.env.VERBOSE_LOGGING === 'true') {
       logger.info(`[MQTT Service] Processing sensor data from device: ${deviceId}`);
@@ -324,6 +332,14 @@ class MQTTService {
    */
   async handleDevicePresence(deviceId, data) {
     try {
+      // Track device as connected when it sends presence announcement
+      this.deviceSubscriptions.add(deviceId);
+      
+      // Remove from subscriptions after 5 minutes of inactivity
+      setTimeout(() => {
+        this.deviceSubscriptions.delete(deviceId);
+      }, 5 * 60 * 1000);
+
       const { status, timestamp } = data;
       
       // Log the announcement but don't update database
@@ -346,6 +362,14 @@ class MQTTService {
   async handlePresenceResponse(data) {
     try {
       if (data.response === 'i_am_online' && data.deviceId) {
+        // Track device as connected when it responds to presence query
+        this.deviceSubscriptions.add(data.deviceId);
+        
+        // Remove from subscriptions after 5 minutes of inactivity
+        setTimeout(() => {
+          this.deviceSubscriptions.delete(data.deviceId);
+        }, 5 * 60 * 1000);
+
         // Check if we've already processed this response (prevent duplicates)
         const existingResponse = this.presenceResponses.get(data.deviceId);
         if (existingResponse) {
@@ -396,13 +420,6 @@ class MQTTService {
           if (oldStatus !== 'online') {
             logger.info(`[MQTT Presence] Device ${data.deviceId} status changed: ${oldStatus} → online`);
           }
-
-          // Invalidate cache (single operation)
-          const CacheService = require('./cache.service');
-          await Promise.all([
-            CacheService.del(`device:${data.deviceId}`),
-            CacheService.delPattern('devices:all:*')
-          ]);
         } else {
           logger.warn(`[MQTT Presence] Device ${data.deviceId} responded but not found in database`);
         }

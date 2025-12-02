@@ -10,7 +10,6 @@ const crypto = require('crypto');
 const asyncHandler = require('../middleware/asyncHandler');
 const { NotFoundError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
-const CacheService = require('../utils/cache.service');
 
 /**
  * Generate Water Quality Report
@@ -1028,10 +1027,6 @@ const deleteReport = asyncHandler(async (req, res) => {
 
   // Delete the report document
   await Report.findByIdAndDelete(req.params.id);
-
-  // Invalidate cache
-  await CacheService.delPattern('reports:*');
-  logger.debug('[Report Controller] Cache invalidated for reports');
 
   ResponseHelper.success(res, null, 'Report deleted successfully');
 });

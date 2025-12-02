@@ -32,8 +32,6 @@ const path = require('path');
  * - Metrics tracking for observability
  */
 
-// Cache the CacheService import
-const CacheService = require('../utils/cache.service');
 
 // Job state management
 let lastSuccessfulPoll = null;
@@ -107,7 +105,6 @@ const presencePollingJob = cron.schedule('*/1 * * * *', async () => {
     
     // Categorize devices by status change
     const devicesToMarkOffline = [];
-    const cacheInvalidationKeys = new Set();
     const metrics = {
       online: 0,
       offline: 0,
@@ -125,7 +122,6 @@ const presencePollingJob = cron.schedule('*/1 * * * *', async () => {
         metrics.online++;
         if (!wasOnline) {
           metrics.offlineToOnline++;
-          cacheInvalidationKeys.add(device.deviceId);
           logger.info(`[Presence Poll] ✅ ${device.deviceId}: OFFLINE → ONLINE`);
         } else {
           metrics.noChange++;
@@ -134,7 +130,6 @@ const presencePollingJob = cron.schedule('*/1 * * * *', async () => {
         metrics.offline++;
         if (wasOnline) {
           devicesToMarkOffline.push(device.deviceId);
-          cacheInvalidationKeys.add(device.deviceId);
           metrics.onlineToOffline++;
           logger.warn(`[Presence Poll] ❌ ${device.deviceId}: ONLINE → OFFLINE`);
         } else {
@@ -158,25 +153,6 @@ const presencePollingJob = cron.schedule('*/1 * * * *', async () => {
       );
       
       logger.debug(`[Presence Poll] Batch update: ${devicesToMarkOffline.length} devices (${Date.now() - updateStartTime}ms)`);
-    }
-    
-    // Smart cache invalidation (only changed devices)
-    if (cacheInvalidationKeys.size > 0) {
-      const cacheStartTime = Date.now();
-      
-      // Parallel cache deletion for changed devices
-      await Promise.all([
-        ...Array.from(cacheInvalidationKeys).map(deviceId => 
-          CacheService.del(`device:${deviceId}`).catch(err => 
-            logger.warn(`Cache del failed for ${deviceId}:`, err.message)
-          )
-        ),
-        CacheService.delPattern('devices:all:*').catch(err =>
-          logger.warn('Cache pattern del failed:', err.message)
-        )
-      ]);
-      
-      logger.debug(`[Presence Poll] Cache invalidation: ${cacheInvalidationKeys.size} devices (${Date.now() - cacheStartTime}ms)`);
     }
     
     // Update metrics
@@ -384,10 +360,6 @@ const cleanupOldReadings = cron.schedule('0 2 * * *', async () => {
       totalDocuments: readingsResult.totalDeleted + alertsResult.totalDeleted
     });
     
-    // Optional: Cleanup old cache entries (fire and forget)
-    CacheService.delPattern('analytics:*')
-      .catch(err => logger.debug('Analytics cache cleanup skipped:', err.message));
-    
   } catch (error) {
     const cleanupDuration = Date.now() - cleanupStartTime;
     
@@ -561,32 +533,7 @@ async function performPreRestartMaintenance() {
         }
       },
       
-      // Task 3: Cache cleanup
-      {
-        name: 'cache_cleanup',
-        timeout: 5000,
-        fn: async () => {
-          logger.info('[Maintenance] 🗄️  Cleaning up stale cache entries...');
-          
-          const patterns = [
-            'analytics:old:*',
-            'reports:temp:*',
-            'session:expired:*'
-          ];
-          
-          const cleanupResults = await Promise.allSettled(
-            patterns.map(pattern => CacheService.delPattern(pattern))
-          );
-          
-          const successfulCleanups = cleanupResults.filter(r => r.status === 'fulfilled').length;
-          
-          logger.info(`[Maintenance] ✅ Cache cleanup: ${successfulCleanups}/${patterns.length} patterns cleared`);
-          
-          return { patterns: patterns.length, cleared: successfulCleanups };
-        }
-      },
-      
-      // Task 4: Database connection health check
+      // Task 3: Database connection health check
       {
         name: 'database_health',
         timeout: 5000,

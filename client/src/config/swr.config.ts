@@ -113,12 +113,10 @@ export const compareData = (a: any, b: any): boolean => {
  * Base SWR configuration
  * Applied to all SWR hooks unless overridden
  * 
- * OPTIMIZED FOR RATE LIMIT COMPLIANCE & DUPLICATE REQUEST PREVENTION:
- * - Long deduping interval prevents duplicate requests
- * - Cache-first strategy reduces unnecessary network calls
- * - Shared cache across all components
- * - Aggressive deduplication to stay under 20 req/min limit
- * - keepPreviousData prevents flash of loading state
+ * OPTIMIZED FOR FRESH DATA (NO AGGRESSIVE CACHING):
+ * - Minimal deduping for fresh data on every request
+ * - No stale data shown to users
+ * - Always revalidate on mount
  * - Deep equality checks prevent unnecessary re-renders
  * - Request cancellation for stale requests
  * - Request queueing for burst scenarios
@@ -130,10 +128,12 @@ export const swrConfig: SWRConfiguration = {
   revalidateOnReconnect: true,  // Refetch when network reconnects
   shouldRetryOnError: true,     // Retry failed requests
   errorRetryCount: 3,           // Max retry attempts
-  errorRetryInterval: 10000,    // 10 seconds between retries (was 5s)
-  dedupingInterval: 60000,      // 1 minute - prevent duplicate requests (was 10s)
-  focusThrottleInterval: 60000, // Throttle focus revalidation to max once per minute (was 30s)
-  keepPreviousData: true,       // Keep showing old data while fetching new data
+  errorRetryInterval: 10000,    // 10 seconds between retries
+  dedupingInterval: 0,          // DISABLED: No deduplication - always fetch fresh data
+  focusThrottleInterval: 60000, // Throttle focus revalidation to max once per minute
+  keepPreviousData: false,      // DISABLED: Don't show stale data
+  revalidateIfStale: true,      // Always revalidate stale data
+  revalidateOnMount: true,      // Always fetch on mount
   provider: () => new Map(),    // Use global cache provider
   onError: (error: Error) => {
     // Don't log cancelled request errors

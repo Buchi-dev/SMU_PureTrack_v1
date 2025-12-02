@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Layout, Modal, message, Space, Input } from 'antd';
 import { ApiOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
@@ -36,11 +36,19 @@ export const AdminDeviceManagement = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ✅ GLOBAL HOOK - Real-time device data
+  // Use more aggressive polling (5s) when on unregistered tab to catch new devices quickly
+  const pollInterval = activeTab === 'unregistered' ? 5000 : 15000;
+  
+  // Don't pass any filters - get ALL devices and filter client-side
+  // This ensures we get both registered and unregistered devices
   const {
     devices: devicesWithSensorData,
     isLoading,
     refetch,
-  } = useDevices({ pollInterval: 15000 });
+  } = useDevices({ 
+    pollInterval,
+    filters: {}, // Explicitly pass empty filters to get all devices
+  });
 
   // ✅ GLOBAL HOOK - Device write operations
   const {
@@ -60,6 +68,19 @@ export const AdminDeviceManagement = () => {
     searchText,
   });
 
+  // Auto-refetch when switching to unregistered tab to see latest pending devices
+  useEffect(() => {
+    if (activeTab === 'unregistered') {
+      console.log('[AdminDeviceManagement] Switched to unregistered tab - refetching devices');
+      // Show subtle message about auto-refresh
+      const unregisteredCount = stats.unregistered;
+      if (unregisteredCount > 0) {
+        message.info(`Found ${unregisteredCount} device${unregisteredCount > 1 ? 's' : ''} pending registration`, 2);
+      }
+      refetch();
+    }
+  }, [activeTab, refetch, stats.unregistered]);
+
   // Device action handlers
   const handleView = (device: Device) => {
     setSelectedDevice(device);
@@ -69,12 +90,29 @@ export const AdminDeviceManagement = () => {
   const handleDelete = (device: Device) => {
     Modal.confirm({
       title: 'Delete Device',
-      content: `Are you sure you want to delete "${device.name}"? This action cannot be undone.`,
+      content: (
+        <div>
+          <p>Are you sure you want to delete "<strong>{device.name}</strong>"?</p>
+          <p style={{ marginTop: '8px', color: '#ff4d4f' }}>
+            This will:
+          </p>
+          <ul style={{ marginTop: '4px', paddingLeft: '20px' }}>
+            <li>Send deregistration command to the device via MQTT</li>
+            <li>Remove the device from the system database</li>
+            <li>Delete all associated data and history</li>
+          </ul>
+          <p style={{ marginTop: '8px', fontWeight: 'bold' }}>
+            This action cannot be undone.
+          </p>
+        </div>
+      ),
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
       onOk: async () => {
         try {
+          // Backend deleteDevice automatically sends 'deregister' command
+          // and handles device cleanup
           await deleteDevice(device.deviceId);
           message.success('Device deleted successfully');
           refetch();

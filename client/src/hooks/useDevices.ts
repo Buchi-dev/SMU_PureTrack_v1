@@ -18,7 +18,7 @@
  */
 
 import useSWR from 'swr';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   devicesService,
   type DeviceFilters,
@@ -28,7 +28,6 @@ import {
 } from '../services/devices.Service';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
 import { useVisibilityPolling } from './useVisibilityPolling';
-import { subscribeToTopic, unsubscribeFromTopic, MQTT_TOPICS } from '../utils/mqtt';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -38,7 +37,6 @@ export interface UseDevicesOptions {
   filters?: DeviceFilters;
   pollInterval?: number;
   enabled?: boolean;
-  realtime?: boolean; // Enable SSE real-time updates
 }
 
 export interface UseDevicesReturn {
@@ -93,9 +91,8 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = 300000, // 5 minutes - only used as fallback when SSE unavailable
+    pollInterval = 30000, // 30 seconds - faster updates for device registration/status changes
     enabled = true,
-    realtime = true, // Enable SSE by default
   } = options;
 
   // Add visibility detection to pause polling when tab is hidden
@@ -106,7 +103,7 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
     ? ['devices', 'list', JSON.stringify(filters)]
     : null;
 
-  // Fetch devices with SWR
+  // Fetch devices with SWR - NO CACHING for fresh data
   const {
     data: devicesData,
     error: devicesError,
@@ -118,102 +115,49 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       const response = await devicesService.getDevices(filters);
       
       // Debug logging to see what data is received
-      if (import.meta.env.DEV && response.data) {
-        console.log('[useDevices] Received devices:', response.data.length);
-        response.data.forEach((device: any, index: number) => {
-          if (index < 3) { // Only log first 3 devices
-            console.log(`[useDevices] Device ${index + 1}:`, {
-              deviceId: device.deviceId,
-              name: device.name,
-              status: device.status,
-              hasLatestReading: !!device.latestReading,
-              lastSeen: device.lastSeen,
-            });
-          }
+      if (import.meta.env.DEV) {
+        console.log('[useDevices] API Response:', response);
+        console.log('[useDevices] Received devices:', response.data?.length || 0);
+        console.log('[useDevices] Response structure:', {
+          success: response.success,
+          hasData: !!response.data,
+          dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+          pagination: response.pagination,
         });
+        
+        if (response.data && Array.isArray(response.data)) {
+          response.data.forEach((device: any, index: number) => {
+            if (index < 3) { // Only log first 3 devices
+              console.log(`[useDevices] Device ${index + 1}:`, {
+                deviceId: device.deviceId,
+                name: device.name,
+                status: device.status,
+                registrationStatus: device.registrationStatus,
+                isRegistered: device.isRegistered,
+                hasLatestReading: !!device.latestReading,
+                lastSeen: device.lastSeen,
+              });
+            }
+          });
+        } else {
+          console.warn('[useDevices] Data is not an array or is null:', response.data);
+        }
       }
       
       return response.data;
     },
     {
-      refreshInterval: realtime ? 0 : adjustedPollInterval, // Disable HTTP polling when SSE is active
-      revalidateOnFocus: false, // Don't refetch on tab focus - rely on SSE
-      revalidateOnReconnect: true, // Only refetch when network reconnects
-      dedupingInterval: 60000, // Prevent duplicate requests for 60 seconds (increased from 30s)
-      keepPreviousData: true, // Keep showing old data while fetching
+      refreshInterval: adjustedPollInterval, // HTTP polling interval
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
+      keepPreviousData: false, // DISABLED: Don't show stale data
+      revalidateIfStale: true, // Always revalidate stale data
+      revalidateOnMount: true, // Always fetch on mount
     }
   );
 
-  // MQTT subscription for real-time updates
-  // Uses ref to prevent multiple subscriptions from the same component
-  useEffect(() => {
-    if (!enabled || !realtime) return;
-
-    // Handle device data messages (real-time sensor readings)
-    const handleDeviceData = (_topic: string, data: any) => {
-      if (import.meta.env.DEV) {
-        console.log('[useDevices] Device data via MQTT:', data);
-      }
-      // Update local state with new reading
-      mutate((currentDevices) => {
-        if (!currentDevices) return currentDevices;
-        
-        // Update the device with latest reading
-        return currentDevices.map((device: any) => {
-          if (device.deviceId === data.deviceId) {
-            return {
-              ...device,
-              latestReading: data,
-              lastSeen: new Date().toISOString(),
-            };
-          }
-          return device;
-        });
-      });
-    };
-
-    // Handle device status messages
-    const handleDeviceStatus = (_topic: string, data: any) => {
-      if (import.meta.env.DEV) {
-        console.log('[useDevices] Device status via MQTT:', data);
-      }
-      // Update device status
-      mutate((currentDevices) => {
-        if (!currentDevices) return currentDevices;
-        
-        return currentDevices.map((device: any) => {
-          if (device.deviceId === data.deviceId) {
-            return {
-              ...device,
-              status: data.status,
-              lastSeen: new Date().toISOString(),
-            };
-          }
-          return device;
-        });
-      });
-    };
-
-    // Subscribe to device topics for real-time data
-    subscribeToTopic(MQTT_TOPICS.DEVICE_DATA, handleDeviceData);
-    subscribeToTopic(MQTT_TOPICS.DEVICE_STATUS, handleDeviceStatus);
-
-    if (import.meta.env.DEV) {
-      console.log('[useDevices] Subscribed to real-time devices via MQTT');
-    }
-
-    return () => {
-      // Remove topic listeners on cleanup
-      unsubscribeFromTopic(MQTT_TOPICS.DEVICE_DATA, handleDeviceData);
-      unsubscribeFromTopic(MQTT_TOPICS.DEVICE_STATUS, handleDeviceStatus);
-
-      if (import.meta.env.DEV) {
-        console.log('[useDevices] Cleaned up MQTT topic listeners');
-      }
-    };
-  }, [enabled, realtime, mutate]);
-
-  // Fetch device stats
+  // Fetch device stats - NO CACHING for fresh data
   const {
     data: statsData,
     error: statsError,
@@ -225,10 +169,12 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: 600000, // Poll stats every 10 minutes (less critical data)
+      refreshInterval: adjustedPollInterval, // Use same interval as device list
       revalidateOnFocus: false,
-      dedupingInterval: 60000, // Prevent duplicate requests for 1 minute
-      keepPreviousData: true, // Keep showing old data while fetching
+      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
+      keepPreviousData: false, // DISABLED: Don't show stale data
+      revalidateIfStale: true, // Always revalidate stale data
+      revalidateOnMount: true, // Always fetch on mount
     }
   );
 
@@ -285,7 +231,10 @@ export function useDeviceReadings(
     {
       refreshInterval: 30000, // Readings can be polled less frequently
       revalidateOnFocus: false,
-      dedupingInterval: 5000,
+      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
+      keepPreviousData: false, // DISABLED: Don't show stale data
+      revalidateIfStale: true, // Always revalidate stale data
+      revalidateOnMount: true, // Always fetch on mount
     }
   );
 
@@ -368,11 +317,14 @@ export function useDeviceMutations(): UseDeviceMutationsReturn {
         // Also set the location string for backward compatibility
         const location = `${building} - ${floor}${notes ? ` (${notes})` : ''}`;
         
-        // Call the new approve endpoint to register the device
+        // Call approve endpoint - backend will update device and send 'go' command
         await devicesService.approveDeviceRegistration(deviceId, {
           location,
           metadata,
         });
+        
+        // Backend automatically sends 'go' command via MQTT
+        // No need for frontend to send command separately
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to register device');
         setError(error);
