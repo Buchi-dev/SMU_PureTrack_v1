@@ -178,11 +178,11 @@
 // ───────────────────────────────────────────────────────────────────────────
 // MQTT Broker Configuration (HiveMQ Cloud - SSL/TLS Port 8883)
 // ───────────────────────────────────────────────────────────────────────────
-#define MQTT_BROKER "0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud"
+#define MQTT_BROKER "f4f8d29564364fbdbe9b052230c33d40.s1.eu.hivemq.cloud"
 #define MQTT_PORT 8883
 #define MQTT_CLIENT_ID "arduino_uno_r4_002"
-#define MQTT_USERNAME "Admin"
-#define MQTT_PASSWORD "Admin123"
+#define MQTT_USERNAME "Device_Production"
+#define MQTT_PASSWORD "Device123"
 
 // ───────────────────────────────────────────────────────────────────────────
 // Device Identity
