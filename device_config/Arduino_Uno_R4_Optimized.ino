@@ -137,6 +137,8 @@ unsigned long transmissionCount = 0;
 unsigned long bootCount = 0;
 int lastTransmissionMinute = -1;
 int transmissionJitterOffset = 0;
+unsigned long mqttMessagesReceived = 0;
+unsigned long mqttCommandsReceived = 0;
 
 unsigned long sensorReadInterval = CALIBRATION_MODE ? CALIBRATION_INTERVAL : SENSOR_READ_INTERVAL;
 
@@ -1101,20 +1103,31 @@ void connectMQTT() {
     mqttConnected = true;
     consecutiveMqttFailures = 0;
 
+    // Show topics for debugging
+    Serial.println(F("\n--- Subscription Setup ---"));
+    Serial.print(F("Commands topic: "));
+    Serial.println(topicCommands);
 
-    if (mqttClient.subscribe(topicCommands, 0)) {
-      Serial.print(F("✓ Subscribed: "));
-      Serial.println(topicCommands);
+    if (mqttClient.subscribe(topicCommands, 1)) {
+      Serial.println(F("✓ Subscribed to commands (QoS 1)"));
+    } else {
+      Serial.println(F("✗ FAILED to subscribe to commands topic!"));
     }
 
     char presenceQueryTopic[30];
     strcpy_P(presenceQueryTopic, PRESENCE_QUERY_TOPIC);
+    Serial.print(F("Presence topic: "));
+    Serial.println(presenceQueryTopic);
     
     if (mqttClient.subscribe(presenceQueryTopic, 1)) {
-      Serial.print(F("✓ Subscribed: "));
-      Serial.println(presenceQueryTopic);
+      Serial.println(F("✓ Subscribed to presence (QoS 1)"));
       Serial.println(F("  Waiting for server presence polls..."));
+    } else {
+      Serial.println(F("✗ FAILED to subscribe to presence topic!"));
     }
+    
+    Serial.println(F("--- Subscription Complete ---\n"));
+    Serial.println(F("📡 READY to receive commands (GO, DEREGISTER, RESTART, SEND_NOW)"));
 
     publishPresenceOnline();
     
@@ -1157,42 +1170,80 @@ void printMqttError(int state) {
 
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
-  Serial.print(F("MQTT RX ["));
+  mqttMessagesReceived++;
+  
+  Serial.print(F("\n>>> MQTT RX #"));
+  Serial.print(mqttMessagesReceived);
+  Serial.print(F(" ["));
   Serial.print(topic);
-  Serial.print(F("]: "));
+  Serial.print(F("] ("));
+  Serial.print(length);
+  Serial.print(F(" bytes): "));
   
   char message[length + 1];
   memcpy(message, payload, length);
   message[length] = '\0';
   Serial.println(message);
 
+  // Handle presence query topic
   char presenceQueryTopic[30];
   strcpy_P(presenceQueryTopic, PRESENCE_QUERY_TOPIC);
   
+  Serial.print(F("  Comparing topic: '"));
+  Serial.print(topic);
+  Serial.print(F("' vs presence: '"));
+  Serial.print(presenceQueryTopic);
+  Serial.print(F("' vs commands: '"));
+  Serial.print(topicCommands);
+  Serial.println(F("'"));
+  
   if (strcmp(topic, presenceQueryTopic) == 0) {
+    Serial.println(F("→ Routing to presence query handler"));
     handlePresenceQuery(message);
     return;
   }
+  
+  if (strcmp(topic, topicCommands) == 0) {
+    Serial.println(F("→ Confirmed: This is a COMMAND topic message"));
+  } else {
+    Serial.println(F("⚠ Warning: Topic doesn't match expected patterns"));
+  }
 
-  StaticJsonDocument<200> doc;
+  // Handle command topic - increased buffer for larger payloads
+  Serial.println(F("→ Parsing as command JSON"));
+  StaticJsonDocument<384> doc;  // Increased from 200 to 384 bytes
   DeserializationError error = deserializeJson(doc, message);
 
-
   if (error) {
-    Serial.println(F("JSON parse error"));
+    Serial.print(F("✗ JSON parse error: "));
+    Serial.println(error.c_str());
+    Serial.print(F("  Message length: "));
+    Serial.println(length);
     return;
   }
 
-
   const char* command = doc["command"];
   
-  if (command == nullptr) return;
+  if (command == nullptr) {
+    Serial.println(F("✗ No 'command' field in JSON"));
+    return;
+  }
+  
+  mqttCommandsReceived++;
+  Serial.print(F("→ Command #"));
+  Serial.print(mqttCommandsReceived);
+  Serial.print(F(" received: '"));
+  Serial.print(command);
+  Serial.println(F("'"));
 
-
-  if (strcmp(command, "go") == 0) {
-    Serial.println(F("CMD: GO - Device approved!"));
+  if (strcmp(command, "go") == 0 || strcmp(command, "GO") == 0) {
+    Serial.println(F("\n╔════════════════════════════════════╗"));
+    Serial.println(F("║  CMD: GO - DEVICE APPROVED!        ║"));
+    Serial.println(F("╚════════════════════════════════════╝"));
     saveApprovedStatus(true);
     lastTransmissionMinute = -1;
+    Serial.print(F("✓ Approval saved to EEPROM. isApproved = "));
+    Serial.println(isApproved ? "TRUE" : "FALSE");
     
   } else if (strcmp(command, "deregister") == 0) {
     Serial.println(F("CMD: DEREGISTER - Approval revoked"));
@@ -1249,35 +1300,20 @@ void publishSensorData() {
     return;
   }
 
-  if (!timeInitialized) {
-    Serial.println(F("⚠ Cannot publish: Time not initialized - waiting for NTP sync"));
-    setModuleStatus(&moduleReadiness.ntp, MODULE_FAILED, "NTP");
-    return;
-  }
-
-  unsigned long epochTime = timeClient.getEpochTime();
-  if (epochTime < 1577836800) {
-    Serial.print(F("⚠ Cannot publish: Invalid epoch time: "));
-    Serial.println(epochTime);
-    Serial.println(F("⚠ Time appears unsynced - blocking transmission"));
-    timeInitialized = false;
-    return;
-  }
-
+  
   StaticJsonDocument<256> doc;
   doc["deviceId"] = DEVICE_ID;
-  doc["timestamp"] = epochTime;
-  
-  char phDateStr[11];
-  getPhilippineDateString(phDateStr, sizeof(phDateStr));
-  doc["phDate"] = phDateStr;
-  
   doc["tds"] = round(tds * 10) / 10.0;
   doc["pH"] = round(ph * 100) / 100.0;
   doc["turbidity"] = round(turbidity * 10) / 10.0;
   doc["messageType"] = "sensor_data";
   doc["interval"] = "30min_clock_sync";
   doc["transmissionNumber"] = transmissionCount;
+  
+  // Optional metadata (not used for timestamping)
+  if (timeInitialized) {
+    doc["deviceUptime"] = (millis() - bootTime) / 1000; // seconds since boot
+  }
 
 
   char payload[256];
@@ -1748,6 +1784,11 @@ void printWatchdog() {
   Serial.println(getWiFiStatus() == WL_CONNECTED ? F("OK") : F("DOWN"));
   Serial.print(F("MQTT SSL: "));
   Serial.println(mqttConnected ? F("OK") : F("DOWN"));
+  
+  Serial.print(F("MQTT Messages RX: "));
+  Serial.println(mqttMessagesReceived);
+  Serial.print(F("MQTT Commands RX: "));
+  Serial.println(mqttCommandsReceived);
   Serial.print(F("TX Count: "));
   Serial.println(transmissionCount);
   Serial.println(F("================\n"));

@@ -3,7 +3,7 @@ node_modules/
 
 # Environment variables
 .env
-# firebase-service-account.json
+.env.production
 
 # Logs
 logs/
@@ -36,4 +36,3 @@ temp/
 tmp/
 logs/
 
-.env.production

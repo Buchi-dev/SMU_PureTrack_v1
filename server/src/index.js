@@ -40,6 +40,7 @@ const alertRoutes = require('./alerts/alert.Routes');
 const deviceRoutes = require('./devices/device.Routes');
 const reportRoutes = require('./reports/report.Routes');
 const analyticsRoutes = require('./analytics/analytics.Routes');
+const sseRoutes = require('./sse/sse.Routes');
 
 // Initialize Express app
 const app = express();
@@ -75,6 +76,8 @@ const allowedOrigins = [
   'https://smupuretrack.firebaseapp.com',
   'http://localhost:5173',
   'http://192.168.88.249:5173',
+  'http://192.168.56.1:5173', // VirtualBox Host-Only network
+  'https://192.168.56.1:5173', // HTTPS variant
   process.env.CLIENT_URL || 'http://localhost:5173'
 ].filter(Boolean);
 
@@ -101,6 +104,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Favicon handler - prevent 404 errors in logs
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end(); // No content
+});
+
+// Socket.IO handler - inform clients that this endpoint is not supported
+// This server uses Server-Sent Events (SSE) for real-time updates, not Socket.IO
+app.use('/socket.io', (req, res) => {
+  res.status(410).json({
+    error: 'Socket.IO Not Supported',
+    message: 'This API uses Server-Sent Events (SSE) for real-time updates, not Socket.IO',
+    documentation: '/api-docs',
+    realtime: 'Use SSE endpoints for real-time data streams'
+  });
 });
 
 // Trust proxy (for proper IP detection behind reverse proxy)
@@ -167,6 +181,9 @@ async function initializeApp() {
   app.use(`${API_VERSION.PREFIX}/devices`, deviceRoutes);
   app.use(`${API_VERSION.PREFIX}/reports`, reportRoutes);
   app.use(`${API_VERSION.PREFIX}/analytics`, analyticsRoutes);
+  
+  // SSE routes for real-time updates
+  app.use(`${API_VERSION.PREFIX}/sse`, sseRoutes);
 
   // ============================================
   // ERROR HANDLING

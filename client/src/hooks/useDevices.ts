@@ -18,7 +18,7 @@
  */
 
 import useSWR from 'swr';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   devicesService,
   type DeviceFilters,
@@ -28,6 +28,7 @@ import {
 } from '../services/devices.Service';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
 import { useVisibilityPolling } from './useVisibilityPolling';
+import { useSSE } from './useSSE';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -37,7 +38,7 @@ export interface UseDevicesOptions {
   filters?: DeviceFilters;
   pollInterval?: number;
   enabled?: boolean;
-  realtime?: boolean; // Enable SSE real-time updates
+  realtime?: boolean; // Enable SSE real-time updates (default: true)
 }
 
 export interface UseDevicesReturn {
@@ -92,10 +93,13 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = 300000, // 5 minutes - only used as fallback when SSE unavailable
+    pollInterval = 120000, // 2 minutes - fallback when SSE disconnected
     enabled = true,
     realtime = true, // Enable SSE by default
   } = options;
+
+  // Connect to SSE for real-time updates
+  const { state: sseState, subscribe } = useSSE({ enabled: enabled && realtime });
 
   // Add visibility detection to pause polling when tab is hidden
   const adjustedPollInterval = useVisibilityPolling(pollInterval);
@@ -135,13 +139,44 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: realtime ? 0 : adjustedPollInterval, // Disable HTTP polling when SSE is active
-      revalidateOnFocus: false, // Don't refetch on tab focus - rely on SSE
-      revalidateOnReconnect: true, // Only refetch when network reconnects
-      dedupingInterval: 60000, // Prevent duplicate requests for 60 seconds (increased from 30s)
+      // Use HTTP polling as fallback when SSE is disconnected or disabled
+      refreshInterval: (realtime && sseState === 'connected') ? 0 : adjustedPollInterval,
+      revalidateOnFocus: !realtime, // Only refetch on focus if SSE disabled
+      revalidateOnReconnect: true, // Always refetch on network reconnect
+      dedupingInterval: 60000, // Prevent duplicate requests for 60 seconds
       keepPreviousData: true, // Keep showing old data while fetching
     }
   );
+
+  // Subscribe to SSE events for real-time updates
+  useEffect(() => {
+    if (!realtime || sseState !== 'connected') {
+      return;
+    }
+
+    // Subscribe to device events
+    const unsubscribeNew = subscribe('device:new', () => {
+      console.log('[useDevices] Device added - refetching...');
+      mutate(); // Refetch devices list
+    });
+
+    const unsubscribeUpdated = subscribe('device:updated', (event) => {
+      console.log('[useDevices] Device updated:', event.data.deviceId);
+      mutate(); // Refetch devices list
+    });
+
+    // Subscribe to sensor reading events (affects latestReading)
+    const unsubscribeReading = subscribe('reading:new', (event) => {
+      console.log('[useDevices] New reading for:', event.data.reading.deviceId);
+      mutate(); // Refetch to get latest reading
+    });
+
+    return () => {
+      unsubscribeNew();
+      unsubscribeUpdated();
+      unsubscribeReading();
+    };
+  }, [realtime, sseState, subscribe, mutate]);
 
   // Fetch device stats
   const {

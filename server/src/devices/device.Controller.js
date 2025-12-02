@@ -407,32 +407,27 @@ const processSensorData = asyncHandler(async (req, res) => {
   
   await device.save();
 
-  // Save sensor reading with trimmed deviceId
-  // Validate timestamp from device
-  let validTimestamp = new Date(); // Default to server time
+  // Invalidate cache when device is updated
+  await CacheService.del(`device:${trimmedDeviceId}`);
+  await CacheService.delPattern('devices:all:*');
+
+  // SERVER-SIDE TIMESTAMPING (Critical for Data Integrity)
+  // ALWAYS use server-generated timestamp for sensor readings
+  // Benefits:
+  // 1. Eliminates NTP synchronization issues on IoT devices
+  // 2. Ensures consistent timezone handling (UTC)
+  // 3. Prevents timestamp drift/clock skew problems
+  // 4. Guarantees accurate sequential ordering of readings
+  // 5. Single source of truth for all timestamps
+  const serverTimestamp = new Date();
   
+  // Log if device sent a timestamp (for debugging/monitoring)
   if (timestamp) {
-    // Handle Unix timestamp (seconds) or ISO string
-    const parsedDate = typeof timestamp === 'number' 
-      ? new Date(timestamp * 1000) // Unix timestamp in seconds
-      : new Date(timestamp);
-    
-    // Validate: timestamp should be after 2020 and not in future
-    const year2020 = new Date('2020-01-01').getTime();
-    const futureLimit = Date.now() + (24 * 60 * 60 * 1000); // Allow 1 day ahead for timezone differences
-    
-    if (!isNaN(parsedDate.getTime()) && 
-        parsedDate.getTime() > year2020 && 
-        parsedDate.getTime() < futureLimit) {
-      validTimestamp = parsedDate;
-    } else {
-      logger.warn('[Device Controller] Invalid device timestamp, using server time', {
-        deviceId: trimmedDeviceId,
-        receivedTimestamp: timestamp,
-        parsedDate: parsedDate.toISOString(),
-        usingServerTime: validTimestamp.toISOString()
-      });
-    }
+    logger.debug('[Device Controller] Device timestamp ignored - using server time', {
+      deviceId: trimmedDeviceId,
+      deviceTimestamp: timestamp,
+      serverTimestamp: serverTimestamp.toISOString()
+    });
   }
   
   const reading = new SensorReading({
@@ -440,7 +435,7 @@ const processSensorData = asyncHandler(async (req, res) => {
     pH,
     turbidity,
     tds,
-    timestamp: validTimestamp,
+    timestamp: serverTimestamp, // Server timestamp is authoritative
   });
 
   await reading.save();
@@ -645,6 +640,9 @@ const deviceRegister = asyncHandler(async (req, res) => {
     
     await device.save();
     
+    // Invalidate cache for new device registration
+    await CacheService.delPattern('devices:all:*');
+    
     logger.info('[Device Controller] Device registration pending', { 
       deviceId: trimmedDeviceId,
       id: device._id 
@@ -661,7 +659,8 @@ const deviceRegister = asyncHandler(async (req, res) => {
     }, 'Device registration request received');
   } else {
     // Device exists - update last seen and metadata
-    // DO NOT set status to online here - only sensor data or presence responses should do that
+    // Set status to online when device sends registration (proves it's actively communicating)
+    device.status = 'online';
     device.lastSeen = new Date();
     
     // Update metadata if provided
@@ -670,6 +669,10 @@ const deviceRegister = asyncHandler(async (req, res) => {
     if (name && !device.name) device.name = name;
     
     await device.save();
+
+    // Invalidate cache when device metadata updated
+    await CacheService.del(`device:${trimmedDeviceId}`);
+    await CacheService.delPattern('devices:all:*');
 
     // NOTE: Do NOT call setupDeviceLWT here - it publishes a retained "online" message
     // which would persist on the broker even if device goes offline.
@@ -741,6 +744,10 @@ const approveDeviceRegistration = asyncHandler(async (req, res) => {
   }
 
   await device.save();
+
+  // Invalidate cache after device approval
+  await CacheService.del(`device:${device.deviceId}`);
+  await CacheService.delPattern('devices:all:*');
 
   logger.info('[Device Controller] Device registration approved', {
     deviceId: device.deviceId,

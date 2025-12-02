@@ -16,8 +16,9 @@
  * @module hooks/useAlerts
  */
 
-import useSWR, { mutate } from 'swr';
-import { useState, useCallback } from 'react';
+import useSWR, { mutate as globalMutate } from 'swr';
+import { useState, useCallback, useEffect } from 'react';
+import { useSSE } from './useSSE';
 import { alertsService, type AlertFilters, type AlertStats } from '../services/alerts.Service';
 import type { WaterQualityAlert } from '../schemas';
 
@@ -64,6 +65,9 @@ export function useAlerts(options: UseAlertsOptions = {}): UseAlertsReturn {
     filters = {},
     enabled = true,
   } = options;
+
+  // Connect to SSE for real-time alert notifications
+  const { state: sseState, subscribe } = useSSE({ enabled });
 
   // Generate cache key from filters
   const cacheKey = enabled
@@ -112,6 +116,38 @@ export function useAlerts(options: UseAlertsOptions = {}): UseAlertsReturn {
     await mutate();
   }, [mutate]);
 
+  // Subscribe to SSE events for real-time alert updates
+  useEffect(() => {
+    if (sseState !== 'connected') {
+      return;
+    }
+
+    // Subscribe to new alert events
+    const unsubscribeNew = subscribe('alert:new', (event) => {
+      console.log('[useAlerts] New alert received:', event.data?.alert || event.data);
+      mutate(); // Refetch alerts list
+      
+      // Also refresh stats since a new alert affects counts
+      globalMutate(['alerts', 'stats']);
+    });
+
+    // Subscribe to alert update events
+    const unsubscribeUpdated = subscribe('alert:updated', (event) => {
+      console.log('[useAlerts] Alert updated:', event.data?.alertId || event.data);
+      mutate(); // Refetch alerts list
+      
+      // Refresh stats if status changed
+      if (event.data?.updates?.status) {
+        globalMutate(['alerts', 'stats']);
+      }
+    });
+
+    return () => {
+      unsubscribeNew();
+      unsubscribeUpdated();
+    };
+  }, [sseState, subscribe, mutate]);
+
   return {
     alerts: alertsData || [],
     stats: statsData || null,
@@ -149,7 +185,7 @@ export function useAlertMutations(): UseAlertMutationsReturn {
       console.log('[useAlertMutations] Acknowledge response:', response);
       
       // Update all alert list caches with server response and revalidate
-      await mutate(
+      await globalMutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'list',
         async (currentData: WaterQualityAlert[] | undefined) => {
           console.log('[useAlertMutations] Current cache data:', currentData);
@@ -171,7 +207,7 @@ export function useAlertMutations(): UseAlertMutationsReturn {
       );
 
       // Update stats cache - trigger refetch
-      await mutate(
+      await globalMutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'stats',
         undefined,
         { revalidate: true } // Revalidate stats from server
@@ -197,7 +233,7 @@ export function useAlertMutations(): UseAlertMutationsReturn {
       console.log('[useAlertMutations] Resolve response:', response);
       
       // Update all alert list caches with server response and revalidate
-      await mutate(
+      await globalMutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'list',
         async (currentData: WaterQualityAlert[] | undefined) => {
           console.log('[useAlertMutations] Current cache data:', currentData);
@@ -219,7 +255,7 @@ export function useAlertMutations(): UseAlertMutationsReturn {
       );
 
       // Update stats cache - trigger refetch
-      await mutate(
+      await globalMutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'stats',
         undefined,
         { revalidate: true } // Revalidate stats from server

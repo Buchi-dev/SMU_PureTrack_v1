@@ -61,14 +61,24 @@ router.post('/verify-token', async (req, res) => {
     }
 
     // Get Firebase user data only AFTER domain validation
-    const firebaseUser = await getFirebaseUser(decodedToken.uid);
+    // Use try-catch to gracefully handle Firebase Admin SDK errors
+    let firebaseUser = null;
+    try {
+      firebaseUser = await getFirebaseUser(decodedToken.uid);
+    } catch (firebaseError) {
+      logger.warn('[Auth] Failed to fetch Firebase user data, using token claims instead', {
+        uid: decodedToken.uid,
+        error: firebaseError.message,
+      });
+      // Continue with token data only - don't fail the entire auth flow
+    }
 
     // Check if user exists in database
     let user = await User.findOne({ firebaseUid: decodedToken.uid });
 
     if (!user) {
-      // Parse name components
-      const fullName = decodedToken.name || firebaseUser.displayName || 'User';
+      // Parse name components - prefer token data, fallback to Firebase user data
+      const fullName = decodedToken.name || (firebaseUser?.displayName) || 'User';
       const nameParts = fullName.trim().split(/\s+/); // Split by whitespace
       
       let firstName = '';
@@ -95,12 +105,12 @@ router.post('/verify-token', async (req, res) => {
       // Create new user
       user = new User({
         firebaseUid: decodedToken.uid,
-        email: decodedToken.email || firebaseUser.email,
+        email: decodedToken.email || (firebaseUser?.email) || '',
         displayName: fullName,
         firstName,
         middleName,
         lastName,
-        profilePicture: decodedToken.picture || firebaseUser.photoURL || '',
+        profilePicture: decodedToken.picture || (firebaseUser?.photoURL) || '',
         provider: 'firebase',
         role: 'staff', // Default role
         status: 'pending',
