@@ -13,7 +13,6 @@ const compression = require('compression');
 
 // Import configurations
 const { connectDB, closeDB } = require('./configs/mongo.Config');
-const { configureFirebase } = require('./configs/firebase.Config');
 const { setupSwagger } = require('./configs/swagger.config');
 
 // Import utilities
@@ -44,9 +43,6 @@ const app = express();
 
 // Connect to MongoDB
 connectDB();
-
-// Configure Firebase Admin SDK
-configureFirebase();
 
 // ============================================
 // SECURITY & PERFORMANCE MIDDLEWARE

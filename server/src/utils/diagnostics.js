@@ -1,22 +1,24 @@
 /**
  * Diagnostic utilities for troubleshooting authentication issues
+ * SIMPLIFIED: Client-side auth only, no Firebase verification
  */
 
 const User = require('../users/user.Model');
-const { verifyIdToken } = require('../configs/firebase.Config');
 const logger = require('./logger');
 
 /**
- * Diagnose authentication issues
- * This helps identify why a token might be rejected
+ * Diagnose authentication issues (simplified for client-side auth)
+ * This helps identify basic auth setup issues
  */
 const diagnoseAuth = async (req, res) => {
   const diagnostics = {
     timestamp: new Date().toISOString(),
+    mode: 'CLIENT_SIDE_AUTH_ONLY',
     headers: {},
     firebaseToken: null,
     user: null,
     errors: [],
+    notice: 'Backend does NOT verify Firebase tokens - client handles all auth',
   };
 
   try {
@@ -34,22 +36,29 @@ const diagnoseAuth = async (req, res) => {
     const idToken = authHeader.split('Bearer ')[1];
     diagnostics.headers.tokenLength = idToken ? idToken.length : 0;
 
-    // 2. Verify Firebase Token
+    // 2. Decode Token (NO VERIFICATION)
     try {
-      const decodedToken = await verifyIdToken(idToken);
+      const base64Url = idToken.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        Buffer.from(base64, 'base64')
+          .toString('utf-8')
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      
+      const decodedToken = JSON.parse(jsonPayload);
       diagnostics.firebaseToken = {
-        uid: decodedToken.uid,
+        uid: decodedToken.uid || decodedToken.user_id,
         email: decodedToken.email,
-        emailVerified: decodedToken.email_verified,
-        exp: new Date(decodedToken.exp * 1000).toISOString(),
-        iat: new Date(decodedToken.iat * 1000).toISOString(),
-        isExpired: decodedToken.exp * 1000 < Date.now(),
+        name: decodedToken.name,
+        decoded: 'Token decoded without verification (client-side auth)',
       };
-    } catch (tokenError) {
+    } catch (decodeError) {
       diagnostics.errors.push({
-        step: 'Firebase token verification',
-        error: tokenError.message,
-        code: tokenError.code,
+        step: 'Token decode',
+        error: decodeError.message,
       });
       return res.json({ success: false, diagnostics });
     }

@@ -90,33 +90,7 @@ router.get('/', async (req, res) => {
     health.checks.memory.message = 'High memory usage detected';
   }
 
-  // 6. Firebase Auth Configuration Check
-  const { admin } = require('../configs/firebase.Config');
-  let firebaseConfigured = false;
-  let firebaseMessage = 'Firebase Admin SDK not initialized';
-  
-  try {
-    // Check if Firebase Admin SDK is initialized
-    const app = admin.app();
-    firebaseConfigured = !!app;
-    firebaseMessage = firebaseConfigured 
-      ? 'Firebase Authentication is configured' 
-      : 'Firebase Admin SDK not initialized';
-  } catch (error) {
-    firebaseConfigured = false;
-    firebaseMessage = `Firebase Auth error: ${error.message}`;
-  }
-
-  health.checks.firebaseAuth = {
-    status: firebaseConfigured ? 'OK' : 'NOT_CONFIGURED',
-    message: firebaseMessage,
-  };
-
-  if (!firebaseConfigured) {
-    isHealthy = false;
-  }
-
-  // 7. API Key Configuration Check
+  // 6. API Key Configuration Check
   health.checks.apiKey = {
     status: process.env.DEVICE_API_KEY ? 'OK' : 'NOT_CONFIGURED',
     message: process.env.DEVICE_API_KEY
