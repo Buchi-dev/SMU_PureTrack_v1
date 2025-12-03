@@ -7,6 +7,7 @@
  */
 
 import admin from 'firebase-admin';
+import path from 'path';
 import { logInfo, logError } from '@utils';
 
 let firebaseInitialized = false;
@@ -27,7 +28,12 @@ export const initializeFirebase = (): void => {
   try {
     // Option 1: Using service account JSON file (recommended for production)
     if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-      const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      // Resolve path relative to project root
+      const serviceAccountPath = path.isAbsolute(process.env.FIREBASE_SERVICE_ACCOUNT_PATH)
+        ? process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+        : path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      
+      const serviceAccount = require(serviceAccountPath);
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
