@@ -209,7 +209,7 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
             </Space>
             <Alert
               message="Command Execution"
-              description="Commands are sent through the backend API to ensure proper authorization and logging. The device must be online to receive commands."
+              description="Commands are handled by backend API and forwarded to devices. Device must be online to receive commands."
               type="info"
               showIcon
               style={{ marginTop: 8 }}

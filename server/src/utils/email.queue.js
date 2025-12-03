@@ -1,432 +1,121 @@
-const Queue = require('bull');
 const logger = require('./logger');
 const { sendAlertEmail } = require('./email.service');
-const { EMAIL } = require('./constants');
 
 /**
- * Email Queue Service
- * Handles asynchronous email sending using Bull queues
- * Provides retry logic and batch processing
+ * Email Service
+ * Handles synchronous email sending with simple retry logic
  */
 
-let emailQueue = null;
+// No initialization needed for synchronous email sending
 
 /**
- * Initialize email queue
- * @param {string} redisUrl - Redis connection URL
- */
-const initializeEmailQueue = (redisUrl) => {
-  if (!redisUrl) {
-    logger.warn('Redis URL not provided. Email queue disabled. Emails will be sent synchronously.');
-    return null;
-  }
-
-  try {
-    emailQueue = new Queue('email-notifications', redisUrl, {
-      defaultJobOptions: {
-        attempts: EMAIL.RETRY_ATTEMPTS,
-        backoff: {
-          type: 'exponential',
-          delay: EMAIL.RETRY_DELAY,
-        },
-        removeOnComplete: true,
-        removeOnFail: false,
-      },
-    });
-
-    // Event handlers
-    emailQueue.on('error', (error) => {
-      logger.error('Email queue error:', { error: error.message });
-    });
-
-    emailQueue.on('failed', (job, error) => {
-      logger.error('Email job failed:', {
-        jobId: job.id,
-        jobType: job.data.type,
-        recipient: job.data.recipient,
-        error: error.message,
-        attempts: job.attemptsMade,
-      });
-    });
-
-    emailQueue.on('completed', (job) => {
-      logger.info('Email job completed:', {
-        jobId: job.id,
-        jobType: job.data.type,
-        recipient: job.data.recipient,
-        duration: Date.now() - job.timestamp,
-      });
-    });
-
-    // Process jobs
-    emailQueue.process(EMAIL.BATCH_SIZE, async (job) => {
-      return await processEmailJob(job);
-    });
-
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      logger.info('[OK] Email queue ready');
-    } else {
-      logger.info('[OK] Email queue initialized');
-    }
-    return emailQueue;
-  } catch (error) {
-    logger.error('Failed to initialize email queue:', { error: error.message });
-    return null;
-  }
-};
-
-/**
- * Process email job with improved error handling
- * @param {Object} job - Bull job object
- */
-const processEmailJob = async (job) => {
-  const { type, recipient, data } = job.data;
-
-  logger.info('Processing email job:', {
-    jobId: job.id,
-    type,
-    recipient: recipient.email,
-    attempts: job.attemptsMade + 1, // Current attempt (0-indexed, so +1)
-    maxAttempts: EMAIL.RETRY_ATTEMPTS,
-    jobData: {
-      alertId: data?.alert?.alertId,
-      severity: data?.alert?.severity,
-      parameter: data?.alert?.parameter,
-    },
-  });
-
-  try {
-    let success = false;
-
-    switch (type) {
-      case 'alert':
-        logger.info('Sending alert email:', {
-          jobId: job.id,
-          recipient: recipient.email,
-          alertId: data.alert.alertId,
-          severity: data.alert.severity,
-        });
-        success = await sendAlertEmail(recipient, data.alert);
-        break;
-
-      default:
-        throw new Error(`Unknown email type: ${type}`);
-    }
-
-    if (!success) {
-      const attemptNumber = job.attemptsMade + 1;
-      
-      // Different logging based on retry status
-      if (attemptNumber < EMAIL.RETRY_ATTEMPTS) {
-        logger.warn('Email sending failed, will retry:', {
-          jobId: job.id,
-          type,
-          recipient: recipient.email,
-          attemptNumber,
-          maxAttempts: EMAIL.RETRY_ATTEMPTS,
-          nextRetryIn: `${EMAIL.RETRY_DELAY / 1000}s`,
-        });
-      } else {
-        logger.error('Email sending failed after all retries:', {
-          jobId: job.id,
-          type,
-          recipient: recipient.email,
-          totalAttempts: EMAIL.RETRY_ATTEMPTS,
-        });
-      }
-      
-      throw new Error('Email sending failed');
-    }
-
-    logger.info('Email job completed successfully:', {
-      jobId: job.id,
-      type,
-      recipient: recipient.email,
-    });
-
-    return { success: true, recipient: recipient.email };
-  } catch (error) {
-    const attemptNumber = job.attemptsMade + 1;
-    const isLastAttempt = attemptNumber >= EMAIL.RETRY_ATTEMPTS;
-    
-    logger.error('Email job processing error:', {
-      jobId: job.id,
-      type,
-      recipient: recipient.email,
-      error: error.message,
-      // Only log stack trace on final failure to reduce log noise
-      ...(isLastAttempt && { stack: error.stack }),
-      attemptNumber,
-      maxAttempts: EMAIL.RETRY_ATTEMPTS,
-      willRetry: !isLastAttempt,
-    });
-    
-    throw error; // Re-throw to trigger retry
-  }
-};
-
-/**
- * Add alert email to queue
+ * Send alert email with retry logic
  * @param {Object} user - User object with email
  * @param {Object} alert - Alert object
- * @returns {Promise<Object>} Job object
+ * @param {number} maxRetries - Maximum number of retries
+ * @returns {Promise<boolean>}
+ */
+const sendAlertEmailWithRetry = async (user, alert, maxRetries = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.info('Sending alert email:', {
+        attempt,
+        maxRetries,
+        userEmail: user.email,
+        alertId: alert.alertId,
+        severity: alert.severity,
+        parameter: alert.parameter,
+      });
+
+      const success = await sendAlertEmail(user, alert);
+
+      if (success) {
+        logger.info('Alert email sent successfully:', {
+          userEmail: user.email,
+          alertId: alert.alertId,
+          attempt,
+        });
+        return true;
+      } else {
+        throw new Error('Email sending returned false');
+      }
+    } catch (error) {
+      logger.error('Failed to send alert email:', {
+        attempt,
+        maxRetries,
+        userEmail: user.email,
+        alertId: alert.alertId,
+        error: error.message,
+        willRetry: attempt < maxRetries,
+      });
+
+      if (attempt >= maxRetries) {
+        logger.error('Alert email failed after all retries:', {
+          userEmail: user.email,
+          alertId: alert.alertId,
+          totalAttempts: maxRetries,
+        });
+        return false;
+      }
+
+      // Wait before retry (exponential backoff)
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Queue alert email (now sends synchronously)
+ * @param {Object} user - User object with email
+ * @param {Object} alert - Alert object
+ * @returns {Promise<Object>}
  */
 const queueAlertEmail = async (user, alert) => {
-  logger.info('Queueing alert email:', {
+  logger.info('Sending alert email:', {
     userId: user._id,
     userEmail: user.email,
     alertId: alert.alertId,
     severity: alert.severity,
     parameter: alert.parameter,
-    queueAvailable: !!emailQueue,
   });
 
-  if (!emailQueue) {
-    // Fallback to synchronous sending if queue not available
-    logger.warn('Email queue not available, attempting synchronous send', {
-      userEmail: user.email,
-      alertId: alert.alertId,
-    });
-    try {
-      if (typeof sendAlertEmail === 'function') {
-        const success = await sendAlertEmail(user, alert);
-        logger.info('Synchronous email send result:', {
-          userEmail: user.email,
-          alertId: alert.alertId,
-          success,
-        });
-        return { synchronous: true, success };
-      } else {
-        logger.error('sendAlertEmail function not available');
-        return { synchronous: true, success: false };
-      }
-    } catch (syncError) {
-      logger.error('Synchronous email send failed:', {
-        userEmail: user.email,
-        alertId: alert.alertId,
-        error: syncError.message,
-      });
-      return { synchronous: true, success: false };
-    }
-  }
-
   try {
-    logger.info('Adding email job to queue:', {
-      userEmail: user.email,
-      alertId: alert.alertId,
-      severity: alert.severity,
-    });
-
-    const job = await emailQueue.add(
-      {
-        type: 'alert',
-        recipient: user,
-        data: {
-          alert,
-        },
-      },
-      {
-        priority: 1, // High priority for alerts
-      }
-    );
-
-    logger.info('Alert email successfully queued:', {
-      jobId: job.id,
+    const success = await sendAlertEmailWithRetry(user, alert);
+    return { 
+      synchronous: true, 
+      success,
       recipient: user.email,
-      alertId: alert.alertId,
-      severity: alert.severity,
-      queueName: 'email-notifications',
-    });
-
-    return job;
+      alertId: alert.alertId 
+    };
   } catch (error) {
-    logger.error('Failed to queue alert email:', {
+    logger.error('Failed to send alert email:', {
       recipient: user.email,
       alertId: alert.alertId,
       error: error.message,
-      stack: error.stack,
     });
-    throw error;
+    return { 
+      synchronous: true, 
+      success: false,
+      error: error.message 
+    };
   }
 };
 
 /**
- * Get queue statistics
+ * Get email service statistics (simplified for synchronous mode)
  * @returns {Promise<Object>}
  */
 const getQueueStats = async () => {
-  if (!emailQueue) {
-    return {
-      available: false,
-      message: 'Email queue not initialized',
-    };
-  }
-
-  try {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      emailQueue.getWaitingCount(),
-      emailQueue.getActiveCount(),
-      emailQueue.getCompletedCount(),
-      emailQueue.getFailedCount(),
-      emailQueue.getDelayedCount(),
-    ]);
-
-    return {
-      available: true,
-      waiting,
-      active,
-      completed,
-      failed,
-      delayed,
-      total: waiting + active + completed + failed + delayed,
-    };
-  } catch (error) {
-    logger.error('Failed to get queue stats:', { error: error.message });
-    return {
-      available: false,
-      error: error.message,
-    };
-  }
-};
-
-/**
- * Clean completed jobs
- * @param {number} grace - Grace period in milliseconds
- */
-const cleanCompletedJobs = async (grace = 3600000) => {
-  if (!emailQueue) {
-    return;
-  }
-
-  try {
-    await emailQueue.clean(grace, 'completed');
-    logger.info('Cleaned completed email jobs');
-  } catch (error) {
-    logger.error('Failed to clean completed jobs:', { error: error.message });
-  }
-};
-
-/**
- * Get failed jobs
- * @returns {Promise<Array>}
- */
-const getFailedJobs = async () => {
-  if (!emailQueue) {
-    return [];
-  }
-
-  try {
-    const failedJobs = await emailQueue.getFailed();
-    return failedJobs.map(job => ({
-      id: job.id,
-      data: job.data,
-      failedReason: job.failedReason,
-      attemptsMade: job.attemptsMade,
-      timestamp: job.timestamp,
-      processedOn: job.processedOn,
-      finishedOn: job.finishedOn,
-    }));
-  } catch (error) {
-    logger.error('Failed to get failed jobs:', { error: error.message });
-    return [];
-  }
-};
-
-/**
- * Retry failed jobs
- * @param {string} jobId - Optional job ID to retry specific job, otherwise retry all
- * @returns {Promise<Object>}
- */
-const retryFailedJobs = async (jobId = null) => {
-  if (!emailQueue) {
-    return { success: false, message: 'Email queue not available' };
-  }
-
-  try {
-    if (jobId) {
-      // Retry specific job
-      const job = await emailQueue.getJob(jobId);
-      if (job && job.isFailed()) {
-        await job.retry();
-        logger.info('Retried failed job:', { jobId });
-        return { success: true, jobId, message: 'Job retried successfully' };
-      } else {
-        return { success: false, jobId, message: 'Job not found or not failed' };
-      }
-    } else {
-      // Retry all failed jobs
-      const failedJobs = await emailQueue.getFailed();
-      let retried = 0;
-      
-      for (const job of failedJobs) {
-        await job.retry();
-        retried++;
-      }
-      
-      logger.info('Retried all failed jobs:', { count: retried });
-      return { success: true, retriedCount: retried, message: `${retried} jobs retried` };
-    }
-  } catch (error) {
-    logger.error('Failed to retry jobs:', { error: error.message });
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Remove failed jobs
- * @param {string} jobId - Optional job ID to remove specific job, otherwise remove all
- * @returns {Promise<Object>}
- */
-const removeFailedJobs = async (jobId = null) => {
-  if (!emailQueue) {
-    return { success: false, message: 'Email queue not available' };
-  }
-
-  try {
-    if (jobId) {
-      // Remove specific job
-      const job = await emailQueue.getJob(jobId);
-      if (job) {
-        await job.remove();
-        logger.info('Removed failed job:', { jobId });
-        return { success: true, jobId, message: 'Job removed successfully' };
-      } else {
-        return { success: false, jobId, message: 'Job not found' };
-      }
-    } else {
-      // Remove all failed jobs
-      await emailQueue.clean(0, 'failed');
-      logger.info('Removed all failed jobs');
-      return { success: true, message: 'All failed jobs removed' };
-    }
-  } catch (error) {
-    logger.error('Failed to remove jobs:', { error: error.message });
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Close email queue
- */
-const closeEmailQueue = async () => {
-  if (emailQueue) {
-    try {
-      await emailQueue.close();
-      logger.info('Email queue closed');
-    } catch (error) {
-      logger.error('Error closing email queue:', { error: error.message });
-    }
-  }
+  return {
+    mode: 'synchronous',
+    message: 'Emails are sent synchronously without queuing',
+  };
 };
 
 module.exports = {
-  initializeEmailQueue,
   queueAlertEmail,
   getQueueStats,
-  cleanCompletedJobs,
-  getFailedJobs,
-  retryFailedJobs,
-  removeFailedJobs,
-  closeEmailQueue,
 };

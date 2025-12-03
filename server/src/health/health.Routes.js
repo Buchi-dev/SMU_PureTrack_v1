@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const { pingRedis, isRedisAvailable } = require('../configs/redis.Config');
-const { getQueueStats, getFailedJobs, retryFailedJobs, removeFailedJobs } = require('../utils/email.queue');
+const { getQueueStats } = require('../utils/email.queue');
 const logger = require('../utils/logger');
 const { HTTP_STATUS } = require('../utils/constants');
 const { diagnoseAuth } = require('../utils/diagnostics');
@@ -46,70 +45,29 @@ router.get('/', async (req, res) => {
     logger.error('Health check - Database failed:', { error: error.message });
   }
 
-  // 2. Redis Health Check
-  if (isRedisAvailable()) {
-    const redisPing = await pingRedis();
-    health.checks.redis = {
-      status: redisPing ? 'OK' : 'FAILED',
-      message: redisPing ? 'Redis is connected' : 'Redis ping failed',
-    };
-    
-    if (!redisPing) {
-      isHealthy = false;
-    }
-  } else {
-    health.checks.redis = {
-      status: 'NOT_CONFIGURED',
-      message: 'Redis is not configured',
-    };
-  }
-
-  // 3. Email Queue Health Check
+  // 2. Email Service Health Check
   try {
     const queueStats = await getQueueStats();
     
-    if (queueStats.available) {
-      health.checks.emailQueue = {
-        status: 'OK',
-        message: 'Email queue is operational',
-        stats: {
-          waiting: queueStats.waiting,
-          active: queueStats.active,
-          failed: queueStats.failed,
-        },
-      };
-      
-      // Warn if too many failed jobs
-      if (queueStats.failed > 10) {
-        health.checks.emailQueue.status = 'WARNING';
-        health.checks.emailQueue.message = `${queueStats.failed} failed jobs in queue`;
-      }
-    } else {
-      health.checks.emailQueue = {
-        status: 'NOT_CONFIGURED',
-        message: queueStats.message || 'Email queue not initialized',
-      };
-    }
+    const smtpConfigured = !!(
+      process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASS
+    );
+    
+    health.checks.emailService = {
+      status: smtpConfigured ? 'OK' : 'NOT_CONFIGURED',
+      message: smtpConfigured
+        ? queueStats.message || 'Email service is operational'
+        : 'SMTP credentials not configured',
+      mode: queueStats.mode || 'synchronous',
+    };
   } catch (error) {
-    health.checks.emailQueue = {
+    health.checks.emailService = {
       status: 'ERROR',
       message: error.message,
     };
   }
-
-  // 4. Email Service Health Check
-  const smtpConfigured = !!(
-    process.env.SMTP_HOST &&
-    process.env.SMTP_USER &&
-    process.env.SMTP_PASS
-  );
-  
-  health.checks.emailService = {
-    status: smtpConfigured ? 'OK' : 'NOT_CONFIGURED',
-    message: smtpConfigured
-      ? 'SMTP is configured'
-      : 'SMTP credentials not configured',
-  };
 
   // 5. Memory Usage Check
   const memoryUsage = process.memoryUsage();

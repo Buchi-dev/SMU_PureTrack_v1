@@ -77,7 +77,7 @@ services:
       - "com.capstone.restart.timezone=Asia/Manila"
       
       # Service dependencies (for monitoring)
-      - "com.capstone.dependencies=mongodb,redis,mqtt,firebase"
+      - "com.capstone.dependencies=mongodb,mqtt,firebase"
       
       # Health monitoring
       - "com.capstone.health.endpoint=/health"

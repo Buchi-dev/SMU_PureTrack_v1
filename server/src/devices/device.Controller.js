@@ -2,8 +2,7 @@ const { Device, SensorReading } = require('./device.Model');
 const Alert = require('../alerts/alert.Model');
 const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
-const { SENSOR_THRESHOLDS, CACHE_TTL } = require('../utils/constants');
-const CacheService = require('../utils/cache.service');
+const { SENSOR_THRESHOLDS } = require('../utils/constants');
 const { NotFoundError, ValidationError, AppError } = require('../errors');
 const ResponseHelper = require('../utils/responses');
 const asyncHandler = require('../middleware/asyncHandler');
@@ -21,15 +20,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
   const filter = {};
   if (status) filter.status = status;
   if (registrationStatus) filter.registrationStatus = registrationStatus;
-
-  // Try to get from cache
-  const cacheKey = `devices:all:${JSON.stringify(filter)}:page${page}:limit${limit}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug('[Device Controller] Returning cached devices list');
-    return ResponseHelper.paginated(res, cached.data, cached.pagination);
-  }
 
   // Use aggregation to fix N+1 query problem
   const devicesAggregation = await Device.aggregate([
@@ -116,9 +106,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
     },
   };
 
-  // Cache the result
-  await CacheService.set(cacheKey, responseData, CACHE_TTL.DEVICES);
-
   ResponseHelper.paginated(res, devicesAggregation, responseData.pagination);
 });
 
@@ -128,15 +115,6 @@ const getAllDevices = asyncHandler(async (req, res) => {
  * @param {Object} res - Express response object
  */
 const getDeviceById = asyncHandler(async (req, res) => {
-  // Try to get from cache
-  const cacheKey = `device:${req.params.deviceId}`;
-  const cached = await CacheService.get(cacheKey);
-  
-  if (cached) {
-    logger.debug(`[Device Controller] Returning cached device: ${req.params.deviceId}`);
-    return ResponseHelper.success(res, cached);
-  }
-
   const device = await Device.findOne({ deviceId: req.params.deviceId });
 
   if (!device) {
@@ -162,9 +140,6 @@ const getDeviceById = asyncHandler(async (req, res) => {
     ...device.toPublicProfile(),
     latestReading: mappedReading,
   };
-
-  // Cache the result
-  await CacheService.set(cacheKey, responseData, CACHE_TTL.DEVICES);
 
   ResponseHelper.success(res, responseData);
 });
@@ -266,11 +241,6 @@ const updateDevice = asyncHandler(async (req, res) => {
     throw new NotFoundError('Device', req.params.deviceId);
   }
 
-  // Invalidate cache
-  await CacheService.del(`device:${req.params.deviceId}`);
-  await CacheService.delPattern('devices:all:*');
-  logger.debug(`[Device Controller] Cache invalidated for device: ${req.params.deviceId}`);
-
   ResponseHelper.success(res, device.toPublicProfile(), 'Device updated successfully');
 });
 
@@ -289,32 +259,30 @@ const deleteDevice = asyncHandler(async (req, res) => {
       });
     }
 
-    // Send deregister command to device if connected via MQTT
-    if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(device.deviceId)) {
-      logger.info('[Device Controller] Sending deregister command to device', {
+    // Send deregister command to device via MQTT
+    // Commands use retain=true, so device receives them when it connects/reconnects
+    if (mqttService && mqttService.sendCommandToDevice) {
+      logger.info('[Device Controller] Publishing deregister command', {
         deviceId: device.deviceId,
       });
       
-      mqttService.sendCommandToDevice(device.deviceId, 'deregister', {
-        message: 'Device has been removed from the system',
-        reason: 'admin_deletion',
-      });
+      const commandSent = mqttService.sendCommandToDevice(device.deviceId, 'deregister');
       
-      // Give device a moment to receive the command
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } else {
-      logger.warn('[Device Controller] Device offline - queuing deregister command in Redis', {
-        deviceId: device.deviceId,
-      });
-      
-      // Queue command in Redis for device to receive when it reconnects via MQTT
-      if (mqttService && mqttService.queueCommandForDevice) {
-        await mqttService.queueCommandForDevice(device.deviceId, 'deregister', {
-          message: 'Device has been removed from the system',
-          reason: 'admin_deletion',
-          timestamp: new Date().toISOString()
+      if (commandSent) {
+        logger.info('[Device Controller] "deregister" command published (retained)', {
+          deviceId: device.deviceId,
+        });
+        // Give device a moment to receive the command if online
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        logger.warn('[Device Controller] Failed to publish "deregister" command', {
+          deviceId: device.deviceId,
         });
       }
+    } else {
+      logger.error('[Device Controller] MQTT service not available', {
+        deviceId: device.deviceId,
+      });
     }
 
     // Delete device and all associated data
@@ -328,11 +296,6 @@ const deleteDevice = asyncHandler(async (req, res) => {
       deviceId: device.deviceId,
       deviceMongoId: req.params.id,
     });
-
-    // Invalidate cache
-    await CacheService.del(`device:${req.params.deviceId}`);
-    await CacheService.delPattern('devices:all:*');
-    logger.debug(`[Device Controller] Cache invalidated for deleted device: ${req.params.deviceId}`);
 
   ResponseHelper.success(res, null, 'Device and all associated data deleted successfully');
 });
@@ -407,27 +370,32 @@ const processSensorData = asyncHandler(async (req, res) => {
   
   await device.save();
 
-  // Invalidate cache when device is updated
-  await CacheService.del(`device:${trimmedDeviceId}`);
-  await CacheService.delPattern('devices:all:*');
-
-  // SERVER-SIDE TIMESTAMPING (Critical for Data Integrity)
-  // ALWAYS use server-generated timestamp for sensor readings
-  // Benefits:
-  // 1. Eliminates NTP synchronization issues on IoT devices
-  // 2. Ensures consistent timezone handling (UTC)
-  // 3. Prevents timestamp drift/clock skew problems
-  // 4. Guarantees accurate sequential ordering of readings
-  // 5. Single source of truth for all timestamps
-  const serverTimestamp = new Date();
+  // Save sensor reading with trimmed deviceId
+  // Validate timestamp from device
+  let validTimestamp = new Date(); // Default to server time
   
-  // Log if device sent a timestamp (for debugging/monitoring)
   if (timestamp) {
-    logger.debug('[Device Controller] Device timestamp ignored - using server time', {
-      deviceId: trimmedDeviceId,
-      deviceTimestamp: timestamp,
-      serverTimestamp: serverTimestamp.toISOString()
-    });
+    // Handle Unix timestamp (seconds) or ISO string
+    const parsedDate = typeof timestamp === 'number' 
+      ? new Date(timestamp * 1000) // Unix timestamp in seconds
+      : new Date(timestamp);
+    
+    // Validate: timestamp should be after 2020 and not in future
+    const year2020 = new Date('2020-01-01').getTime();
+    const futureLimit = Date.now() + (24 * 60 * 60 * 1000); // Allow 1 day ahead for timezone differences
+    
+    if (!isNaN(parsedDate.getTime()) && 
+        parsedDate.getTime() > year2020 && 
+        parsedDate.getTime() < futureLimit) {
+      validTimestamp = parsedDate;
+    } else {
+      logger.warn('[Device Controller] Invalid device timestamp, using server time', {
+        deviceId: trimmedDeviceId,
+        receivedTimestamp: timestamp,
+        parsedDate: parsedDate.toISOString(),
+        usingServerTime: validTimestamp.toISOString()
+      });
+    }
   }
   
   const reading = new SensorReading({
@@ -435,7 +403,7 @@ const processSensorData = asyncHandler(async (req, res) => {
     pH,
     turbidity,
     tds,
-    timestamp: serverTimestamp, // Server timestamp is authoritative
+    timestamp: validTimestamp,
   });
 
   await reading.save();
@@ -632,7 +600,7 @@ const deviceRegister = asyncHandler(async (req, res) => {
       macAddress: macAddress || '',
       ipAddress: ipAddress || '',
       sensors: sensors || ['pH', 'turbidity', 'tds'],
-      status: 'offline', // Start as offline - will be marked online when first sensor data arrives
+      status: 'online', // Device is online (it just registered via MQTT)
       registrationStatus: 'pending',
       isRegistered: false,
       lastSeen: new Date(),
@@ -640,17 +608,31 @@ const deviceRegister = asyncHandler(async (req, res) => {
     
     await device.save();
     
-    // Invalidate cache for new device registration
-    await CacheService.delPattern('devices:all:*');
-    
     logger.info('[Device Controller] Device registration pending', { 
       deviceId: trimmedDeviceId,
       id: device._id 
     });
 
-    // Device will remain in pending state until admin approves
-    // No need to send command - device checks registration status via polling
-    
+    // Send "wait" command to device via MQTT
+    // Commands use retain=true, so device receives them when it connects/reconnects
+    if (mqttService && mqttService.sendCommandToDevice) {
+      const commandSent = mqttService.sendCommandToDevice(trimmedDeviceId, 'wait');
+      
+      if (commandSent) {
+        logger.info('[Device Controller] "wait" command published (retained)', {
+          deviceId: trimmedDeviceId,
+        });
+      } else {
+        logger.warn('[Device Controller] Failed to publish "wait" command', {
+          deviceId: trimmedDeviceId,
+        });
+      }
+    } else {
+      logger.error('[Device Controller] MQTT service not available', {
+        deviceId: trimmedDeviceId,
+      });
+    }
+
     return ResponseHelper.success(res, {
       device: device.toPublicProfile(),
       message: 'Device registration pending admin approval',
@@ -658,9 +640,8 @@ const deviceRegister = asyncHandler(async (req, res) => {
       isRegistered: false,
     }, 'Device registration request received');
   } else {
-    // Device exists - update last seen and metadata
-    // Set status to online when device sends registration (proves it's actively communicating)
-    device.status = 'online';
+    // Device exists - update last seen, status, and metadata
+    device.status = 'online'; // Device is online (it just re-registered via MQTT)
     device.lastSeen = new Date();
     
     // Update metadata if provided
@@ -669,10 +650,6 @@ const deviceRegister = asyncHandler(async (req, res) => {
     if (name && !device.name) device.name = name;
     
     await device.save();
-
-    // Invalidate cache when device metadata updated
-    await CacheService.del(`device:${trimmedDeviceId}`);
-    await CacheService.delPattern('devices:all:*');
 
     // NOTE: Do NOT call setupDeviceLWT here - it publishes a retained "online" message
     // which would persist on the broker even if device goes offline.
@@ -694,9 +671,26 @@ const deviceRegister = asyncHandler(async (req, res) => {
         command: 'go', // Tell device it can start sending sensor data
       }, 'Device registration approved');
     } else {
-      // Device will remain in pending state until admin approves
-      // No need to send command - device checks registration status via polling
-      
+      // Send "wait" command to device via MQTT
+      // Commands use retain=true, so device receives them when it connects/reconnects
+      if (mqttService && mqttService.sendCommandToDevice) {
+        const commandSent = mqttService.sendCommandToDevice(trimmedDeviceId, 'wait');
+        
+        if (commandSent) {
+          logger.info('[Device Controller] "wait" command published (retained)', {
+            deviceId: trimmedDeviceId,
+          });
+        } else {
+          logger.warn('[Device Controller] Failed to publish "wait" command', {
+            deviceId: trimmedDeviceId,
+          });
+        }
+      } else {
+        logger.error('[Device Controller] MQTT service not available', {
+          deviceId: trimmedDeviceId,
+        });
+      }
+
       return ResponseHelper.success(res, {
         device: device.toPublicProfile(),
         message: 'Device registration pending admin approval',
@@ -745,32 +739,28 @@ const approveDeviceRegistration = asyncHandler(async (req, res) => {
 
   await device.save();
 
-  // Invalidate cache after device approval
-  await CacheService.del(`device:${device.deviceId}`);
-  await CacheService.delPattern('devices:all:*');
-
   logger.info('[Device Controller] Device registration approved', {
     deviceId: device.deviceId,
     id: device._id,
   });
 
-  // Send "go" command to device via MQTT if connected
-  if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(device.deviceId)) {
-    const commandSent = mqttService.sendCommandToDevice(device.deviceId, 'go', {
-      message: 'Device registration approved. You can now start sending sensor data.',
-      device: device.toPublicProfile(),
-    });
+  // Send "go" command to device via MQTT
+  // Commands use retain=true, so device receives them when it connects/reconnects
+  if (mqttService && mqttService.sendCommandToDevice) {
+    const commandSent = mqttService.sendCommandToDevice(device.deviceId, 'go');
     
     if (commandSent) {
-      logger.info('[Device Controller] "go" command sent to device', {
+      logger.info('[Device Controller] "go" command published (retained)', {
+        deviceId: device.deviceId,
+      });
+    } else {
+      logger.warn('[Device Controller] Failed to publish "go" command', {
         deviceId: device.deviceId,
       });
     }
   } else {
-    logger.warn('[Device Controller] MQTT service not available or device not connected, "go" command not sent', {
+    logger.error('[Device Controller] MQTT service not available', {
       deviceId: device.deviceId,
-      mqttServiceAvailable: !!mqttService,
-      isDeviceConnectedAvailable: !!(mqttService && mqttService.isDeviceConnected),
     });
   }
 
@@ -842,8 +832,8 @@ const getDeviceStatus = asyncHandler(async (req, res) => {
 });
 
 /**
- * Send command to device (Admin only)
- * Handles restart, send_now, and other device commands
+ * Send command to device via MQTT
+ * @route POST /api/v1/devices/:deviceId/commands
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -852,9 +842,9 @@ const sendDeviceCommand = asyncHandler(async (req, res) => {
   const { command, data = {} } = req.body;
 
   // Validate command
-  const validCommands = ['restart', 'send_now'];
+  const validCommands = ['send_now', 'restart', 'go', 'wait', 'deregister'];
   if (!command || !validCommands.includes(command)) {
-    throw new ValidationError(`Invalid command. Valid commands: ${validCommands.join(', ')}`);
+    throw new ValidationError(`Invalid command. Must be one of: ${validCommands.join(', ')}`);
   }
 
   // Check if device exists
@@ -863,54 +853,51 @@ const sendDeviceCommand = asyncHandler(async (req, res) => {
     throw new NotFoundError('Device', deviceId);
   }
 
-  // Check if device is online for send_now command
-  if (command === 'send_now' && device.status !== 'online') {
-    return ResponseHelper.error(
-      res,
-      'Device must be online to receive send_now command',
-      400,
-      'DEVICE_OFFLINE'
-    );
-  }
-
-  // Send command via MQTT
-  if (mqttService && mqttService.isDeviceConnected && mqttService.isDeviceConnected(deviceId)) {
-    const commandSent = mqttService.sendCommandToDevice(deviceId, command, {
-      message: `${command} command from admin`,
-      timestamp: new Date().toISOString(),
-      requestedBy: req.user.email,
-      ...data,
-    });
-
-    if (commandSent) {
-      logger.info('[Device Controller] Command sent to device', {
-        deviceId,
-        command,
-        requestedBy: req.user.email,
-        userId: req.user._id,
-      });
-
-      return ResponseHelper.success(res, {
-        deviceId,
-        command,
-        status: 'sent',
-        timestamp: new Date().toISOString(),
-      }, `${command} command sent successfully to device ${device.name}`);
-    }
-  }
-
-  logger.warn('[Device Controller] Failed to send command - device not connected', {
+  // Log command request
+  logger.info('[Device Controller] Sending command to device', {
     deviceId,
     command,
+    deviceName: device.name,
     deviceStatus: device.status,
+    requestedBy: req.user?.email || 'unknown',
   });
 
-  return ResponseHelper.error(
-    res,
-    'Device is not connected to MQTT broker. Command could not be sent.',
-    503,
-    'DEVICE_NOT_CONNECTED'
-  );
+  // Send command via MQTT
+  try {
+    const commandSent = mqttService.sendCommandToDevice(deviceId, command, data);
+    
+    if (!commandSent) {
+      throw new AppError('Failed to send command - MQTT service unavailable', 503);
+    }
+
+    // Update device status based on command
+    if (command === 'deregister') {
+      device.registrationStatus = 'pending';
+      device.isRegistered = false;
+      await device.save();
+      
+      logger.info('[Device Controller] Device deregistered', {
+        deviceId,
+        command,
+      });
+    }
+
+    ResponseHelper.success(res, {
+      deviceId,
+      command,
+      status: 'sent',
+      timestamp: new Date().toISOString(),
+      deviceStatus: device.status,
+    }, `Command '${command}' sent to device successfully`);
+
+  } catch (error) {
+    logger.error('[Device Controller] Failed to send command', {
+      deviceId,
+      command,
+      error: error.message,
+    });
+    throw new AppError(`Failed to send command: ${error.message}`, 500);
+  }
 });
 
 module.exports = {

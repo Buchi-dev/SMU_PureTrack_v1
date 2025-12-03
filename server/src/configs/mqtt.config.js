@@ -1,12 +1,6 @@
 /**
- * MQTT Configuration for HiveMQ (Backend Server)
- * 
- * SECURITY ARCHITECTURE:
- * - Backend: FULL ACCESS (read all topics, write commands)
- * - Frontend: READ ONLY (subscribes to data/presence, NO publish rights)
- * - Devices: LIMITED (publish data, subscribe to commands for own deviceId)
- * 
- * See MQTT_PERMISSIONS.md for complete security setup guide
+ * MQTT Configuration for HiveMQ
+ * Handles connection settings and topic definitions
  */
 
 const mqtt = require('mqtt');
@@ -14,19 +8,18 @@ const mqtt = require('mqtt');
 // MQTT Broker Configuration
 const MQTT_CONFIG = {
   // HiveMQ Cloud Cluster Configuration
-  BROKER_URL: process.env.MQTT_BROKER_URL,
-  // Generate unique client ID with timestamp to prevent conflicts
-  CLIENT_ID: `water-quality-server-${Date.now()}`,
+  BROKER_URL: process.env.MQTT_BROKER_URL || 'mqtts://0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud:8883',
+  CLIENT_ID: process.env.MQTT_CLIENT_ID || `water-quality-server-${Date.now()}`,
 
-  // Connection Options (Optimized for HiveMQ Cloud stability)
+  // Connection Options
   OPTIONS: {
     // Only include username/password if they are actually set
     ...(process.env.MQTT_USERNAME && { username: process.env.MQTT_USERNAME }),
     ...(process.env.MQTT_PASSWORD && { password: process.env.MQTT_PASSWORD }),
     clean: true, // Clean session - start fresh each time
     connectTimeout: 30000, // 30 second timeout for cloud connection
-    reconnectPeriod: 5000,  // 5 second reconnect period (faster recovery)
-    keepalive: 60, // 60 second keepalive (HiveMQ Cloud recommended: longer is more stable)
+    reconnectPeriod: 10000,  // 10 second reconnect period (increased to avoid rapid reconnects)
+    keepalive: 30, // 30 second keepalive - shorter interval for faster detection
     protocolVersion: 4, // MQTT v3.1.1
     // SSL/TLS options for HiveMQ Cloud
     rejectUnauthorized: true, // Validate HiveMQ certificates properly
@@ -69,16 +62,12 @@ const MQTT_CONFIG = {
     COMMAND: 'command',
   },
 
-  // Commands that backend server can send to devices via MQTT
-  // ✅ SECURITY: Frontend calls REST API, backend validates & sends commands
-  // ✅ All commands are logged and require admin authentication
+  // Commands that server can send to devices
   COMMANDS: {
-    GO: 'go',                 // Approve device - sent by backend during device approval
-    DEREGISTER: 'deregister', // Revoke approval - sent by backend during device deletion
-    RESTART: 'restart',       // Restart device - sent by backend via /api/v1/devices/:id/command
-    SEND_NOW: 'send_now',     // Force data transmission - sent by backend via /api/v1/devices/:id/command
-    // REMOVED: 'wait' - Device has no handler
-    // REMOVED: 'update_config' - Never implemented
+    GO: 'go',
+    WAIT: 'wait',
+    DEREGISTER: 'deregister',
+    RESTART: 'restart',
   },
 };
 

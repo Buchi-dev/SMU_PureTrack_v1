@@ -354,26 +354,40 @@ export class DevicesService {
     }
   }
 
+  // ==========================================================================
+  // DEVICE COMMANDS
+  // ==========================================================================
+
   /**
-   * Send command to device (admin only)
-   * Sends commands like 'restart' or 'send_now' through backend API
+   * Send command to device via MQTT (Admin only)
+   * Backend handles MQTT publishing to device
    * 
    * @param deviceId - Device ID to send command to
-   * @param command - Command to send ('restart', 'send_now')
-   * @param data - Optional additional data
-   * @throws {Error} If command fails
+   * @param command - Command type (send_now, restart, go, wait, deregister)
+   * @param data - Optional command data
+   * @returns Promise with command status
    * @example
    * await devicesService.sendDeviceCommand('WQ-001', 'restart');
    * await devicesService.sendDeviceCommand('WQ-001', 'send_now');
    */
   async sendDeviceCommand(
     deviceId: string,
-    command: 'restart' | 'send_now',
-    data?: Record<string, any>
-  ): Promise<{ success: boolean; message: string; data?: any }> {
+    command: 'send_now' | 'restart' | 'go' | 'wait' | 'deregister',
+    data: Record<string, any> = {}
+  ): Promise<{
+    success: boolean;
+    data: {
+      deviceId: string;
+      command: string;
+      status: string;
+      timestamp: string;
+      deviceStatus: string;
+    };
+    message: string;
+  }> {
     try {
-      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
-        DEVICE_ENDPOINTS.SEND_COMMAND(deviceId),
+      const response = await apiClient.post(
+        `${DEVICE_ENDPOINTS.BY_ID(deviceId)}/commands`,
         { command, data }
       );
       return response.data;

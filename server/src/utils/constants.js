@@ -31,15 +31,6 @@ const PAGINATION = {
   READINGS_LIMIT: 100,
 };
 
-// Cache TTL (Time To Live) in seconds
-const CACHE_TTL = {
-  DEVICES: 300, // 5 minutes
-  USERS: 600, // 10 minutes
-  ALERTS: 60, // 1 minute
-  SUMMARY: 120, // 2 minutes
-  REPORTS: 3600, // 1 hour
-};
-
 // Session configuration
 const SESSION = {
   MAX_AGE: TIME.ONE_DAY,
@@ -104,7 +95,6 @@ module.exports = {
   TIME,
   SENSOR_THRESHOLDS,
   PAGINATION,
-  CACHE_TTL,
   SESSION,
   HTTP_STATUS,
   EMAIL,

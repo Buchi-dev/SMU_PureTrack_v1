@@ -62,17 +62,27 @@ export const AdminDeviceReadings = () => {
   }, [enrichedDevices]);
 
   const handleForceDeviceSendData = async () => {
-    // Send "send_now" command to all online devices through backend API
     const onlineDevices = enrichedDevices.filter(d => d.status === 'online');
+    
+    if (onlineDevices.length === 0) {
+      message.warning('No online devices available to send command');
+      return;
+    }
+
     try {
-      await Promise.all(
-        onlineDevices.map(device => 
-          devicesService.sendDeviceCommand(device.deviceId, 'send_now')
-        )
+      const promises = onlineDevices.map(device => 
+        devicesService.sendDeviceCommand(device.deviceId, 'send_now')
       );
+      
+      await Promise.all(promises);
       message.success(`Send Now command sent to ${onlineDevices.length} online device(s)`);
+      
+      // Refresh data after a short delay to see updated readings
+      setTimeout(() => {
+        refetchDevices();
+      }, 2000);
     } catch (error) {
-      message.error(`Failed to send commands: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      message.error(`Failed to send command: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

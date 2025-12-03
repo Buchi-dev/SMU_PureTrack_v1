@@ -57,12 +57,13 @@ export const RegisterDeviceModal = ({
         return;
       }
 
+      // Backend approveDeviceRegistration automatically sends 'go' command
+      // No need for frontend to send it separately
       await onRegister(device.deviceId, {
         building: values.building,
         floor: values.floor,
         notes: values.notes || '',
       });
-      // Backend automatically sends 'go' command during approval
       // Reset submission state after a delay to ensure the modal has time to close
       setTimeout(() => {
         setIsSubmitting(false);

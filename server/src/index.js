@@ -13,13 +13,11 @@ const compression = require('compression');
 
 // Import configurations
 const { connectDB, closeDB } = require('./configs/mongo.Config');
-const { connectRedis, closeRedis } = require('./configs/redis.Config');
 const { configureFirebase } = require('./configs/firebase.Config');
 const { setupSwagger } = require('./configs/swagger.config');
 
 // Import utilities
 const logger = require('./utils/logger');
-const { initializeEmailQueue, closeEmailQueue } = require('./utils/email.queue');
 const { API_VERSION } = require('./utils/constants');
 const mqttService = require('./utils/mqtt.service');
 const { initializeChangeStreams, closeChangeStreams } = require('./utils/changeStreams');
@@ -50,9 +48,6 @@ connectDB();
 
 // Configure Firebase Admin SDK
 configureFirebase();
-
-// Store Redis client at module level
-let redisClient;
 
 // ============================================
 // SECURITY & PERFORMANCE MIDDLEWARE
@@ -125,14 +120,6 @@ app.set('trust proxy', 1);
 // ============================================
 
 async function initializeApp() {
-  // Connect to Redis (optional but recommended for production)
-  redisClient = await connectRedis();
-  
-  // Initialize email queue if Redis is available
-  if (redisClient) {
-    initializeEmailQueue(process.env.REDIS_URL);
-  }
-
   // Connect to MQTT Broker (HiveMQ)
   await mqttService.connect();
 
@@ -194,8 +181,6 @@ async function initializeApp() {
 
   // Global error handler - Must be last
   app.use(errorHandler);
-
-  return redisClient;
 }
 
 // ============================================
@@ -221,7 +206,7 @@ initializeApp().then(() => {
       logger.info('Water Quality Monitoring API - PRODUCTION');
       logger.info('========================================');
       logger.info(`Port: ${PORT} | Environment: ${envSummary.nodeEnv} | API: ${API_VERSION.CURRENT}`);
-      logger.info(`Services: MongoDB ✓ | Redis ✓ | SMTP ✓ | Firebase ✓ | MQTT ✓`);
+      logger.info(`Services: MongoDB ✓ | SMTP ✓ | Firebase ✓ | MQTT ✓`);
       logger.info(`Health: http://localhost:${PORT}/health`);
       logger.info('========================================');
     } else {
@@ -236,7 +221,6 @@ initializeApp().then(() => {
       logger.info('');
       logger.info('[SERVICES] Status:');
       logger.info(`   MongoDB:     ${envSummary.mongoConfigured ? '[OK]' : '[FAIL]'}`);
-      logger.info(`   Redis:       ${envSummary.redisConfigured ? '[OK]' : '[WARN] Not configured'}`);
       logger.info(`   SMTP:        ${envSummary.smtpConfigured ? '[OK]' : '[WARN] Not configured'}`);
       logger.info(`   Firebase:    ${envSummary.firebaseConfigured ? '[OK]' : '[FAIL]'}`);
       logger.info(`   API Key:     ${envSummary.apiKeyConfigured ? '[OK]' : '[FAIL]'}`);
@@ -281,14 +265,6 @@ const gracefulShutdown = async (signal) => {
 
     // Disconnect from MQTT broker
     await mqttService.disconnect();
-
-    // Close email queue
-    await closeEmailQueue();
-
-    // Close Redis connection (suppress "connection closed" warning during shutdown)
-    if (redisClient) {
-      await closeRedis();
-    }
 
     // Close MongoDB connection (suppress "disconnected" warning during shutdown)
     await closeDB();

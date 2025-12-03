@@ -1,5 +1,7 @@
 /**
- * PDF Report Templates
+ * Report Templates Exports
+ * 
+ * PDF generation has been moved to the backend.
+ * Frontend now only requests reports via API.
  */
-
-export * from './WaterQualityReportTemplate';
+// No exports - all PDF generation is backend responsibility

@@ -102,11 +102,12 @@ router.get('/status/:deviceId', ensureApiKey, deviceSSEConnection);
 router.post('/:deviceId/approve', ensureAdmin, approveDeviceRegistration);
 
 /**
- * @route   POST /api/v1/devices/:deviceId/command
- * @desc    Send command to device (restart, send_now, etc.)
+ * @route   POST /api/v1/devices/:deviceId/commands
+ * @desc    Send command to device via MQTT
  * @access  Admin only
- * @note    Sends commands to devices via MQTT through backend (proper authorization & logging)
+ * @body    { command: 'send_now' | 'restart' | 'go' | 'wait' | 'deregister', data?: {} }
+ * @note    Sends MQTT command to device. Valid commands: send_now, restart, go, wait, deregister
  */
-router.post('/:deviceId/command', ensureAdmin, sendDeviceCommand);
+router.post('/:deviceId/commands', ensureAdmin, sendDeviceCommand);
 
 module.exports = router;
