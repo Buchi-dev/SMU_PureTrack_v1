@@ -7,7 +7,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import admin from 'firebase-admin';
+import { getFirebaseAuth } from '@core/configs';
 import { UnauthorizedError, ForbiddenError } from '@utils/errors.util';
 import { ERROR_MESSAGES } from '@core/configs/messages.config';
 import { UserRole } from '@feature/users/user.types';
@@ -45,7 +45,7 @@ export const requireAuth = async (
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token with Firebase
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await getFirebaseAuth().verifyIdToken(token);
 
     // Get user from database
     const user = await userService.getUserByFirebaseUid(decodedToken.uid);
@@ -146,7 +146,7 @@ export const optionalAuth = async (
     }
 
     const token = authHeader.substring(7);
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await getFirebaseAuth().verifyIdToken(token);
     const user = await userService.getUserByFirebaseUid(decodedToken.uid);
 
     if (user) {

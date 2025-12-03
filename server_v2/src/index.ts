@@ -1,7 +1,7 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { appConfig, dbConnection } from '@core/configs';
+import { appConfig, dbConnection, initializeFirebase } from '@core/configs';
 import { errorHandler, requestLogger } from '@core/middlewares';
 import { NotFoundError } from '@utils/errors.util';
 import { mqttService, emailService, gridfsService, initializeLogger, logInfo, logError } from '@utils';
@@ -67,6 +67,9 @@ const startServer = async (): Promise<void> => {
   try {
     // Initialize Winston logger
     initializeLogger();
+
+    // Initialize Firebase Admin SDK
+    initializeFirebase();
 
     // Connect to database
     await dbConnection.connect();

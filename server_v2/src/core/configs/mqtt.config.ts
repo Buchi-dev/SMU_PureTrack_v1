@@ -88,11 +88,9 @@ interface MQTTConfig {
  * Create MQTT configuration with environment-based settings
  */
 const createMQTTConfig = (): MQTTConfig => {
-  const brokerUrl = process.env.MQTT_BROKER_URL || 
-    'mqtts://0331c5286d084675b9198021329c7573.s1.eu.hivemq.cloud:8883';
+  const brokerUrl = process.env.MQTT_BROKER_URL || '';
   
-  const clientId = process.env.MQTT_CLIENT_ID || 
-    `water-quality-server-${Date.now()}`;
+  const clientId =  `PureTrack Server-${Date.now()}`;
 
   // Build connection options
   const options: IClientOptions = {

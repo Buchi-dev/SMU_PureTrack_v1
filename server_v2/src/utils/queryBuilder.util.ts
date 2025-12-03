@@ -449,7 +449,8 @@ export class CRUDOperations<T extends Document> {
    * Get paginated results using QueryBuilder
    */
   public query(): QueryBuilder<T> {
-    return new QueryBuilder(this.model) as any;
+    // @ts-ignore: Type compatibility issue with Mongoose Model generics
+    return new QueryBuilder<T>(this.model);
   }
 }
 

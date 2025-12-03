@@ -12,6 +12,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+serviceAccountKey.json
+
 # IDE
 .vscode/
 .idea/
