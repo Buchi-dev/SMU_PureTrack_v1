@@ -32,7 +32,7 @@ export const appConfig: Config = {
   server: {
     port: parseInt(process.env.PORT || '', 10),
     nodeEnv: process.env.NODE_ENV || '',
-    apiVersion: process.env.API_VERSION || '',
+    apiVersion: process.env.API_VERSION || 'v2',
   },
   database: {
     uri: process.env.MONGODB_URI || '',
