@@ -39,85 +39,170 @@ const validateServiceAccount = (serviceAccount) => {
 };
 
 /**
- * Configure Firebase Admin SDK
- * Used for verifying Firebase Auth tokens on the backend
+ * Test Firebase credentials by attempting to generate a token
+ * This validates that the service account key is valid and not revoked
+ * @returns {Promise<boolean>} True if credentials are valid
  */
-const configureFirebase = () => {
+const testFirebaseCredentials = async () => {
   try {
-    let serviceAccount;
-
-    // Check if service account is provided as environment variable (for production)
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      try {
-        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-      } catch (parseError) {
-        throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT: ${parseError.message}`);
-      }
-    } 
-    // Otherwise load from file path
-    else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
-      const accountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-      try {
-        serviceAccount = require(accountPath);
-      } catch (loadError) {
-        throw new Error(`Failed to load service account from ${accountPath}: ${loadError.message}`);
-      }
-    } 
-    else {
-      throw new Error('Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_SERVICE_ACCOUNT_PATH is set');
-    }
-
-    // Validate service account structure
-    validateServiceAccount(serviceAccount);
-
-    // Verify project ID matches
-    if (process.env.FIREBASE_PROJECT_ID && serviceAccount.project_id !== process.env.FIREBASE_PROJECT_ID) {
-      logger.warn('[Firebase] FIREBASE_PROJECT_ID env var does not match service account project_id', {
-        envProjectId: process.env.FIREBASE_PROJECT_ID,
-        serviceAccountProjectId: serviceAccount.project_id,
-      });
-    }
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,
+    // Try to create a test custom token - this will fail if:
+    // 1. Service account key is revoked
+    // 2. System time is not synchronized
+    // 3. Network connectivity issues
+    const testToken = await admin.auth().createCustomToken('validation-test-uid', {
+      test: true,
+      timestamp: Date.now(),
     });
-
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      logger.info('[Firebase] Initialized ✓');
-      logger.info(`[Firebase] Project: ${serviceAccount.project_id}`);
-      logger.info(`[Firebase] Key ID: ${serviceAccount.private_key_id.substring(0, 8)}...`);
-    } else {
-      logger.info('[Firebase] Admin SDK initialized successfully');
-      logger.info(`[Firebase] Project: ${serviceAccount.project_id}`);
-      logger.info(`[Firebase] Service Account: ${serviceAccount.client_email}`);
-      logger.info(`[Firebase] Key ID: ${serviceAccount.private_key_id}`);
+    
+    if (testToken && testToken.length > 0) {
+      logger.info('[Firebase] Credential validation successful ✓');
+      return true;
     }
+    
+    logger.warn('[Firebase] Credential validation returned empty token');
+    return false;
   } catch (error) {
-    logger.error('[Firebase] Failed to initialize Admin SDK', {
+    logger.error('[Firebase] Credential validation failed', {
       error: error.message,
+      code: error.code,
     });
-    
-    // Provide helpful troubleshooting information
-    logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    logger.error('🔥 FIREBASE INITIALIZATION FAILED 🔥');
-    logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    logger.error('Common causes:');
-    logger.error('1. Service account JSON is invalid or corrupted');
-    logger.error('2. Service account key has been revoked or rotated');
-    logger.error('3. Environment variable not properly set');
-    logger.error('4. Server time is not synchronized (causes JWT signature errors)');
-    logger.error('');
-    logger.error('Solutions:');
-    logger.error('1. Verify FIREBASE_SERVICE_ACCOUNT env var is set correctly');
-    logger.error('2. Generate new service account key: https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk');
-    logger.error('3. Ensure server time is synced (Docker: check host time)');
-    logger.error('4. Check service account has required IAM roles');
-    logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    throw error;
+    return false;
   }
+};
+
+/**
+ * Sleep helper for retry logic
+ * @param {number} ms - Milliseconds to sleep
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Configure Firebase Admin SDK with retry logic
+ * Used for verifying Firebase Auth tokens on the backend
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ * @param {number} retryDelay - Delay between retries in ms (default: 2000)
+ */
+const configureFirebase = async (maxRetries = 3, retryDelay = 2000) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      let serviceAccount;
+
+      // Check if service account is provided as environment variable (for production)
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        try {
+          serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        } catch (parseError) {
+          throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT: ${parseError.message}`);
+        }
+      } 
+      // Otherwise load from file path
+      else if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+        const accountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+        try {
+          serviceAccount = require(accountPath);
+        } catch (loadError) {
+          throw new Error(`Failed to load service account from ${accountPath}: ${loadError.message}`);
+        }
+      } 
+      else {
+        throw new Error('Neither FIREBASE_SERVICE_ACCOUNT nor FIREBASE_SERVICE_ACCOUNT_PATH is set');
+      }
+
+      // Validate service account structure
+      validateServiceAccount(serviceAccount);
+
+      // Verify project ID matches
+      if (process.env.FIREBASE_PROJECT_ID && serviceAccount.project_id !== process.env.FIREBASE_PROJECT_ID) {
+        logger.warn('[Firebase] FIREBASE_PROJECT_ID env var does not match service account project_id', {
+          envProjectId: process.env.FIREBASE_PROJECT_ID,
+          serviceAccountProjectId: serviceAccount.project_id,
+        });
+      }
+
+      // Clean up any existing Firebase apps (for retry scenarios)
+      if (admin.apps.length > 0) {
+        logger.info('[Firebase] Cleaning up existing Firebase app instances...');
+        await Promise.all(admin.apps.map(app => app.delete()));
+      }
+
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,
+      });
+
+      const isProduction = process.env.NODE_ENV === 'production';
+      if (isProduction) {
+        logger.info('[Firebase] Initialized ✓');
+        logger.info(`[Firebase] Project: ${serviceAccount.project_id}`);
+        logger.info(`[Firebase] Key ID: ${serviceAccount.private_key_id.substring(0, 8)}...`);
+      } else {
+        logger.info('[Firebase] Admin SDK initialized successfully');
+        logger.info(`[Firebase] Project: ${serviceAccount.project_id}`);
+        logger.info(`[Firebase] Service Account: ${serviceAccount.client_email}`);
+        logger.info(`[Firebase] Key ID: ${serviceAccount.private_key_id}`);
+      }
+      
+      // Test credentials to ensure they're valid
+      logger.info('[Firebase] Validating credentials...');
+      const credentialsValid = await testFirebaseCredentials();
+      
+      if (!credentialsValid) {
+        throw new Error('Credential validation failed - service account key may be revoked');
+      }
+      
+      logger.info('[Firebase] Configuration complete and validated ✓');
+      return; // Success - exit retry loop
+      
+    } catch (error) {
+      lastError = error;
+      
+      // Check if this is a retryable error
+      const isRetryable = 
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('ETIMEDOUT') ||
+        error.message.includes('ENOTFOUND') ||
+        error.message.includes('network') ||
+        (attempt === 1 && error.message.includes('Invalid JWT Signature')); // Retry once for time sync
+      
+      if (isRetryable && attempt < maxRetries) {
+        logger.warn(`[Firebase] Initialization attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        logger.info(`[Firebase] Retrying in ${retryDelay}ms...`);
+        await sleep(retryDelay);
+        continue;
+      }
+      
+      // Non-retryable error or max retries reached
+      logger.error('[Firebase] Failed to initialize Admin SDK', {
+        error: error.message,
+        attempt: `${attempt}/${maxRetries}`,
+      });
+      
+      // Provide helpful troubleshooting information
+      logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.error('🔥 FIREBASE INITIALIZATION FAILED 🔥');
+      logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      logger.error('Common causes:');
+      logger.error('1. Service account JSON is invalid or corrupted');
+      logger.error('2. Service account key has been revoked or rotated');
+      logger.error('3. Environment variable not properly set');
+      logger.error('4. Server time is not synchronized (causes JWT signature errors)');
+      logger.error('');
+      logger.error('Solutions:');
+      logger.error('1. Run validation script: node scripts/validate-firebase-key.js');
+      logger.error('2. Generate new service account key: https://console.firebase.google.com/project/_/settings/serviceaccounts/adminsdk');
+      logger.error('3. Sync server time - Windows: w32tm /resync, Linux: sudo ntpdate pool.ntp.org');
+      logger.error('4. Check service account has required IAM roles');
+      logger.error('5. Verify project ID matches your Firebase project');
+      logger.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      throw error;
+    }
+  }
+  
+  // If we get here, all retries failed
+  throw lastError;
 };
 
 /**
@@ -254,5 +339,7 @@ module.exports = {
   configureFirebase,
   verifyIdToken,
   getFirebaseUser,
+  testFirebaseCredentials,
+  validateServiceAccount,
   admin,
 };

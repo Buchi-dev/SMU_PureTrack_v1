@@ -43,11 +43,7 @@ const sseRoutes = require('./sse/sse.Routes');
 // Initialize Express app
 const app = express();
 
-// Connect to MongoDB
-connectDB();
-
-// Configure Firebase Admin SDK
-configureFirebase();
+// Note: Firebase initialization is now async and happens in initializeApp()
 
 // ============================================
 // SECURITY & PERFORMANCE MIDDLEWARE
@@ -120,7 +116,16 @@ app.set('trust proxy', 1);
 // ============================================
 
 async function initializeApp() {
-  // Connect to MQTT Broker (HiveMQ)
+  // Step 1: Connect to MongoDB
+  logger.info('[Startup] Connecting to MongoDB...');
+  await connectDB();
+  
+  // Step 2: Configure Firebase Admin SDK with retry logic
+  logger.info('[Startup] Initializing Firebase Admin SDK...');
+  await configureFirebase();
+  
+  // Step 3: Connect to MQTT Broker (HiveMQ)
+  logger.info('[Startup] Connecting to MQTT Broker...');
   await mqttService.connect();
 
   // Add user context for logging (Firebase token-based)
