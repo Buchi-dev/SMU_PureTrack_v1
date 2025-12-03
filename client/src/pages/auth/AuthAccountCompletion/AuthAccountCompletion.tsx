@@ -16,6 +16,7 @@ import {
 } from "@ant-design/icons";
 import { useAuth } from "../../../hooks";
 import { useUserMutations } from "../../../hooks";
+import { isValidSMUEmail } from "../../../utils/validation.util";
 
 const { Title, Text } = Typography;
 
@@ -53,8 +54,10 @@ export const AuthAccountCompletion = () => {
 
     if (user) {
       // CRITICAL: Domain validation - block personal accounts
-      if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
-        console.error('[AccountCompletion] Unauthorized access attempt - personal account detected:', user.email);
+      if (!user.email || !isValidSMUEmail(user.email)) {
+        if (import.meta.env.DEV) {
+          console.error('[AccountCompletion] Unauthorized access attempt - personal account detected:', user.email);
+        }
         message.error('Access denied: Only SMU email addresses (@smu.edu.ph) are allowed.');
         navigate("/auth/login");
         return;
@@ -122,7 +125,9 @@ export const AuthAccountCompletion = () => {
       navigate("/auth/pending-approval");
     } catch (err) {
       // Error is already handled by useUserMutations hook
-      console.error("Error completing profile:", err);
+      if (import.meta.env.DEV) {
+        console.error("Error completing profile:", err);
+      }
     }
   };
 

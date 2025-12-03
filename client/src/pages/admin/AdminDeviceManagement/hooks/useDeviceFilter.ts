@@ -33,7 +33,6 @@ export const useDeviceFilter = ({ devices, activeTab, searchText }: UseDeviceFil
         total: devices.length,
         online: devices.filter((d) => d.status === 'online').length,
         offline: devices.filter((d) => d.status === 'offline').length,
-        maintenance: devices.filter((d) => d.status === 'maintenance').length,
         registered: registered.length,
         unregistered: unregistered.length,
       },

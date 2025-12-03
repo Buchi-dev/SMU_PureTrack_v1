@@ -20,6 +20,7 @@ import { useThemeToken } from '../../../theme';
 import type { WaterQualityAlert } from '../../../schemas';
 import { RealtimeAlertMonitor } from '../../../components/RealtimeAlertMonitor';
 import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
+import { ALERT_STATUS } from '../../../constants';
 import {
   DashboardHeader,
   DeviceStatsCards,
@@ -142,7 +143,7 @@ export const StaffDashboard = () => {
   const recentAlertsData: RecentAlert[] = useMemo(() => {
     return alerts
       .filter((alert: WaterQualityAlert) => 
-        alert.status === 'Active' || alert.status === 'Acknowledged'
+        alert.status === ALERT_STATUS.UNACKNOWLEDGED || alert.status === ALERT_STATUS.ACKNOWLEDGED
       )
       .slice(0, 5)
       .map((alert: WaterQualityAlert) => ({

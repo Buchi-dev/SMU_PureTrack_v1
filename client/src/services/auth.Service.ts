@@ -15,6 +15,9 @@ import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth, googleProvider } from '../config/firebase.config';
 import { apiClient, getErrorMessage } from '../config/api.config';
 import { AUTH_ENDPOINTS } from '../config/endpoints';
+import { ERROR_MESSAGES } from '../constants/errorMessages.constants';
+import { REQUEST_TIMEOUT } from '../constants/api.constants';
+import { isValidSMUEmail } from '../utils/validation.util';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -90,43 +93,24 @@ export class AuthService {
             'Authorization': `Bearer ${idToken}`
           },
           // Use longer timeout for token verification to allow backend processing
-          timeout: 15000, // 15 seconds
+          timeout: REQUEST_TIMEOUT.DEFAULT,
         }
       );
       return response.data;
     } catch (error: any) {
       // Check for specific error codes from backend
       if (error.response?.data?.errorCode === 'AUTH_INVALID_DOMAIN') {
-        const message = error.response.data.message || 
-          'Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.';
-        console.error('[AuthService] Domain validation failed:', message);
+        const message = error.response.data.message || ERROR_MESSAGES.AUTH.INVALID_EMAIL_DOMAIN;
+        if (import.meta.env.DEV) {
+          console.error('[AuthService] Domain validation failed:', message);
+        }
         throw new Error(message);
       }
       
       const message = getErrorMessage(error);
-      console.error('[AuthService] Token verification error:', message);
-      throw new Error(message);
-    }
-  }
-
-  /**
-   * Get current authenticated user from backend
-   * Requires valid Firebase ID token in Authorization header
-   * 
-   * @returns Promise with user data
-   * @throws {Error} If user is not authenticated
-   * @example
-   * const { user } = await authService.getCurrentUser();
-   */
-  async getCurrentUser(): Promise<CurrentUserResponse> {
-    try {
-      const response = await apiClient.get<CurrentUserResponse>(
-        AUTH_ENDPOINTS.CURRENT_USER
-      );
-      return response.data;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      console.error('[AuthService] Get current user error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[AuthService] Token verification error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -146,21 +130,11 @@ export class AuthService {
       );
       return response.data;
     } catch (error) {
-      console.error('[AuthService] Check status error:', error);
+      if (import.meta.env.DEV) {
+        console.error('[AuthService] Check status error:', error);
+      }
       return { authenticated: false, user: null };
     }
-  }
-
-  /**
-   * Check authentication status (alias for checkStatus)
-   * Used by AuthContext for compatibility
-   * 
-   * @returns Promise with authentication status
-   * @example
-   * const { authenticated, user } = await authService.checkAuthStatus();
-   */
-  async checkAuthStatus(): Promise<AuthStatusResponse> {
-    return this.checkStatus();
   }
 
   /**
@@ -182,13 +156,15 @@ export class AuthService {
 
       // CRITICAL: Check domain BEFORE backend verification to fail fast
       const email = firebaseUser.email;
-      if (!email || !email.endsWith('@smu.edu.ph')) {
-        console.warn('[AuthService] Domain validation failed - personal account detected:', email);
+      if (!email || !isValidSMUEmail(email)) {
+        if (import.meta.env.DEV) {
+          console.warn('[AuthService] Domain validation failed - personal account detected:', email);
+        }
         
         // Immediately sign out from Firebase to prevent session persistence
         await firebaseSignOut(auth);
         
-        throw new Error('Access denied: Only SMU email addresses (@smu.edu.ph) are allowed. Personal accounts are not permitted.');
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_EMAIL_DOMAIN);
       }
 
       // Get ID token from Firebase
@@ -212,19 +188,21 @@ export class AuthService {
       
       // Handle specific Firebase errors
       if (error.code === 'auth/popup-closed-by-user') {
-        throw new Error('Sign-in cancelled. Please try again.');
+        throw new Error(ERROR_MESSAGES.AUTH.UNAUTHORIZED);
       }
       
       if (error.code === 'auth/popup-blocked') {
-        throw new Error('Pop-up blocked by browser. Please allow pop-ups for this site.');
+        throw new Error(ERROR_MESSAGES.NETWORK.CORS_ERROR);
       }
       
       if (error.code === 'auth/network-request-failed') {
-        throw new Error('Network error. Please check your internet connection.');
+        throw new Error(ERROR_MESSAGES.NETWORK.NO_CONNECTION);
       }
       
       const message = getErrorMessage(error);
-      console.error('[AuthService] Google login error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[AuthService] Google login error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -250,7 +228,9 @@ export class AuthService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[AuthService] Logout error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[AuthService] Logout error:', message);
+      }
       throw new Error(message);
     }
   }

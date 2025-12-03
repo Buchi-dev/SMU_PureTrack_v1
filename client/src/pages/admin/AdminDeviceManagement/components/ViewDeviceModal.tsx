@@ -14,8 +14,6 @@ import {
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  WarningOutlined,
-  ToolOutlined,
   WifiOutlined,
   ApiOutlined,
   EnvironmentOutlined,
@@ -40,8 +38,6 @@ interface ViewDeviceModalProps {
 const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
-  error: { color: 'error', icon: <WarningOutlined /> },
-  maintenance: { color: 'warning', icon: <ToolOutlined /> },
 };
 
 export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalProps) => {
@@ -223,15 +219,6 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
             message="Device Offline"
             description="This device is currently offline. Sensor data is not available."
             type="warning"
-            showIcon
-          />
-        )}
-
-        {device.status === 'error' && (
-          <Alert
-            message="Device Error"
-            description="This device is reporting an error state. Please check the device logs."
-            type="error"
             showIcon
           />
         )}

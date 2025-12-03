@@ -2,8 +2,6 @@ import { Card, Space, Tag, Button, Typography, Tooltip } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  WarningOutlined,
-  ToolOutlined,
   WifiOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
@@ -16,8 +14,6 @@ const { Text, Title } = Typography;
 const statusConfig: Record<DeviceStatus, { color: string; icon: React.ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
-  error: { color: 'error', icon: <WarningOutlined /> },
-  maintenance: { color: 'warning', icon: <ToolOutlined /> },
 };
 
 interface UnregisteredDeviceCardProps {
@@ -47,7 +43,7 @@ export const UnregisteredDeviceCard = ({ device, onRegister }: UnregisteredDevic
           <div style={{ flex: 1 }}>
             <Space direction="vertical" size={4}>
               <Space size="small">
-                <WarningOutlined style={{ color: token.colorWarning, fontSize: '16px' }} />
+                <InfoCircleOutlined style={{ color: token.colorInfo, fontSize: '16px' }} />
                 <Title level={5} style={{ margin: 0, fontSize: '16px' }}>
                   {device.name}
                 </Title>

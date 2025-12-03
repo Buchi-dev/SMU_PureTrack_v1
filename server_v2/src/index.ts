@@ -8,6 +8,7 @@ import { mqttService, emailService, gridfsService, initializeLogger, logInfo, lo
 import { startDeviceOfflineChecker, stopDeviceOfflineChecker, startReportCleanupJob, stopReportCleanupJob } from '@feature/jobs';
 
 // Import entity routes
+import { authRoutes } from '@feature/auth';
 import { alertRoutes } from '@feature/alerts';
 import { userRoutes } from '@feature/users';
 import { deviceRoutes } from '@feature/devices';
@@ -48,6 +49,10 @@ app.get('/api', (_req: Request, res: Response) => {
 // API v1 routes
 const API_V1 = '/api/v1';
 
+// Auth routes (no /api/v1 prefix)
+app.use('/auth', authRoutes);
+
+// API routes
 app.use(`${API_V1}/alerts`, alertRoutes);
 app.use(`${API_V1}/users`, userRoutes);
 app.use(`${API_V1}/devices`, deviceRoutes);

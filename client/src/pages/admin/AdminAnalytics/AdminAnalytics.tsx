@@ -32,6 +32,7 @@ import {
   useAnalyticsSummary
 } from '../../../hooks';
 import { useAnalyticsProcessing, useAnalyticsStats } from './hooks';
+import { ALERT_STATUS } from '../../../constants';
 import {
   KeyMetrics,
   WaterQualityStandards,
@@ -78,7 +79,7 @@ export const AdminAnalytics = memo(() => {
       // Extract latestReading from device (populated by server aggregation)
       // Server returns devices with latestReading via MongoDB lookup
       const latestReading = (device as any).latestReading || null;
-      const activeDeviceAlerts = alerts.filter(a => a.deviceId === device.deviceId && a.status === 'Active');
+      const activeDeviceAlerts = alerts.filter(a => a.deviceId === device.deviceId && a.status === ALERT_STATUS.UNACKNOWLEDGED);
       
       // Calculate severity based on alerts and reading values
       let severityScore = 0;

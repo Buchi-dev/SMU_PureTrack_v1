@@ -8,6 +8,7 @@ import { memo } from 'react';
 import type { WaterQualityMetrics } from '../hooks';
 import type { Device } from '../../../../schemas';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -53,7 +54,7 @@ export const WaterQualityAssessment = memo<WaterQualityAssessmentProps>(({
     );
   }
 
-  const activeAlerts = alerts.filter(a => a.status === 'Active');
+  const activeAlerts = alerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED);
 
   return (
     <Card title="Water Quality Assessment & Standards">

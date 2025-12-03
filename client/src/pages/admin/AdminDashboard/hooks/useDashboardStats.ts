@@ -13,6 +13,7 @@
 
 import { useMemo } from 'react';
 import type { Device, DeviceWithReadings, WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../../constants';
 
 /**
  * Device statistics
@@ -87,13 +88,13 @@ export const calculateDeviceStats = (devices: (Device | DeviceWithReadings)[]): 
 export const calculateAlertStats = (alerts: WaterQualityAlert[]): AlertStats => {
   return {
     total: alerts.length,
-    active: alerts.filter((a) => a.status === 'Active').length,
+    active: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED).length,
     // Only count Active alerts by severity (exclude Resolved/Acknowledged)
-    critical: alerts.filter((a) => a.status === 'Active' && a.severity === 'Critical').length,
-    warning: alerts.filter((a) => a.status === 'Active' && a.severity === 'Warning').length,
-    advisory: alerts.filter((a) => a.status === 'Active' && a.severity === 'Advisory').length,
-    acknowledged: alerts.filter((a) => a.status === 'Acknowledged').length,
-    resolved: alerts.filter((a) => a.status === 'Resolved').length,
+    critical: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.CRITICAL).length,
+    warning: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.WARNING).length,
+    advisory: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.ADVISORY).length,
+    acknowledged: alerts.filter((a) => a.status === ALERT_STATUS.ACKNOWLEDGED).length,
+    resolved: alerts.filter((a) => a.status === ALERT_STATUS.RESOLVED).length,
   };
 };
 

@@ -20,6 +20,7 @@ import {
   formatAlertValue,
 } from '../../../../schemas';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -81,7 +82,7 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
     selectedRowKeys,
     onChange: (keys) => setSelectedRowKeys(keys),
     getCheckboxProps: (record) => ({
-      disabled: record.status !== 'Active',
+      disabled: record.status !== ALERT_STATUS.UNACKNOWLEDGED,
     }),
   };
 
@@ -98,8 +99,8 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
           <Tag 
             color={getStatusColor(record.status)} 
             icon={
-              record.status === 'Active' ? <ExclamationCircleOutlined /> :
-              record.status === 'Acknowledged' ? <CheckCircleOutlined /> :
+              record.status === ALERT_STATUS.UNACKNOWLEDGED ? <ExclamationCircleOutlined /> :
+              record.status === ALERT_STATUS.ACKNOWLEDGED ? <CheckCircleOutlined /> :
               <CloseCircleOutlined />
             }
           >
@@ -245,7 +246,7 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
               View
             </Button>
           </Tooltip>
-          {record.status === 'Active' && (
+          {record.status === ALERT_STATUS.UNACKNOWLEDGED && (
             <Tooltip title="Acknowledge Alert" getPopupContainer={(trigger) => trigger.parentElement || document.body}>
               <Button
                 type="link"

@@ -102,9 +102,14 @@ export const AdminReports = () => {
       macAddress: d.macAddress || 'N/A',
       ipAddress: d.ipAddress || 'N/A',
       sensors: d.sensors || ['tds', 'ph', 'turbidity'],
+      location: d.location || 'Unknown',
       status: d.status,
+      registrationStatus: d.isRegistered ? 'registered' : 'pending',
+      isRegistered: d.isRegistered ?? true,
       registeredAt: d.registeredAt,
       lastSeen: d.lastSeen,
+      createdAt: d.createdAt || d.registeredAt,
+      updatedAt: d.updatedAt || d.lastSeen,
       metadata: d.metadata
     }));
   }, [devicesWithReadings]);

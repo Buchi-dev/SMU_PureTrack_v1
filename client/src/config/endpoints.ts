@@ -33,9 +33,16 @@ export const USER_ENDPOINTS = {
 } as const;
 
 // ==================== ALERTS ====================
+// ✅ V2 Backend Routes:
+// GET /api/v1/alerts - List all alerts
+// GET /api/v1/alerts/statistics - Get statistics (not /stats)
+// GET /api/v1/alerts/:id - Get by ID
+// PATCH /api/v1/alerts/:id/acknowledge - Acknowledge
+// PATCH /api/v1/alerts/:id/resolve - Resolve
+// DELETE /api/v1/alerts/:id - Delete
 export const ALERT_ENDPOINTS = {
   LIST: `${API_VERSION}/alerts`,
-  STATS: `${API_VERSION}/alerts/stats`,
+  STATS: `${API_VERSION}/alerts/statistics`, // ✅ V2 uses /statistics
   BY_ID: (alertId: string) => `${API_VERSION}/alerts/${alertId}`,
   ACKNOWLEDGE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/acknowledge`,
   RESOLVE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/resolve`,
@@ -44,6 +51,11 @@ export const ALERT_ENDPOINTS = {
 } as const;
 
 // ==================== DEVICES ====================
+// ✅ V2 Backend Routes:
+// GET /api/v1/devices - List devices
+// GET /api/v1/devices/:id - Get by ID
+// PUT /api/v1/devices/:id - Update device
+// DELETE /api/v1/devices/:id - Delete device
 export const DEVICE_ENDPOINTS = {
   LIST: `${API_VERSION}/devices`,
   STATS: `${API_VERSION}/devices/stats`,
@@ -52,6 +64,22 @@ export const DEVICE_ENDPOINTS = {
   UPDATE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
   DELETE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
   PROCESS_READING: `${API_VERSION}/devices/readings`,
+} as const;
+
+// ==================== SENSOR READINGS ====================
+// ✅ V2 Backend Routes:
+// GET /api/v1/sensor-readings - List readings
+// GET /api/v1/sensor-readings/statistics - Statistics
+// GET /api/v1/sensor-readings/:deviceId/latest - Latest reading
+// POST /api/v1/sensor-readings - Create reading
+export const SENSOR_READING_ENDPOINTS = {
+  LIST: `${API_VERSION}/sensor-readings`,
+  STATISTICS: `${API_VERSION}/sensor-readings/statistics`,
+  AGGREGATED: `${API_VERSION}/sensor-readings/aggregated`,
+  COUNT: `${API_VERSION}/sensor-readings/count`,
+  LATEST: (deviceId: string) => `${API_VERSION}/sensor-readings/${deviceId}/latest`,
+  CREATE: `${API_VERSION}/sensor-readings`,
+  BULK: `${API_VERSION}/sensor-readings/bulk`,
 } as const;
 
 // ==================== REPORTS ====================
@@ -93,6 +121,7 @@ export const buildQuery = (params: Record<string, string | number | boolean | st
 
 /**
  * Build alerts list URL with filters
+ * ✅ V2 Backend expects: status, severity, deviceId, startDate, endDate, page, limit
  */
 export const buildAlertsUrl = (filters?: {
   status?: string;
@@ -103,13 +132,8 @@ export const buildAlertsUrl = (filters?: {
   page?: number;
   limit?: number;
 }): string => {
-  // Map client 'Active' status to server 'Unacknowledged' status
-  const mappedFilters = filters ? {
-    ...filters,
-    status: filters.status === 'Active' ? 'Unacknowledged' : filters.status,
-  } : undefined;
-  
-  return ALERT_ENDPOINTS.LIST + (mappedFilters ? buildQuery(mappedFilters) : '');
+  // ✅ No mapping needed - V2 uses 'Unacknowledged', 'Acknowledged', 'Resolved'
+  return ALERT_ENDPOINTS.LIST + (filters ? buildQuery(filters) : '');
 };
 
 /**

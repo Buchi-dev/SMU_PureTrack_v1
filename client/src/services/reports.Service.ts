@@ -17,6 +17,8 @@
 
 import { apiClient, getErrorMessage } from '../config/api.config';
 import { REPORT_ENDPOINTS, buildReportsUrl } from '../config/endpoints';
+import { ERROR_MESSAGES } from '../constants/errorMessages.constants';
+import { REQUEST_TIMEOUT } from '../constants/api.constants';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -161,7 +163,7 @@ export class ReportsService {
         REPORT_ENDPOINTS.WATER_QUALITY,
         request,
         {
-          timeout: 30000, // 30 seconds for report generation
+          timeout: REQUEST_TIMEOUT.LONG, // 60 seconds for report generation
         }
       );
 
@@ -203,7 +205,7 @@ export class ReportsService {
         REPORT_ENDPOINTS.DEVICE_STATUS,
         request,
         {
-          timeout: 30000, // 30 seconds for report generation
+          timeout: REQUEST_TIMEOUT.LONG, // 60 seconds for report generation
         }
       );
       return response.data;
@@ -306,7 +308,7 @@ export class ReportsService {
         deviceIds: request.deviceIds as string[] | undefined,
       });
     }
-    throw new Error(`Unsupported report type: ${request.reportType as string}`);
+    throw new Error(ERROR_MESSAGES.REPORT.INVALID_TYPE);
   }
 
   /**
@@ -341,7 +343,9 @@ export class ReportsService {
         pagination: response.data.pagination,
       };
     } catch (error) {
-      throw new Error(`Failed to fetch report history: ${getErrorMessage(error)}`);
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Report history error:', message);
+      throw new Error(message);
     }
   }
 
@@ -359,11 +363,14 @@ export class ReportsService {
       const url = REPORT_ENDPOINTS.DOWNLOAD(fileId);
       const response = await apiClient.get(url, {
         responseType: 'blob',
+        timeout: REQUEST_TIMEOUT.DOWNLOAD,
       });
 
       return response.data;
     } catch (error) {
-      throw new Error(`Failed to download report: ${getErrorMessage(error)}`);
+      const message = getErrorMessage(error);
+      console.error('[ReportsService] Download error:', message);
+      throw new Error(message);
     }
   }
 
@@ -371,14 +378,14 @@ export class ReportsService {
    * @deprecated Use generateDataSummaryReport() - not yet implemented on server
    */
   async generateDataSummaryReport(): Promise<ReportListResponse> {
-    throw new Error('Data summary reports not yet implemented on Express server');
+    throw new Error(ERROR_MESSAGES.GENERAL.NOT_IMPLEMENTED);
   }
 
   /**
    * @deprecated Use generateComplianceReport() - not yet implemented on server
    */
   async generateComplianceReport(): Promise<ReportListResponse> {
-    throw new Error('Compliance reports not yet implemented on Express server');
+    throw new Error(ERROR_MESSAGES.GENERAL.NOT_IMPLEMENTED);
   }
 }
 

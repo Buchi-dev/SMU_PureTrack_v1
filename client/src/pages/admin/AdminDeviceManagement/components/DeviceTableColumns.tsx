@@ -6,8 +6,6 @@ import {
   EyeOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  WarningOutlined,
-  ToolOutlined,
   WifiOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
@@ -22,8 +20,6 @@ const { Text } = Typography;
 const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
-  error: { color: 'error', icon: <WarningOutlined /> },
-  maintenance: { color: 'warning', icon: <ToolOutlined /> },
 };
 
 interface UseDeviceColumnsProps {
@@ -85,7 +81,6 @@ export const useDeviceColumns = ({
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
-        { text: 'Maintenance', value: 'maintenance' },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status: DeviceStatus) => (
@@ -248,7 +243,7 @@ export const useDeviceColumns = ({
       render: (text) => (
         <Tooltip title={text}>
           <Space size="small">
-            <WarningOutlined style={{ color: token.colorWarning as string, fontSize: '14px' }} />
+            <InfoCircleOutlined style={{ color: token.colorInfo as string, fontSize: '14px' }} />
             <Text strong code style={{ fontSize: '12px' }}>
               {text}
             </Text>
@@ -289,7 +284,6 @@ export const useDeviceColumns = ({
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
-        { text: 'Maintenance', value: 'maintenance' },
       ],
       onFilter: (value, record) => record.status === value,
       render: (status: DeviceStatus) => (

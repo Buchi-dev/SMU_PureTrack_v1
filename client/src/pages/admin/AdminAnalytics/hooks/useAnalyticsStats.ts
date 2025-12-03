@@ -20,6 +20,7 @@ import {
   HEALTH_COLORS,
   calculateServerHealthScore 
 } from '../../AdminDashboard/config';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../../constants';
 
 /**
  * Device statistics
@@ -113,13 +114,13 @@ const calculateDeviceStats = (devices: DeviceWithReadings[]): DeviceStats => {
 const calculateAlertStats = (alerts: WaterQualityAlert[]): AlertStats => {
   return {
     total: alerts.length,
-    active: alerts.filter((a) => a.status === 'Active').length,
+    active: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED).length,
     // Only count Active alerts by severity (exclude Resolved/Acknowledged)
-    critical: alerts.filter((a) => a.status === 'Active' && a.severity === 'Critical').length,
-    warning: alerts.filter((a) => a.status === 'Active' && a.severity === 'Warning').length,
-    advisory: alerts.filter((a) => a.status === 'Active' && a.severity === 'Advisory').length,
-    acknowledged: alerts.filter((a) => a.status === 'Acknowledged').length,
-    resolved: alerts.filter((a) => a.status === 'Resolved').length,
+    critical: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.CRITICAL).length,
+    warning: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.WARNING).length,
+    advisory: alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.ADVISORY).length,
+    acknowledged: alerts.filter((a) => a.status === ALERT_STATUS.ACKNOWLEDGED).length,
+    resolved: alerts.filter((a) => a.status === ALERT_STATUS.RESOLVED).length,
   };
 };
 
@@ -306,23 +307,26 @@ const calculateDevicePerformance = (devices: DeviceWithReadings[], alerts: Water
       const { ph, tds, turbidity } = device.latestReading;
       
       // pH penalty (WHO: 6.5-8.5)
-      if (ph < 6.5 || ph > 8.5) {
+      const phValue = ph ?? 7.0;
+      if (phValue < 6.5 || phValue > 8.5) {
         qualityScore -= 30;
-      } else if (ph < 6.8 || ph > 8.2) {
+      } else if (phValue < 6.8 || phValue > 8.2) {
         qualityScore -= 10;
       }
       
       // TDS penalty (WHO: ≤ 500 ppm)
-      if (tds > 500) {
+      const tdsValue = tds ?? 0;
+      if (tdsValue > 500) {
         qualityScore -= 30;
-      } else if (tds > 400) {
+      } else if (tdsValue > 400) {
         qualityScore -= 10;
       }
       
       // Turbidity penalty (WHO: ≤ 5 NTU)
-      if (turbidity > 5) {
+      const turbidityValue = turbidity ?? 0;
+      if (turbidityValue > 5) {
         qualityScore -= 30;
-      } else if (turbidity > 4) {
+      } else if (turbidityValue > 4) {
         qualityScore -= 10;
       }
 

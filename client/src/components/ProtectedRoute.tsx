@@ -8,6 +8,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { Spin, Result, Button } from "antd";
 import { LoadingOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuth } from "../contexts";
+import { isValidSMUEmail } from "../utils/validation.util";
 
 /**
  * Loading Spinner Component
@@ -50,7 +51,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   // CRITICAL: Domain validation - block personal accounts
-  if (user && (!user.email || !user.email.endsWith('@smu.edu.ph'))) {
+  if (user && (!user.email || !isValidSMUEmail(user.email))) {
     console.error('[ProtectedRoute] Unauthorized access - personal account detected:', user.email);
     return <Navigate to="/auth/login" replace />;
   }
@@ -79,7 +80,7 @@ export function ApprovedRoute({ children }: ProtectedRouteProps) {
   }
 
   // CRITICAL: Domain validation - block personal accounts
-  if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
+  if (!user.email || !isValidSMUEmail(user.email)) {
     console.error('[ApprovedRoute] Unauthorized access - personal account detected:', user.email);
     return <Navigate to="/auth/login" replace />;
   }
@@ -123,7 +124,7 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
   }
 
   // CRITICAL: Domain validation - block personal accounts
-  if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
+  if (!user.email || !isValidSMUEmail(user.email)) {
     console.error('[AdminRoute] Unauthorized access - personal account detected:', user.email);
     return <Navigate to="/auth/login" replace />;
   }

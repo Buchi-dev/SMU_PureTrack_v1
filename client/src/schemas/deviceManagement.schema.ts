@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { SENSOR_THRESHOLDS } from '../constants/waterQuality.constants';
 
 // ============================================================================
 // ENUMS
@@ -13,8 +14,15 @@ import { z } from 'zod';
 
 /**
  * Device Status
+ * ✅ V2 Backend: 'online' | 'offline'
  */
-export const DeviceStatusSchema = z.enum(['online', 'offline', 'error', 'maintenance']);
+export const DeviceStatusSchema = z.enum(['online', 'offline']);
+
+/**
+ * Device Registration Status  
+ * ✅ V2 Backend: 'registered' | 'pending'
+ */
+export const DeviceRegistrationStatusSchema = z.enum(['registered', 'pending']);
 
 // ============================================================================
 // NESTED OBJECT SCHEMAS
@@ -44,10 +52,11 @@ export const DeviceMetadataSchema = z.object({
 
 /**
  * Device Document Schema
- * Represents a device in Firestore
+ * ✅ Matches V2 Backend device.types.ts
  */
 export const DeviceSchema = z.object({
-  id: z.string(),
+  id: z.union([z.string(), z.any()]).optional(), // MongoDB _id (can be ObjectId or string)
+  _id: z.any().optional(), // MongoDB _id as ObjectId
   deviceId: z.string(),
   name: z.string(),
   type: z.string(),
@@ -55,24 +64,41 @@ export const DeviceSchema = z.object({
   macAddress: z.string(),
   ipAddress: z.string(),
   sensors: z.array(z.string()),
+  location: z.string(), // ✅ V2 uses string location, not nested object
   status: DeviceStatusSchema,
-  registrationStatus: z.enum(['registered', 'pending']).optional(),
-  isRegistered: z.boolean().optional(),
-  registeredAt: z.any(), // Firebase Timestamp
-  lastSeen: z.any(), // Firebase Timestamp
+  registrationStatus: DeviceRegistrationStatusSchema,
+  isRegistered: z.boolean(),
+  lastSeen: z.union([z.date(), z.any()]),
   metadata: DeviceMetadataSchema.optional(),
+  createdAt: z.union([z.date(), z.any()]),
+  updatedAt: z.union([z.date(), z.any()]).optional(),
+  // Legacy fields for backwards compatibility
+  registeredAt: z.any().optional(),
 });
 
 /**
  * Sensor Reading Schema
+ * ✅ V2 Backend uses: pH (capital H), turbidity, tds
+ * ✅ Uses SENSOR_THRESHOLDS from constants for validation
  */
 export const SensorReadingSchema = z.object({
+  id: z.union([z.string(), z.any()]).optional(),
+  _id: z.any().optional(),
   deviceId: z.string(),
-  turbidity: z.number().min(0),
-  tds: z.number().min(0),
-  ph: z.number().min(0).max(14),
-  timestamp: z.number(),
-  receivedAt: z.number(),
+  pH: z.number()
+    .min(SENSOR_THRESHOLDS.pH.critical.min, `pH must be at least ${SENSOR_THRESHOLDS.pH.critical.min}`)
+    .max(SENSOR_THRESHOLDS.pH.critical.max, `pH must not exceed ${SENSOR_THRESHOLDS.pH.critical.max}`),
+  turbidity: z.number()
+    .min(0, 'Turbidity must be non-negative')
+    .max(SENSOR_THRESHOLDS.turbidity.critical * 2, `Turbidity reading exceeds maximum expected value`),
+  tds: z.number()
+    .min(0, 'TDS must be non-negative')
+    .max(SENSOR_THRESHOLDS.tds.critical * 2, `TDS reading exceeds maximum expected value`),
+  timestamp: z.union([z.date(), z.any()]),
+  createdAt: z.union([z.date(), z.any()]).optional(),
+  // Legacy fields for backwards compatibility
+  ph: z.number().optional(), // Lowercase for compatibility
+  receivedAt: z.number().optional(),
 });
 
 // ============================================================================
@@ -120,6 +146,7 @@ export const DeviceResponseSchema = z.object({
 // ============================================================================
 
 export type DeviceStatus = z.infer<typeof DeviceStatusSchema>;
+export type DeviceRegistrationStatus = z.infer<typeof DeviceRegistrationStatusSchema>;
 export type DeviceLocation = z.infer<typeof DeviceLocationSchema>;
 export type DeviceMetadata = z.infer<typeof DeviceMetadataSchema>;
 export type Device = z.infer<typeof DeviceSchema>;

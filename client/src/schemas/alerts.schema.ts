@@ -6,6 +6,11 @@
  */
 
 import { z } from 'zod';
+import { 
+  ALERT_SEVERITY, 
+  ALERT_STATUS, 
+  WATER_QUALITY_PARAMETERS 
+} from '../constants/waterQuality.constants';
 
 // ============================================================================
 // ENUMS
@@ -13,18 +18,32 @@ import { z } from 'zod';
 
 /**
  * Water Quality Alert Status
+ * ✅ V2 Backend: 'Unacknowledged' | 'Acknowledged' | 'Resolved'
+ * Uses constants from waterQuality.constants.ts
  */
-export const WaterQualityAlertStatusSchema = z.enum(['Active', 'Acknowledged', 'Resolved']);
+export const WaterQualityAlertStatusSchema = z.enum([
+  ALERT_STATUS.UNACKNOWLEDGED,
+  ALERT_STATUS.ACKNOWLEDGED,
+  ALERT_STATUS.RESOLVED
+] as const);
 
 /**
  * Water Quality Alert Severity
+ * ✅ V2 Backend: 'Critical' | 'Warning' | 'Advisory'
+ * Uses constants from waterQuality.constants.ts
  */
-export const WaterQualityAlertSeveritySchema = z.enum(['Advisory', 'Warning', 'Critical']);
+export const WaterQualityAlertSeveritySchema = z.enum([
+  ALERT_SEVERITY.ADVISORY,
+  ALERT_SEVERITY.WARNING,
+  ALERT_SEVERITY.CRITICAL
+] as const);
 
 /**
  * Water Quality Parameter
+ * ✅ V2 Backend: 'pH' | 'Turbidity' | 'TDS' (capitalized)
+ * Uses keys from WATER_QUALITY_PARAMETERS
  */
-export const WaterQualityParameterSchema = z.enum(['tds', 'ph', 'turbidity']);
+export const WaterQualityParameterSchema = z.enum(['pH', 'Turbidity', 'TDS'] as const);
 
 /**
  * Trend Direction
@@ -42,38 +61,46 @@ export const WaterQualityAlertTypeSchema = z.enum(['threshold', 'trend']);
 
 /**
  * Water Quality Alert Document Schema
- * Represents a water quality alert in Firestore
- * Note: Firestore Timestamp fields are typed as `any` for flexibility
+ * ✅ Matches V2 Backend alert.types.ts
+ * V2 Backend has: value, threshold, parameter (capitalized), status (Unacknowledged/Acknowledged/Resolved)
  */
 export const WaterQualityAlertSchema = z.object({
-  id: z.string().optional(), // MongoDB _id (used for API operations)
+  id: z.union([z.string(), z.any()]).optional(), // MongoDB _id (can be ObjectId or string)
+  _id: z.any().optional(), // MongoDB _id as ObjectId
   alertId: z.string(),
   deviceId: z.string(),
-  deviceName: z.string().optional(),
+  deviceName: z.string(),
+  severity: WaterQualityAlertSeveritySchema,
+  parameter: WaterQualityParameterSchema,
+  value: z.number(), // ✅ V2 field name (primary)
+  threshold: z.number(), // ✅ V2 field name (not nullable in V2)
+  message: z.string(),
+  status: WaterQualityAlertStatusSchema,
+  acknowledged: z.boolean().optional(), // V2 has this field
+  acknowledgedAt: z.union([z.date(), z.any()]).optional().nullable(),
+  acknowledgedBy: z.any().optional().nullable(), // Can be ObjectId or populated user
+  resolvedAt: z.union([z.date(), z.any()]).optional().nullable(),
+  resolvedBy: z.any().optional().nullable(), // Can be ObjectId or populated user
+  resolutionNotes: z.string().optional(),
+  timestamp: z.union([z.date(), z.any()]),
+  occurrenceCount: z.number().optional(),
+  firstOccurrence: z.union([z.date(), z.any()]).optional(),
+  lastOccurrence: z.union([z.date(), z.any()]).optional(),
+  currentValue: z.number().optional(), // Alias for 'value' (for compatibility)
+  emailSent: z.boolean().optional(),
+  emailSentAt: z.union([z.date(), z.any()]).optional().nullable(),
+  createdAt: z.union([z.date(), z.any()]),
+  updatedAt: z.union([z.date(), z.any()]).optional(),
+  // Legacy fields (removed in V2, kept for backwards compatibility)
   deviceBuilding: z.string().optional(),
   deviceFloor: z.string().optional(),
-  parameter: WaterQualityParameterSchema,
-  alertType: WaterQualityAlertTypeSchema,
-  severity: WaterQualityAlertSeveritySchema,
-  status: WaterQualityAlertStatusSchema,
-  // ✅ Database field mapping: 'value' in DB → 'currentValue' in schema
-  currentValue: z.number().optional(), // Mapped from 'value' field in database
-  value: z.number().optional(), // Raw database field (for backwards compatibility)
-  previousValue: z.number().optional(), // Previous sensor reading
-  changeRate: z.number().optional(), // Rate of change (can be Infinity)
-  thresholdValue: z.number().nullable().optional(), // Can be null in database
+  alertType: WaterQualityAlertTypeSchema.optional(),
+  previousValue: z.number().optional(),
+  changeRate: z.number().optional(),
+  thresholdValue: z.number().optional(), // Alias for 'threshold'
   trendDirection: TrendDirectionSchema.optional(),
-  message: z.string().optional(), // Some alerts may not have message
-  recommendedAction: z.string().optional(), // Some alerts may not have recommendations
-  timestamp: z.any().optional(), // Server timestamp field
-  createdAt: z.any(), // Firestore Timestamp
-  updatedAt: z.any().optional(), // Firestore Timestamp
-  acknowledgedAt: z.any().optional(), // Firestore Timestamp
-  acknowledgedBy: z.string().optional(),
-  resolvedAt: z.any().optional(), // Firestore Timestamp
-  resolvedBy: z.string().optional(),
-  resolutionNotes: z.string().optional(),
-  notificationsSent: z.array(z.string()).optional(), // Can be empty array or missing
+  recommendedAction: z.string().optional(),
+  notificationsSent: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
@@ -168,46 +195,33 @@ export type AlertResponse = z.infer<typeof AlertResponseSchema>;
 
 /**
  * Get display unit for water parameter
+ * Uses constants from waterQuality.constants.ts
  */
 export const getParameterUnit = (parameter: WaterQualityParameter): string => {
-  switch (parameter) {
-    case 'tds':
-      return 'ppm';
-    case 'ph':
-      return '';
-    case 'turbidity':
-      return 'NTU';
-    default:
-      return '';
-  }
+  const paramInfo = WATER_QUALITY_PARAMETERS[parameter];
+  return paramInfo?.unit || '';
 };
 
 /**
  * Get display name for water parameter
+ * Uses constants from waterQuality.constants.ts
  */
 export const getParameterName = (parameter: WaterQualityParameter): string => {
-  switch (parameter) {
-    case 'tds':
-      return 'TDS (Total Dissolved Solids)';
-    case 'ph':
-      return 'pH Level';
-    case 'turbidity':
-      return 'Turbidity';
-    default:
-      return parameter;
-  }
+  const paramInfo = WATER_QUALITY_PARAMETERS[parameter];
+  return paramInfo?.name || parameter;
 };
 
 /**
  * Get Ant Design color tag for severity
+ * Uses constants from waterQuality.constants.ts
  */
 export const getSeverityColor = (severity: WaterQualityAlertSeverity): string => {
   switch (severity) {
-    case 'Critical':
+    case ALERT_SEVERITY.CRITICAL:
       return 'error';
-    case 'Warning':
+    case ALERT_SEVERITY.WARNING:
       return 'warning';
-    case 'Advisory':
+    case ALERT_SEVERITY.ADVISORY:
       return 'processing';
     default:
       return 'default';
@@ -216,14 +230,15 @@ export const getSeverityColor = (severity: WaterQualityAlertSeverity): string =>
 
 /**
  * Get Ant Design color tag for status
+ * ✅ Updated for V2 status values with constants
  */
 export const getStatusColor = (status: WaterQualityAlertStatus): string => {
   switch (status) {
-    case 'Active':
+    case ALERT_STATUS.UNACKNOWLEDGED:
       return 'error';
-    case 'Acknowledged':
+    case ALERT_STATUS.ACKNOWLEDGED:
       return 'warning';
-    case 'Resolved':
+    case ALERT_STATUS.RESOLVED:
       return 'success';
     default:
       return 'default';

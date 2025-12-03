@@ -10,6 +10,7 @@ import { authService, type AuthUser } from "../services/auth.Service";
 import { auth } from "../config/firebase.config";
 import { onAuthStateChanged } from "firebase/auth";
 import { AuthContext, type AuthContextType } from "./auth.context";
+import { isValidSMUEmail } from "../utils/validation.util";
 
 // User status types (mapped from MongoDB model)
 export type UserStatus = "active" | "pending" | "suspended";
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const fetchUser = useCallback(async () => {
     try {
-      const { authenticated, user: userData } = await authService.checkAuthStatus();
+      const { authenticated, user: userData } = await authService.checkStatus();
       
       if (authenticated && userData) {
         setUser(userData);
@@ -79,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // CRITICAL: Domain validation BEFORE any backend calls
         const email = firebaseUser.email;
-        if (!email || !email.endsWith('@smu.edu.ph')) {
+        if (!email || !isValidSMUEmail(email)) {
           console.error('[AuthContext] Domain validation failed - personal account detected:', email);
           console.error('[AuthContext] Signing out unauthorized user immediately');
           

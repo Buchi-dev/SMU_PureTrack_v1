@@ -2,7 +2,6 @@ import { Row, Col } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ToolOutlined,
   InfoCircleOutlined,
   DashboardOutlined,
 } from '@ant-design/icons';
@@ -14,7 +13,6 @@ interface DeviceStatsProps {
     total: number;
     online: number;
     offline: number;
-    maintenance: number;
     registered: number;
     unregistered: number;
   };
@@ -25,7 +23,7 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
 
   return (
     <Row gutter={[16, 16]}>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <StatsCard
           title="Total Devices"
           value={stats.total}
@@ -35,7 +33,7 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
           size="small"
         />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <StatsCard
           title="Online"
           value={stats.online}
@@ -45,7 +43,7 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
           size="small"
         />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <StatsCard
           title="Offline"
           value={stats.offline}
@@ -55,17 +53,7 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
           size="small"
         />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
-        <StatsCard
-          title="Maintenance"
-          value={stats.maintenance}
-          icon={<ToolOutlined />}
-          color={token.colorWarning}
-          description="Under maintenance"
-          size="small"
-        />
-      </Col>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <StatsCard
           title="Registered"
           value={stats.registered}
@@ -75,7 +63,7 @@ export const DeviceStats = ({ stats }: DeviceStatsProps) => {
           size="small"
         />
       </Col>
-      <Col xs={24} sm={12} md={8} lg={4} xl={4}>
+      <Col xs={24} sm={12} md={8} lg={6} xl={6}>
         <StatsCard
           title="Unregistered"
           value={stats.unregistered}

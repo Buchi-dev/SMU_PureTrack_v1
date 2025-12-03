@@ -8,6 +8,9 @@
 import { z } from 'zod';
 import { SensorReadingSchema } from './deviceManagement.schema';
 
+// Note: Report schemas use enums for report types and formats
+// Water quality thresholds are imported via SensorReadingSchema from deviceManagement.schema
+
 // ============================================================================
 // ENUMS
 // ============================================================================

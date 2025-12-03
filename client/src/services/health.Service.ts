@@ -13,6 +13,7 @@
  */
 
 import { apiClient, getErrorMessage } from '../config/api.config';
+import { REQUEST_TIMEOUT } from '../constants/api.constants';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -183,7 +184,9 @@ export class HealthService {
    */
   async getSystemHealth(): Promise<SystemHealth> {
     try {
-      const response = await apiClient.get<SystemHealth>('/health');
+      const response = await apiClient.get<SystemHealth>('/health', {
+        timeout: REQUEST_TIMEOUT.SHORT,
+      });
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -203,7 +206,9 @@ export class HealthService {
    */
   async checkLiveness(): Promise<LivenessResponse> {
     try {
-      const response = await apiClient.get<LivenessResponse>('/health/liveness');
+      const response = await apiClient.get<LivenessResponse>('/health/liveness', {
+        timeout: REQUEST_TIMEOUT.SHORT,
+      });
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
@@ -223,7 +228,9 @@ export class HealthService {
    */
   async checkReadiness(): Promise<ReadinessResponse> {
     try {
-      const response = await apiClient.get<ReadinessResponse>('/health/readiness');
+      const response = await apiClient.get<ReadinessResponse>('/health/readiness', {
+        timeout: REQUEST_TIMEOUT.SHORT,
+      });
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);

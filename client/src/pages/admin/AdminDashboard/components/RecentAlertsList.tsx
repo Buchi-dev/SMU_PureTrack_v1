@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -208,8 +209,8 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
                               type="secondary" 
                               style={{ 
                                 fontSize: '11px',
-                                color: alert.status === 'Active' ? '#ff4d4f' : 
-                                       alert.status === 'Acknowledged' ? '#faad14' : '#52c41a'
+                                color: alert.status === ALERT_STATUS.UNACKNOWLEDGED ? '#ff4d4f' : 
+                                       alert.status === ALERT_STATUS.ACKNOWLEDGED ? '#faad14' : '#52c41a'
                               }}
                             >
                               {alert.status}

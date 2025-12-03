@@ -32,6 +32,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../constants';
 import { useThemeToken } from '../../../theme';
 import { useAlerts, useAlertMutations } from '../../../hooks';
 import { PageHeader, StatsCard } from '../../../components/staff';
@@ -99,12 +100,12 @@ export const StaffAlerts = () => {
 
   // Calculate filtered stats
   const filteredStats = useMemo(() => {
-    const active = filteredAlerts.filter(a => a.status === 'Active').length;
-    const acknowledged = filteredAlerts.filter(a => a.status === 'Acknowledged').length;
-    const resolved = filteredAlerts.filter(a => a.status === 'Resolved').length;
-    const critical = filteredAlerts.filter(a => a.severity === 'Critical').length;
-    const warning = filteredAlerts.filter(a => a.severity === 'Warning').length;
-    const advisory = filteredAlerts.filter(a => a.severity === 'Advisory').length;
+    const active = filteredAlerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED).length;
+    const acknowledged = filteredAlerts.filter(a => a.status === ALERT_STATUS.ACKNOWLEDGED).length;
+    const resolved = filteredAlerts.filter(a => a.status === ALERT_STATUS.RESOLVED).length;
+    const critical = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.CRITICAL).length;
+    const warning = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.WARNING).length;
+    const advisory = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.ADVISORY).length;
 
     return {
       total: filteredAlerts.length,
@@ -350,7 +351,7 @@ export const StaffAlerts = () => {
           >
             Details
           </Button>
-          {record.status === 'Active' && (
+          {record.status === ALERT_STATUS.UNACKNOWLEDGED && (
             <Button
               size="small"
               type="primary"
@@ -361,7 +362,7 @@ export const StaffAlerts = () => {
               Acknowledge
             </Button>
           )}
-          {(record.status === 'Active' || record.status === 'Acknowledged') && (
+          {(record.status === ALERT_STATUS.UNACKNOWLEDGED || record.status === ALERT_STATUS.ACKNOWLEDGED) && (
             <Button
               size="small"
               type="default"
@@ -562,7 +563,7 @@ export const StaffAlerts = () => {
             <Button key="close" onClick={() => setDetailsModalVisible(false)}>
               Close
             </Button>,
-            selectedAlert?.status === 'Active' && (
+            selectedAlert?.status === ALERT_STATUS.UNACKNOWLEDGED && (
               <Button
                 key="acknowledge"
                 type="primary"
@@ -576,7 +577,7 @@ export const StaffAlerts = () => {
                 Acknowledge
               </Button>
             ),
-            (selectedAlert?.status === 'Active' || selectedAlert?.status === 'Acknowledged') && (
+            (selectedAlert?.status === ALERT_STATUS.UNACKNOWLEDGED || selectedAlert?.status === ALERT_STATUS.ACKNOWLEDGED) && (
               <Button
                 key="resolve"
                 type="primary"

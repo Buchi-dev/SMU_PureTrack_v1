@@ -15,6 +15,7 @@ import {
   HEALTH_COLORS,
 } from '../config/healthThresholds';
 import { calculateSystemHealth, getSystemHealthColor, getSystemHealthDescription } from '../utils';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../../constants';
 
 const { Text, Title } = Typography;
 
@@ -270,16 +271,16 @@ export const DashboardSummary = memo<DashboardSummaryProps>(({
             <div style={{ flex: 1 }}>
               <LiveMetricIndicator
                 title="Active Alerts"
-                currentValue={alerts.filter(a => a.status === 'Active').length}
+                currentValue={alerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED).length}
                 totalValue={alerts.length}
                 icon={<ArrowUpOutlined />}
                 color={
-                  alerts.filter(a => a.status === 'Active' && a.severity === 'Critical').length > 0 ? HEALTH_COLORS.ERROR :
-                  alerts.filter(a => a.status === 'Active' && a.severity === 'Warning').length > 0 ? HEALTH_COLORS.WARNING :
+                  alerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.CRITICAL).length > 0 ? HEALTH_COLORS.ERROR :
+                  alerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED && a.severity === ALERT_SEVERITY.WARNING).length > 0 ? HEALTH_COLORS.WARNING :
                   HEALTH_COLORS.EXCELLENT
                 }
                 subtitle={`${alerts.length} total alerts`}
-                tooltip={`${alerts.filter(a => a.status === 'Active').length} active alerts out of ${alerts.length} total`}
+                tooltip={`${alerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED).length} active alerts out of ${alerts.length} total`}
                 loading={loading}
               />
             </div>

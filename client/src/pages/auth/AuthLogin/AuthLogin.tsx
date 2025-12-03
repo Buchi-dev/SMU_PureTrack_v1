@@ -36,7 +36,9 @@ export default function AuthLogin() {
 
     // Redirect if already authenticated
     if (!loading && isAuthenticated && user) {
-      console.log('[AuthLogin] User authenticated, redirecting...', user);
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] User authenticated, redirecting...', user);
+      }
       
       // Route based on user role and status
       if (user.status === 'suspended') {
@@ -80,14 +82,18 @@ export default function AuthLogin() {
       // Domain check is now done in authService.loginWithGoogle()
       // If we reach here, the user has a valid SMU email
       
-      console.log('[AuthLogin] Login successful, user:', response.user);
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] Login successful, user:', response.user);
+      }
       
       // Wait for Firebase auth state to be fully established
       // This ensures subsequent API calls will have auth.currentUser available
       await new Promise<void>((resolve) => {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
-            console.log('[AuthLogin] Firebase auth state confirmed for:', firebaseUser.email);
+            if (import.meta.env.DEV) {
+              console.log('[AuthLogin] Firebase auth state confirmed for:', firebaseUser.email);
+            }
             unsubscribe();
             resolve();
           }
@@ -105,15 +111,21 @@ export default function AuthLogin() {
       
       // Now refetch the user through AuthContext
       // At this point, auth.currentUser is ready, so the API interceptor will work
-      console.log('[AuthLogin] Refetching user through AuthContext...');
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] Refetching user through AuthContext...');
+      }
       await refetchUser();
       
-      console.log('[AuthLogin] User refetched successfully');
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] User refetched successfully');
+      }
       
       // If we reach here and still not authenticated, something is wrong
       // Navigate manually based on the login response
       if (!isAuthenticated) {
-        console.warn('[AuthLogin] AuthContext not updated, navigating manually');
+        if (import.meta.env.DEV) {
+          console.warn('[AuthLogin] AuthContext not updated, navigating manually');
+        }
         const loggedInUser = response.user;
         
         if (loggedInUser.status === 'suspended') {
@@ -138,7 +150,9 @@ export default function AuthLogin() {
       // Otherwise, useEffect will handle navigation and stop loading
       
     } catch (err) {
-      console.error('[AuthLogin] Login failed:', err);
+      if (import.meta.env.DEV) {
+        console.error('[AuthLogin] Login failed:', err);
+      }
       const errorMessage = (err as Error).message || 'Failed to sign in. Please try again.';
       
       // Show user-friendly error for domain validation

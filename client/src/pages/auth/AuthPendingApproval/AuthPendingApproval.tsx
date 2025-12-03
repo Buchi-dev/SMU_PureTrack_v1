@@ -17,6 +17,7 @@ import {
 } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
+import { isValidSMUEmail } from "../../../utils/validation.util";
 
 const { Title, Text } = Typography;
 
@@ -35,18 +36,23 @@ export const AuthPendingApproval = () => {
     // Check status and redirect accordingly
     if (!authLoading && user) {
       // CRITICAL: Domain validation - block personal accounts
-      if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
-        console.error('[PendingApproval] Unauthorized access attempt - personal account detected:', user.email);
+      if (!user.email || !isValidSMUEmail(user.email)) {
+        if (import.meta.env.DEV) {
+          console.error('[PendingApproval] Unauthorized access attempt - personal account detected:', user.email);
+        }
         navigate("/auth/login");
         return;
       }
       
-      console.log("User status:", user.status);
+      if (import.meta.env.DEV) {
+        console.log("User status:", user.status);
+      }
 
       // If status changes to active, redirect to dashboard
       if (user.status === "active") {
-        console.log("User approved! Redirecting to dashboard...");
-        
+        if (import.meta.env.DEV) {
+          console.log("User approved! Redirecting to dashboard...");
+        }
         if (user.role === "admin") {
           navigate("/admin/dashboard");
         } else if (user.role === "staff") {
@@ -59,7 +65,9 @@ export const AuthPendingApproval = () => {
 
       // If status changes to suspended
       if (user.status === "suspended") {
-        console.log("User suspended! Redirecting...");
+        if (import.meta.env.DEV) {
+          console.log("User suspended! Redirecting...");
+        }
         navigate("/auth/account-suspended");
         return;
       }
@@ -71,7 +79,9 @@ export const AuthPendingApproval = () => {
     if (!isAuthenticated || !user) return;
 
     const interval = setInterval(async () => {
-      console.log("Checking for status updates...");
+      if (import.meta.env.DEV) {
+        console.log("Checking for status updates...");
+      }
       await refetchUser();
     }, 30000); // 30 seconds
 
@@ -82,7 +92,9 @@ export const AuthPendingApproval = () => {
     try {
       await authService.logout();
     } catch (error) {
-      console.error("Error signing out:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error signing out:", error);
+      }
     }
   };
 

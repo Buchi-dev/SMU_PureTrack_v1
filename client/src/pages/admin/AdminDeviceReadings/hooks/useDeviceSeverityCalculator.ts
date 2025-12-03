@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { Device, SensorReading, DeviceWithReadings } from '../../../../schemas/deviceManagement.schema';
 import type { WaterQualityAlert } from '../../../../schemas/alerts.schema';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../../constants';
 
 /**
  * UI-specific hook for device severity calculation and sorting
@@ -48,13 +49,13 @@ export const useDeviceSeverityCalculator = () => {
 
       // Filter active alerts for this device
       const criticalAlerts = deviceAlerts.filter(
-        (a) => a.deviceId === device.deviceId && a.severity === 'Critical' && a.status === 'Active'
+        (a) => a.deviceId === device.deviceId && a.severity === ALERT_SEVERITY.CRITICAL && a.status === ALERT_STATUS.UNACKNOWLEDGED
       );
       const warningAlerts = deviceAlerts.filter(
-        (a) => a.deviceId === device.deviceId && a.severity === 'Warning' && a.status === 'Active'
+        (a) => a.deviceId === device.deviceId && a.severity === ALERT_SEVERITY.WARNING && a.status === ALERT_STATUS.UNACKNOWLEDGED
       );
       const advisoryAlerts = deviceAlerts.filter(
-        (a) => a.deviceId === device.deviceId && a.severity === 'Advisory' && a.status === 'Active'
+        (a) => a.deviceId === device.deviceId && a.severity === ALERT_SEVERITY.ADVISORY && a.status === ALERT_STATUS.UNACKNOWLEDGED
       );
 
       // Add alert-based scores
@@ -64,18 +65,21 @@ export const useDeviceSeverityCalculator = () => {
 
       // Check parameter thresholds (WHO guidelines)
       // pH: ideal range 6.5-8.5
-      if (reading.ph < 6.5 || reading.ph > 8.5) {
-        score += Math.abs(reading.ph - 7.0) * 50;
+      const phValue = reading.ph ?? 7.0;
+      if (phValue < 6.5 || phValue > 8.5) {
+        score += Math.abs(phValue - 7.0) * 50;
       }
 
       // TDS: ideal < 500 ppm
-      if (reading.tds > 500) {
-        score += (reading.tds - 500) * 0.5;
+      const tdsValue = reading.tds ?? 0;
+      if (tdsValue > 500) {
+        score += (tdsValue - 500) * 0.5;
       }
 
       // Turbidity: ideal < 5 NTU
-      if (reading.turbidity > 5) {
-        score += (reading.turbidity - 5) * 20;
+      const turbidityValue = reading.turbidity ?? 0;
+      if (turbidityValue > 5) {
+        score += (turbidityValue - 5) * 20;
       }
 
       // Determine severity level
@@ -107,7 +111,7 @@ export const useDeviceSeverityCalculator = () => {
     (deviceData: Device, allAlerts: WaterQualityAlert[]): DeviceWithReadings => {
       // Find active alerts for this device
       const deviceAlerts = allAlerts.filter(
-        (a) => a.deviceId === deviceData.deviceId && a.status === 'Active'
+        (a) => a.deviceId === deviceData.deviceId && a.status === ALERT_STATUS.UNACKNOWLEDGED
       );
 
       // Device info is just the device data itself

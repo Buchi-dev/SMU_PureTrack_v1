@@ -10,3 +10,4 @@ export { ProtectedRoute } from './ProtectedRoute';
 export { RealtimeAlertMonitor } from './RealtimeAlertMonitor';
 export { RootRedirect } from './RootRedirect';
 export { ThemeSwitcher } from './ThemeSwitcher';
+export { AuthErrorBoundary } from './AuthErrorBoundary';
