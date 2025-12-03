@@ -111,13 +111,15 @@ export const downloadReport = asyncHandler(async (req: Request, res: Response) =
     throw new BadRequestError('Report file not available yet');
   }
 
-  // TODO: Stream file from GridFS
-  // const stream = await gridfsService.downloadFile(report.file.fileId);
-  // res.setHeader('Content-Type', report.file.mimeType);
-  // res.setHeader('Content-Disposition', `attachment; filename="${report.file.filename}"`);
-  // stream.pipe(res);
-
-  ResponseHandler.success(res, { fileId: report.file.fileId }, 'File download not implemented yet');
+  // Stream file from GridFS
+  const { gridfsService } = await import('@utils');
+  const stream = gridfsService.downloadFile(report.file.fileId);
+  
+  res.setHeader('Content-Type', report.file.mimeType);
+  res.setHeader('Content-Disposition', `attachment; filename="${report.file.filename}"`);
+  res.setHeader('Content-Length', report.file.size.toString());
+  
+  stream.pipe(res);
 });
 
 /**

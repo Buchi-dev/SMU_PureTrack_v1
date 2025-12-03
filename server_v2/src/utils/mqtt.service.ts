@@ -13,6 +13,7 @@ import mqtt, { MqttClient, IClientOptions } from 'mqtt';
 import { mqttConfig } from '@core/configs';
 import { deviceService } from '@feature/devices';
 import { sensorReadingService } from '@feature/sensorReadings';
+import logger from '@utils/logger.util';
 import { alertService } from '@feature/alerts';
 
 /**
@@ -47,24 +48,18 @@ class MQTTService {
   /**
    * Initialize MQTT connection
    */
-  public async connect(): Promise<void> {
+  async connect(): Promise<void> {
     if (this.client && this.isConnected) {
-      console.log('🔄 MQTT: Already connected');
+      logger.info('🔄 MQTT: Already connected');
       return;
     }
 
-    console.log('🔌 MQTT: Connecting to HiveMQ Cloud...');
+    logger.info('🔌 MQTT: Connecting to HiveMQ Cloud...');
 
     const options: IClientOptions = {
+      ...mqttConfig.options, // Contains username/password from config
       clientId: mqttConfig.clientId,
-      username: mqttConfig.username,
-      password: mqttConfig.password,
-      protocol: 'mqtts',
-      port: 8883,
-      reconnectPeriod: 0, // Disable auto-reconnect (we handle manually)
-      connectTimeout: 30000,
-      clean: true,
-      rejectUnauthorized: true,
+      reconnectPeriod: 0, // Override: Disable auto-reconnect (we handle manually)
     };
 
     this.client = mqtt.connect(mqttConfig.brokerUrl, options);
@@ -73,23 +68,23 @@ class MQTTService {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.reconnectDelay = RECONNECT_CONFIG.INITIAL_DELAY;
-      console.log('✅ MQTT: Connected to HiveMQ Cloud');
+      logger.info('✅ MQTT: Connected to HiveMQ Cloud');
       this.subscribeToTopics();
     });
 
     this.client.on('error', (error) => {
-      console.error('❌ MQTT Error:', error.message);
+      logger.error('❌ MQTT Error', { error: error.message, stack: error.stack });
       this.isConnected = false;
     });
 
     this.client.on('close', () => {
-      console.log('🔌 MQTT: Connection closed');
+      logger.info('🔌 MQTT: Connection closed');
       this.isConnected = false;
       this.handleReconnection();
     });
 
     this.client.on('offline', () => {
-      console.log('⚠️ MQTT: Client offline');
+      logger.warn('⚠️ MQTT: Client offline');
       this.isConnected = false;
     });
 
@@ -109,11 +104,11 @@ class MQTTService {
     ];
 
     topics.forEach((topic) => {
-      this.client!.subscribe(topic, { qos: mqttConfig.qos }, (error) => {
+      this.client!.subscribe(topic, { qos: 1 as 0 | 1 | 2 }, (error) => {
         if (error) {
-          console.error(`❌ MQTT: Failed to subscribe to ${topic}:`, error.message);
+          logger.error(`❌ MQTT: Failed to subscribe to ${topic}`, { error: error.message, topic });
         } else {
-          console.log(`✅ MQTT: Subscribed to ${topic}`);
+          logger.info(`✅ MQTT: Subscribed to ${topic}`);
         }
       });
     });
@@ -128,7 +123,7 @@ class MQTTService {
       const deviceId = this.extractDeviceId(topic);
 
       if (!deviceId) {
-        console.error('❌ MQTT: Invalid topic format:', topic);
+        logger.error('❌ MQTT: Invalid topic format', { topic });
         return;
       }
 
@@ -140,8 +135,8 @@ class MQTTService {
       } else if (topic.includes('/presence')) {
         await this.handleDevicePresence(deviceId, message);
       }
-    } catch (error) {
-      console.error('❌ MQTT: Message handling error:', error);
+    } catch (error: any) {
+      logger.error('❌ MQTT: Message handling error', { error: error.message, stack: error.stack });
     }
   }
 
@@ -152,7 +147,7 @@ class MQTTService {
     try {
       // Validate required fields
       if (typeof data.pH !== 'number' || typeof data.turbidity !== 'number' || typeof data.tds !== 'number') {
-        console.error('❌ MQTT: Invalid sensor data format from', deviceId);
+        logger.error('❌ MQTT: Invalid sensor data format', { deviceId, data });
         return;
       }
 
@@ -160,7 +155,7 @@ class MQTTService {
       await deviceService.updateHeartbeat(deviceId);
 
       // Store sensor reading
-      const reading = await sensorReadingService.processSensorData(deviceId, {
+      await sensorReadingService.processSensorData(deviceId, {
         pH: data.pH,
         turbidity: data.turbidity,
         tds: data.tds,
@@ -168,11 +163,16 @@ class MQTTService {
       });
 
       // Check for threshold violations and create alerts
-      await alertService.checkThresholdsAndCreateAlerts(reading);
+      await alertService.checkThresholdsAndCreateAlerts(deviceId, data.deviceName || deviceId, {
+        pH: data.pH,
+        turbidity: data.turbidity,
+        tds: data.tds,
+        timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+      });
 
-      console.log(`📊 MQTT: Processed sensor data from ${deviceId}`);
-    } catch (error) {
-      console.error(`❌ MQTT: Error processing sensor data from ${deviceId}:`, error);
+      logger.info(`📊 MQTT: Processed sensor data from ${deviceId}`);
+    } catch (error: any) {
+      logger.error(`❌ MQTT: Error processing sensor data from ${deviceId}`, { error: error.message, stack: error.stack, deviceId });
     }
   }
 
@@ -181,10 +181,15 @@ class MQTTService {
    */
   private async handleDeviceRegistration(deviceId: string, data: any): Promise<void> {
     try {
-      await deviceService.processDeviceRegistration(deviceId, data);
-      console.log(`📝 MQTT: Processed registration for ${deviceId}`);
-    } catch (error) {
-      console.error(`❌ MQTT: Error processing registration for ${deviceId}:`, error);
+      await deviceService.processDeviceRegistration({
+        deviceId,
+        name: data.name || deviceId,
+        location: data.location,
+        ...data,
+      });
+      logger.info(`📝 MQTT: Processed registration for ${deviceId}`);
+    } catch (error: any) {
+      logger.error(`❌ MQTT: Error processing registration for ${deviceId}`, { error: error.message, stack: error.stack, deviceId });
     }
   }
 
@@ -194,9 +199,9 @@ class MQTTService {
   private async handleDevicePresence(deviceId: string, _data: any): Promise<void> {
     try {
       await deviceService.updateHeartbeat(deviceId);
-      console.log(`💓 MQTT: Heartbeat from ${deviceId}`);
-    } catch (error) {
-      console.error(`❌ MQTT: Error processing heartbeat from ${deviceId}:`, error);
+      logger.info(`💓 MQTT: Heartbeat from ${deviceId}`);
+    } catch (error: any) {
+      logger.error(`❌ MQTT: Error processing heartbeat from ${deviceId}`, { error: error.message, stack: error.stack, deviceId });
     }
   }
 
@@ -212,12 +217,12 @@ class MQTTService {
     const payload = JSON.stringify(command);
 
     return new Promise((resolve, reject) => {
-      this.client!.publish(topic, payload, { qos: mqttConfig.qos }, (error) => {
+      this.client!.publish(topic, payload, { qos: 1 as 0 | 1 | 2 }, (error) => {
         if (error) {
-          console.error(`❌ MQTT: Failed to publish command to ${deviceId}:`, error.message);
+          logger.error(`❌ MQTT: Failed to publish command to ${deviceId}`, { error: error.message, deviceId, command });
           reject(error);
         } else {
-          console.log(`✅ MQTT: Published command to ${deviceId}`);
+          logger.info(`✅ MQTT: Published command to ${deviceId}`);
           resolve();
         }
       });
@@ -230,7 +235,7 @@ class MQTTService {
   private extractDeviceId(topic: string): string | null {
     const parts = topic.split('/');
     // Topic format: water-quality/sensors/{deviceId}/data or water-quality/devices/{deviceId}/registration
-    return parts.length >= 3 ? parts[2] : null;
+    return parts.length >= 3 && parts[2] ? parts[2] : null;
   }
 
   /**
@@ -241,12 +246,12 @@ class MQTTService {
 
     this.reconnectAttempts++;
     
-    console.log(`🔄 MQTT: Reconnecting (attempt ${this.reconnectAttempts}) in ${this.reconnectDelay}ms...`);
+    logger.info(`🔄 MQTT: Reconnecting (attempt ${this.reconnectAttempts}) in ${this.reconnectDelay}ms...`);
 
     setTimeout(() => {
       if (!this.isConnected) {
         this.connect().catch((error) => {
-          console.error('❌ MQTT: Reconnection failed:', error.message);
+          logger.error('❌ MQTT: Reconnection failed', { error: error.message, attempts: this.reconnectAttempts });
         });
       }
     }, this.reconnectDelay);
@@ -266,7 +271,7 @@ class MQTTService {
 
     return new Promise((resolve) => {
       this.client!.end(false, {}, () => {
-        console.log('👋 MQTT: Disconnected from broker');
+        logger.info('👋 MQTT: Disconnected from broker');
         this.isConnected = false;
         this.client = null;
         resolve();

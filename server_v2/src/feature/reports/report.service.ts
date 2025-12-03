@@ -24,6 +24,7 @@ import { CRUDOperations } from '@utils/queryBuilder.util';
 import { NotFoundError, BadRequestError } from '@utils/errors.util';
 import { ERROR_MESSAGES } from '@core/configs/messages.config';
 import { Types, Document } from 'mongoose';
+import logger from '@utils/logger.util';
 
 /**
  * Report Service Class
@@ -52,8 +53,10 @@ export class ReportService {
 
     const report = await this.crud.create(reportData as any);
 
-    // TODO: Trigger async report generation
-    // await this._generateReportAsync(report._id);
+    // Trigger async report generation (fire and forget)
+    this._generateReportAsync(report._id).catch((error) => {
+      logger.error(`Failed to generate report ${report._id}:`, error);
+    });
 
     return report;
   }
@@ -177,14 +180,14 @@ export class ReportService {
    * Also deletes associated file from GridFS
    */
   async deleteReport(reportId: string): Promise<void> {
-    // Verify report exists (throws NotFoundError if not found)
-    await this.getReportById(reportId);
+    // Get report to check for file
+    const report = await this.getReportById(reportId);
 
-    // TODO: Delete file from GridFS if exists
-    // const report = await this.getReportById(reportId);
-    // if (report.file?.fileId) {
-    //   await gridfsService.deleteFile(report.file.fileId);
-    // }
+    // Delete file from GridFS if exists
+    if (report.file?.fileId) {
+      const { gridfsService } = await import('@utils');
+      await gridfsService.deleteFile(report.file.fileId);
+    }
 
     await Report.findByIdAndDelete(reportId);
   }
@@ -196,15 +199,22 @@ export class ReportService {
   async deleteExpiredReports(): Promise<number> {
     const now = new Date();
 
-    // TODO: Find and delete files from GridFS
-    // const expiredReports = await Report.find({
-    //   expiresAt: { $lt: now },
-    // }).select('_id file');
-    // for (const report of expiredReports) {
-    //   if (report.file?.fileId) {
-    //     await gridfsService.deleteFile(report.file.fileId);
-    //   }
-    // }
+    // Find expired reports with files
+    const expiredReports = await Report.find({
+      expiresAt: { $lt: now },
+    }).select('_id file');
+
+    // Delete files from GridFS
+    if (expiredReports.length > 0) {
+      const fileIds = expiredReports
+        .filter((report) => report.file?.fileId)
+        .map((report) => report.file!.fileId);
+
+      if (fileIds.length > 0) {
+        const { gridfsService } = await import('@utils');
+        await gridfsService.deleteFiles(fileIds);
+      }
+    }
 
     // Delete reports
     const result = await Report.deleteMany({
@@ -293,27 +303,43 @@ export class ReportService {
 
   /**
    * Generate report (async)
-   * TODO: Implement with PDF/GridFS services
-   * @private - Will be used once PDF/GridFS services are implemented
+   * Generates PDF and stores in GridFS
+   * @private
    */
-  // @ts-ignore - Unused until PDF/GridFS services are implemented
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async _generateReportAsync(reportId: Types.ObjectId): Promise<void> {
     try {
       // Update status to generating
       await this.updateReportStatus(reportId.toString(), ReportStatus.GENERATING);
 
-      // TODO: Generate PDF based on report type
-      // const pdfBuffer = await pdfService.generateReport(report);
+      // Get report details
+      const report = await this.getReportById(reportId.toString());
 
-      // TODO: Upload to GridFS
-      // const fileId = await gridfsService.uploadFile(pdfBuffer, filename);
+      // Build report parameters based on type
+      const reportParams = await this._buildReportParams(report);
 
-      // TODO: Attach file to report
-      // await this.attachFile(reportId.toString(), fileData);
+      // Generate PDF
+      const { pdfService } = await import('@utils');
+      const pdfBuffer = await pdfService.generateReport(report.type, reportParams);
 
-      // Placeholder: Mark as completed
-      await this.updateReportStatus(reportId.toString(), ReportStatus.COMPLETED);
+      // Upload to GridFS
+      const { gridfsService } = await import('@utils');
+      const filename = `${report.type}-${reportId}-${Date.now()}.pdf`;
+      const uploadResult = await gridfsService.uploadFile(pdfBuffer, filename, {
+        filename,
+        contentType: 'application/pdf',
+        reportId: reportId.toString(),
+        reportType: report.type,
+        uploadedAt: new Date(),
+      });
+
+      // Attach file to report
+      await this.attachFile(reportId.toString(), {
+        fileId: uploadResult.fileId,
+        filename: uploadResult.filename,
+        format: ReportFormat.PDF,
+        size: uploadResult.size,
+        mimeType: 'application/pdf',
+      });
     } catch (error) {
       await this.updateReportStatus(
         reportId.toString(),
@@ -323,6 +349,176 @@ export class ReportService {
       throw error;
     }
   }
+
+  /**
+   * Build report parameters based on report type
+   * @private
+   */
+  private async _buildReportParams(report: IReportDocument): Promise<any> {
+    const { parameters } = report;
+
+    switch (report.type) {
+      case ReportType.WATER_QUALITY: {
+        // Fetch sensor readings for device in date range
+        const SensorReading = (await import('@feature/sensorReadings/sensorReading.model')).default;
+        const readings = await SensorReading.find({
+          deviceId: parameters.deviceId,
+          timestamp: {
+            $gte: parameters.startDate,
+            $lte: parameters.endDate,
+          },
+        })
+          .sort({ timestamp: -1 })
+          .limit(100)
+          .lean();
+
+        // Calculate statistics
+        const phValues = readings.map((r: any) => r.ph).filter((v: number) => v != null);
+        const turbidityValues = readings.map((r: any) => r.turbidity).filter((v: number) => v != null);
+        const tdsValues = readings.map((r: any) => r.tds).filter((v: number) => v != null);
+
+        return {
+          deviceId: parameters.deviceId,
+          deviceName: parameters.deviceName || parameters.deviceId,
+          startDate: parameters.startDate,
+          endDate: parameters.endDate,
+          readings: readings.map((r: any) => ({
+            timestamp: r.timestamp,
+            ph: r.ph,
+            turbidity: r.turbidity,
+            tds: r.tds,
+          })),
+          statistics: {
+            avgPh: phValues.reduce((a: number, b: number) => a + b, 0) / phValues.length || 0,
+            avgTurbidity: turbidityValues.reduce((a: number, b: number) => a + b, 0) / turbidityValues.length || 0,
+            avgTds: tdsValues.reduce((a: number, b: number) => a + b, 0) / tdsValues.length || 0,
+            minPh: Math.min(...phValues) || 0,
+            maxPh: Math.max(...phValues) || 0,
+            minTurbidity: Math.min(...turbidityValues) || 0,
+            maxTurbidity: Math.max(...turbidityValues) || 0,
+            minTds: Math.min(...tdsValues) || 0,
+            maxTds: Math.max(...tdsValues) || 0,
+          },
+        };
+      }
+
+      case ReportType.DEVICE_STATUS: {
+        // Fetch all devices
+        const Device = (await import('@feature/devices/device.model')).default;
+        const devices = await Device.find().lean();
+
+        const deviceData = devices.map((d: any) => ({
+          deviceId: d.deviceId,
+          name: d.name,
+          status: d.status,
+          location: d.location,
+          lastHeartbeat: d.lastHeartbeat,
+          uptime: 95.5, // Placeholder - calculate from historical data
+        }));
+
+        const onlineCount = devices.filter((d: any) => d.status === 'online').length;
+
+        return {
+          devices: deviceData,
+          summary: {
+            total: devices.length,
+            online: onlineCount,
+            offline: devices.length - onlineCount,
+          },
+        };
+      }
+
+      case ReportType.COMPLIANCE: {
+        // Fetch threshold violations (alerts with severity)
+        const Alert = (await import('@feature/alerts/alert.model')).default;
+        const violations = await Alert.find({
+          createdAt: {
+            $gte: parameters.startDate,
+            $lte: parameters.endDate,
+          },
+        })
+          .sort({ createdAt: -1 })
+          .limit(100)
+          .lean();
+
+        const severityCounts = {
+          critical: violations.filter((v: any) => v.severity === 'CRITICAL').length,
+          high: violations.filter((v: any) => v.severity === 'HIGH').length,
+          medium: violations.filter((v: any) => v.severity === 'MEDIUM').length,
+          low: violations.filter((v: any) => v.severity === 'LOW').length,
+        };
+
+        return {
+          startDate: parameters.startDate,
+          endDate: parameters.endDate,
+          violations: violations.map((v: any) => ({
+            timestamp: v.createdAt,
+            deviceId: v.deviceId,
+            deviceName: v.deviceName || v.deviceId,
+            parameter: v.parameter,
+            value: v.currentValue,
+            threshold: v.thresholdValue,
+            severity: v.severity,
+          })),
+          summary: {
+            total: violations.length,
+            ...severityCounts,
+          },
+        };
+      }
+
+      case ReportType.ALERT_SUMMARY: {
+        // Fetch all alerts in date range
+        const Alert = (await import('@feature/alerts/alert.model')).default;
+        const alerts = await Alert.find({
+          createdAt: {
+            $gte: parameters.startDate,
+            $lte: parameters.endDate,
+          },
+        })
+          .sort({ createdAt: -1 })
+          .limit(100)
+          .lean();
+
+        const statusCounts = {
+          active: alerts.filter((a: any) => a.status === 'ACTIVE').length,
+          acknowledged: alerts.filter((a: any) => a.status === 'ACKNOWLEDGED').length,
+          resolved: alerts.filter((a: any) => a.status === 'RESOLVED').length,
+        };
+
+        const severityCounts = {
+          critical: alerts.filter((a: any) => a.severity === 'CRITICAL').length,
+          high: alerts.filter((a: any) => a.severity === 'HIGH').length,
+          medium: alerts.filter((a: any) => a.severity === 'MEDIUM').length,
+          low: alerts.filter((a: any) => a.severity === 'LOW').length,
+        };
+
+        return {
+          startDate: parameters.startDate,
+          endDate: parameters.endDate,
+          alerts: alerts.map((a: any) => ({
+            alertId: a.alertId,
+            createdAt: a.createdAt,
+            severity: a.severity,
+            parameter: a.parameter,
+            deviceId: a.deviceId,
+            status: a.status,
+            acknowledgedAt: a.acknowledgedAt,
+            resolvedAt: a.resolvedAt,
+          })),
+          summary: {
+            total: alerts.length,
+            ...statusCounts,
+            bySeverity: severityCounts,
+          },
+        };
+      }
+
+      default:
+        throw new Error(`Unsupported report type: ${report.type}`);
+    }
+  }
 }
 
 export default new ReportService();
+

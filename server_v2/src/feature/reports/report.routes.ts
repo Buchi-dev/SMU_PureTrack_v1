@@ -15,6 +15,7 @@ import {
   getReportStatistics,
   deleteExpiredReports,
 } from './report.controller';
+import { requireAuth, requireStaff, requireAdmin } from '@core/middlewares';
 import { validateRequest } from '@core/middlewares/validation.middleware';
 import {
   createReportSchema,
@@ -29,48 +30,48 @@ const router = Router();
  * GET /api/v1/reports
  * Get all reports with filters
  */
-router.get('/', validateRequest(reportFiltersSchema), getAllReports);
+router.get('/', requireStaff, validateRequest(reportFiltersSchema), getAllReports);
 
 /**
  * GET /api/v1/reports/my-reports
  * Get current user's reports
  */
-router.get('/my-reports', getMyReports);
+router.get('/my-reports', requireAuth, getMyReports);
 
 /**
  * GET /api/v1/reports/statistics
  * Get report statistics
  */
-router.get('/statistics', getReportStatistics);
+router.get('/statistics', requireStaff, getReportStatistics);
 
 /**
  * POST /api/v1/reports
  * Create report request
  */
-router.post('/', validateRequest(createReportSchema), createReport);
+router.post('/', requireStaff, validateRequest(createReportSchema), createReport);
 
 /**
  * DELETE /api/v1/reports/expired
  * Delete expired reports (Admin only)
  */
-router.delete('/expired', deleteExpiredReports);
+router.delete('/expired', requireAdmin, deleteExpiredReports);
 
 /**
  * GET /api/v1/reports/:id
  * Get report by ID
  */
-router.get('/:id', validateRequest(getReportByIdSchema), getReportById);
+router.get('/:id', requireAuth, validateRequest(getReportByIdSchema), getReportById);
 
 /**
  * GET /api/v1/reports/:id/download
  * Download report file
  */
-router.get('/:id/download', validateRequest(getReportByIdSchema), downloadReport);
+router.get('/:id/download', requireAuth, validateRequest(getReportByIdSchema), downloadReport);
 
 /**
  * DELETE /api/v1/reports/:id
  * Delete report
  */
-router.delete('/:id', validateRequest(deleteReportSchema), deleteReport);
+router.delete('/:id', requireAdmin, validateRequest(deleteReportSchema), deleteReport);
 
 export default router;

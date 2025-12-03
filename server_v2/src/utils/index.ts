@@ -15,3 +15,17 @@ export {
   QueryBuilderOptions,
   QueryResult 
 } from './queryBuilder.util';
+export { default as mqttService } from './mqtt.service';
+export { default as emailService } from './email.service';
+export { default as pdfService } from './pdf.service';
+export { default as gridfsService } from './gridfs.service';
+export { 
+  default as logger, 
+  logError, 
+  logInfo, 
+  logWarn, 
+  logDebug, 
+  logHttp, 
+  logStream,
+  initializeLogger 
+} from './logger.util';

@@ -30,6 +30,7 @@ import {
 import { ERROR_MESSAGES } from '@core/configs/messages.config';
 import { DEVICE } from '@core/configs/constants.config';
 import { Types, Document } from 'mongoose';
+import logger from '@utils/logger.util';
 
 /**
  * Device Service Class
@@ -366,10 +367,13 @@ export class DeviceService {
       throw new BadRequestError(ERROR_MESSAGES.DEVICE.OFFLINE);
     }
 
-    // TODO: Integrate with MQTT service
-    // await mqttService.publishCommand(deviceId, command, payload);
-    console.log(`Command queued for device ${deviceId}: ${command}`, payload);
+    // Publish command to MQTT broker
+    const mqttService = (await import('@utils/mqtt.service')).default;
+    await mqttService.publishCommand(deviceId, { command, payload, timestamp: new Date() });
+    
+    logger.info(`✅ Command sent to device ${deviceId}: ${command}`, payload);
   }
 }
 
 export default new DeviceService();
+

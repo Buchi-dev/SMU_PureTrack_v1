@@ -11,6 +11,7 @@
     "paths": {
       "@core/*": ["core/*"],
       "@feature/*": ["feature/*"],
+      "@utils": ["utils/index"],
       "@utils/*": ["utils/*"],
       "@types/*": ["types/*"]
     },

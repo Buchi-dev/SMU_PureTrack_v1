@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logError } from '@utils/logger.util';
 
 interface ApiError extends Error {
   statusCode?: number;
@@ -14,11 +15,9 @@ export const errorHandler = (
   const statusCode = err.statusCode || 500;
   const isOperational = err.isOperational !== undefined ? err.isOperational : false;
 
-  console.error('Error:', {
-    message: err.message,
+  logError('API Error', err, {
     statusCode,
     isOperational,
-    stack: err.stack,
   });
 
   res.status(statusCode).json({

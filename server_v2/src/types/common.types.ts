@@ -70,6 +70,4 @@ export interface EnvironmentVariables {
   NODE_ENV: 'development' | 'production' | 'test';
   MONGODB_URI: string;
   CORS_ORIGIN: string;
-  JWT_SECRET?: string;
-  JWT_EXPIRES_IN?: string;
 }

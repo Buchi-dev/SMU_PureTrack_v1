@@ -36,6 +36,7 @@ import {
 } from '@core/configs/constants.config';
 import { ERROR_MESSAGES, LOG_MESSAGES } from '@core/configs/messages.config';
 import { Types, Document } from 'mongoose';
+import logger from '@utils/logger.util';
 
 /**
  * Alert Service Class
@@ -99,7 +100,7 @@ export class AlertService {
 
       return alerts;
     } catch (error: any) {
-      console.error(LOG_MESSAGES.ALERT.THRESHOLD_CHECK_FAILED(deviceId, error.message));
+      logger.error(LOG_MESSAGES.ALERT.THRESHOLD_CHECK_FAILED(deviceId, error.message));
       return alerts; // Return partial results
     }
   }
@@ -280,7 +281,7 @@ export class AlertService {
 
     // Trigger email notification asynchronously (don't await to avoid blocking)
     this.triggerEmailNotification(newAlert).catch((error) => {
-      console.error(LOG_MESSAGES.EMAIL.SEND_FAILED(error.message));
+      logger.error(LOG_MESSAGES.EMAIL.SEND_FAILED(error.message));
     });
 
     return newAlert;
@@ -345,12 +346,11 @@ export class AlertService {
    * @private
    */
   private async triggerEmailNotification(alert: IAlertDocument): Promise<void> {
-    // TODO: Implement email service integration
-    // For now, just mark as queued
-    console.log(LOG_MESSAGES.EMAIL.QUEUED(alert.alertId));
+    logger.info(LOG_MESSAGES.EMAIL.QUEUED(alert.alertId));
     
-    // This will be implemented with email service
-    // await emailService.sendAlertNotification(alert);
+    // Send email notification via email service
+    const emailService = (await import('@utils/email.service')).default;
+    await emailService.sendAlertNotification(alert);
   }
 
   /**
@@ -583,3 +583,4 @@ export class AlertService {
 }
 
 export default new AlertService();
+

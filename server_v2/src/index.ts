@@ -1,8 +1,11 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { appConfig, dbConnection } from '@core/configs';
 import { errorHandler, requestLogger } from '@core/middlewares';
 import { NotFoundError } from '@utils/errors.util';
+import { mqttService, emailService, gridfsService, initializeLogger, logInfo, logError } from '@utils';
+import { startDeviceOfflineChecker, stopDeviceOfflineChecker, startReportCleanupJob, stopReportCleanupJob } from '@feature/jobs';
 
 // Import entity routes
 import { alertRoutes } from '@feature/alerts';
@@ -13,6 +16,9 @@ import { reportRoutes } from '@feature/reports';
 
 // Initialize Express app
 const app: Application = express();
+
+// Security middleware
+app.use(helmet());
 
 // Middleware
 app.use(cors(appConfig.cors));
@@ -59,34 +65,70 @@ app.use(errorHandler);
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    // Initialize Winston logger
+    initializeLogger();
+
     // Connect to database
     await dbConnection.connect();
 
+    // Initialize GridFS
+    await gridfsService.initialize();
+
+    // Initialize Email Service
+    await emailService.initialize();
+
+    // Connect to MQTT broker
+    await mqttService.connect();
+
+    // Start background jobs
+    startDeviceOfflineChecker();
+    startReportCleanupJob();
+
     // Start listening
     app.listen(appConfig.server.port, () => {
-      console.log('='.repeat(50));
-      console.log(`🚀 Server is running on port ${appConfig.server.port}`);
-      console.log(`📊 Environment: ${appConfig.server.nodeEnv}`);
-      console.log(`🔗 API Version: ${appConfig.server.apiVersion}`);
-      console.log(`🌐 CORS Origin: ${appConfig.cors.origin}`);
-      console.log('='.repeat(50));
+      logInfo('='.repeat(50));
+      logInfo(`🚀 Server is running on port ${appConfig.server.port}`);
+      logInfo(`📊 Environment: ${appConfig.server.nodeEnv}`);
+      logInfo(`🔗 API Version: ${appConfig.server.apiVersion}`);
+      logInfo(`🌐 CORS Origin: ${appConfig.cors.origin}`);
+      logInfo('='.repeat(50));
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    logError('❌ Failed to start server', error);
     process.exit(1);
   }
 };
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('⚠️  SIGTERM received, shutting down gracefully...');
+  logInfo('⚠️  SIGTERM received, shutting down gracefully...');
+  
+  // Stop background jobs
+  stopDeviceOfflineChecker();
+  stopReportCleanupJob();
+  
+  // Disconnect services
+  await mqttService.disconnect();
+  await emailService.close();
   await dbConnection.disconnect();
+  
+  logInfo('✅ Graceful shutdown complete');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('⚠️  SIGINT received, shutting down gracefully...');
+  logInfo('⚠️  SIGINT received, shutting down gracefully...');
+  
+  // Stop background jobs
+  stopDeviceOfflineChecker();
+  stopReportCleanupJob();
+  
+  // Disconnect services
+  await mqttService.disconnect();
+  await emailService.close();
   await dbConnection.disconnect();
+  
+  logInfo('✅ Graceful shutdown complete');
   process.exit(0);
 });
 

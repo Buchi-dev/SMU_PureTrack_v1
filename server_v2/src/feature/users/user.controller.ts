@@ -4,6 +4,8 @@
  */
 
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
+import { AuthRequest } from '@core/middlewares';
 import userService from './user.service';
 import { ResponseHandler } from '@utils/response.util';
 import { asyncHandler } from '@utils/asyncHandler.util';
@@ -59,10 +61,10 @@ export const getUserById = asyncHandler(async (req: Request, res: Response) => {
  * Get current user profile
  * @route GET /api/v1/users/me
  */
-export const getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req as any).user._id;
+export const getCurrentUser = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const userId = req.user!.userId; // userId is the MongoDB _id as string
 
-  const user = await userService.getUserById(userId.toString());
+  const user = await userService.getUserById(userId);
 
   ResponseHandler.success(res, user.toPublicProfile());
 });
@@ -101,7 +103,7 @@ export const updateUser = asyncHandler(async (req: Request, res: Response) => {
  * Update user status
  * @route PATCH /api/v1/users/:id/status
  */
-export const updateUserStatus = asyncHandler(async (req: Request, res: Response) => {
+export const updateUserStatus = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   if (!id) {
@@ -109,7 +111,7 @@ export const updateUserStatus = asyncHandler(async (req: Request, res: Response)
   }
 
   const { status } = req.body;
-  const updatedBy = (req as any).user._id;
+  const updatedBy = new Types.ObjectId(req.user!.userId);
 
   const updatedUser = await userService.updateUserStatus(id, status, updatedBy);
 
@@ -124,7 +126,7 @@ export const updateUserStatus = asyncHandler(async (req: Request, res: Response)
  * Update user role
  * @route PATCH /api/v1/users/:id/role
  */
-export const updateUserRole = asyncHandler(async (req: Request, res: Response) => {
+export const updateUserRole = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   if (!id) {
@@ -132,8 +134,8 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response) =
   }
 
   const { role } = req.body;
-  const updatedBy = (req as any).user._id;
-  const updaterRole = (req as any).user.role;
+  const updatedBy = new Types.ObjectId(req.user!.userId);
+  const updaterRole = req.user!.role;
 
   const updatedUser = await userService.updateUserRole(id, role, updatedBy, updaterRole);
 
@@ -168,15 +170,15 @@ export const updateNotificationPreferences = asyncHandler(
  * Delete user
  * @route DELETE /api/v1/users/:id
  */
-export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+export const deleteUser = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   if (!id) {
     throw new Error('User ID is required');
   }
 
-  const deletedBy = (req as any).user._id;
-  const deleterRole = (req as any).user.role;
+  const deletedBy = new Types.ObjectId(req.user!.userId);
+  const deleterRole = req.user!.role;
 
   await userService.deleteUser(id, deletedBy, deleterRole);
 

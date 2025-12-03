@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { appConfig } from './app.config';
+import logger from '@utils/logger.util';
 
 export class DatabaseConnection {
   private static instance: DatabaseConnection;
@@ -16,31 +17,31 @@ export class DatabaseConnection {
 
   public async connect(): Promise<void> {
     if (this.isConnected) {
-      console.log('📦 Using existing database connection');
+      logger.info('📦 Using existing database connection');
       return;
     }
 
     try {
       await mongoose.connect(appConfig.database.uri);
       this.isConnected = true;
-      console.log('✅ MongoDB connected successfully');
+      logger.info('✅ MongoDB connected successfully');
 
       mongoose.connection.on('error', (error) => {
-        console.error('❌ MongoDB connection error:', error);
+        logger.error('❌ MongoDB connection error', { error: error.message, stack: error.stack });
         this.isConnected = false;
       });
 
       mongoose.connection.on('disconnected', () => {
-        console.log('⚠️ MongoDB disconnected');
+        logger.warn('⚠️ MongoDB disconnected');
         this.isConnected = false;
       });
 
       mongoose.connection.on('reconnected', () => {
-        console.log('✅ MongoDB reconnected');
+        logger.info('✅ MongoDB reconnected');
         this.isConnected = true;
       });
-    } catch (error) {
-      console.error('❌ Failed to connect to MongoDB:', error);
+    } catch (error: any) {
+      logger.error('❌ Failed to connect to MongoDB', { error: error.message, stack: error.stack });
       throw error;
     }
   }
@@ -53,15 +54,22 @@ export class DatabaseConnection {
     try {
       await mongoose.disconnect();
       this.isConnected = false;
-      console.log('👋 MongoDB disconnected');
-    } catch (error) {
-      console.error('❌ Error disconnecting from MongoDB:', error);
+      logger.info('👋 MongoDB disconnected');
+    } catch (error: any) {
+      logger.error('❌ Error disconnecting from MongoDB', { error: error.message, stack: error.stack });
       throw error;
     }
   }
 
   public getConnectionStatus(): boolean {
     return this.isConnected;
+  }
+
+  public getConnection(): mongoose.Connection {
+    if (!this.isConnected) {
+      throw new Error('Database not connected. Call connect() first.');
+    }
+    return mongoose.connection;
   }
 }
 

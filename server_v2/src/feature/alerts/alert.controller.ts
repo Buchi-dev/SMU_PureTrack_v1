@@ -4,6 +4,8 @@
  */
 
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
+import { AuthRequest } from '@core/middlewares';
 import alertService from './alert.service';
 import { ResponseHandler } from '@utils/response.util';
 import { asyncHandler } from '@utils/asyncHandler.util';
@@ -67,14 +69,14 @@ export const getAlertById = asyncHandler(async (req: Request, res: Response) => 
  * Acknowledge alert
  * @route PATCH /api/v1/alerts/:id/acknowledge
  */
-export const acknowledgeAlert = asyncHandler(async (req: Request, res: Response) => {
+export const acknowledgeAlert = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   
   if (!id) {
     throw new Error('Alert ID is required');
   }
   
-  const userId = (req as any).user._id; // From auth middleware
+  const userId = new Types.ObjectId(req.user!.userId);
 
   const alert = await alertService.acknowledgeAlert(id, userId);
 
@@ -89,7 +91,7 @@ export const acknowledgeAlert = asyncHandler(async (req: Request, res: Response)
  * Resolve alert
  * @route PATCH /api/v1/alerts/:id/resolve
  */
-export const resolveAlert = asyncHandler(async (req: Request, res: Response) => {
+export const resolveAlert = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
   
   if (!id) {
@@ -97,7 +99,7 @@ export const resolveAlert = asyncHandler(async (req: Request, res: Response) => 
   }
   
   const { resolutionNotes } = req.body;
-  const userId = (req as any).user._id; // From auth middleware
+  const userId = new Types.ObjectId(req.user!.userId);
 
   const alert = await alertService.resolveAlert(id, userId, resolutionNotes);
 
