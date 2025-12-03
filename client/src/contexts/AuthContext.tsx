@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setFirebaseReady(true);
           setLoading(false);
           
-          // Do NOT proceed with user fetch
+          // Do NOT proceed with user fetch or MQTT connection
           return;
         }
         

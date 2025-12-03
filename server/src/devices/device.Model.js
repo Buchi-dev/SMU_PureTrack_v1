@@ -80,18 +80,12 @@ const deviceSchema = new mongoose.Schema(
 );
 
 /**
- * Indexes for optimized queries (optimized for high-load scenarios)
+ * Indexes for optimized queries
  */
-// Primary query patterns
-deviceSchema.index({ status: 1, lastSeen: -1 }); // List online/offline devices
-deviceSchema.index({ registrationStatus: 1, createdAt: -1 }); // List pending registrations
-deviceSchema.index({ isRegistered: 1, status: 1 }); // Active devices
-deviceSchema.index({ deviceId: 1, isRegistered: 1 }); // Fast device lookup with registration check
-
-// Additional compound indexes for high-load scenarios
-deviceSchema.index({ status: 1, isRegistered: 1, lastSeen: -1 }); // Registered online devices sorted by activity
-deviceSchema.index({ createdAt: -1 }); // Recent devices (for pagination)
-deviceSchema.index({ lastSeen: -1 }); // Recently active devices
+deviceSchema.index({ status: 1, lastSeen: -1 });
+deviceSchema.index({ registrationStatus: 1, createdAt: -1 });
+deviceSchema.index({ isRegistered: 1, status: 1 });
+deviceSchema.index({ deviceId: 1, isRegistered: 1 });
 
 /**
  * Instance method to get public device data
@@ -167,13 +161,10 @@ const sensorReadingSchema = new mongoose.Schema(
 );
 
 /**
- * Compound indexes for optimized queries during high-load scenarios
- * These indexes support jittered device transmissions (0-5 min window)
+ * Compound indexes for optimized queries
+ * Note: timestamp index is created through compound indexes and TTL index
  */
-sensorReadingSchema.index({ deviceId: 1, timestamp: -1 }); // Primary query: latest reading per device
-sensorReadingSchema.index({ timestamp: -1 }); // Query: recent readings across all devices
-sensorReadingSchema.index({ deviceId: 1, receivedAt: -1 }); // Query: latest received readings per device
-sensorReadingSchema.index({ receivedAt: -1 }); // Query: processing order (FIFO)
+sensorReadingSchema.index({ deviceId: 1, timestamp: -1 });
 
 /**
  * TTL Index - Automatically delete readings older than 90 days

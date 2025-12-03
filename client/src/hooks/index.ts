@@ -29,9 +29,6 @@ export {
   useVisibilityPollingWithState,
 } from './useVisibilityPolling';
 
-// Real-time updates via Server-Sent Events
-export { useSSE, type SSEConnectionState, type SSEEvent, type UseSSEOptions, type UseSSEReturn } from './useSSE';
-
 // ============================================================================
 // AUTHENTICATION HOOKS
 // ============================================================================

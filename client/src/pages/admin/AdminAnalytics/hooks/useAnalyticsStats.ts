@@ -20,7 +20,6 @@ import {
   HEALTH_COLORS,
   calculateServerHealthScore 
 } from '../../AdminDashboard/config';
-import { WATER_QUALITY_THRESHOLDS } from '../../../../constants/waterQualityStandards';
 
 /**
  * Device statistics
@@ -228,12 +227,12 @@ const calculateComplianceStatus = (metrics: WaterQualityMetrics) => {
 
   const complianceStatus = [];
 
-  // pH Compliance (WHO)
+  // pH Compliance (WHO: 6.5-8.5)
   if (phReadings.length > 0) {
-    const phCompliant = phReadings.filter(ph => ph >= WATER_QUALITY_THRESHOLDS.pH.min && ph <= WATER_QUALITY_THRESHOLDS.pH.max).length;
+    const phCompliant = phReadings.filter(ph => ph >= 6.5 && ph <= 8.5).length;
     const phViolations = phReadings.length - phCompliant;
-    const belowMin = phReadings.filter(ph => ph < WATER_QUALITY_THRESHOLDS.pH.min).length;
-    const aboveMax = phReadings.filter(ph => ph > WATER_QUALITY_THRESHOLDS.pH.max).length;
+    const belowMin = phReadings.filter(ph => ph < 6.5).length;
+    const aboveMax = phReadings.filter(ph => ph > 8.5).length;
     
     let violationType: 'below_min' | 'above_max' | 'both' | 'none' = 'none';
     if (belowMin > 0 && aboveMax > 0) violationType = 'both';
@@ -245,7 +244,7 @@ const calculateComplianceStatus = (metrics: WaterQualityMetrics) => {
       compliant: phViolations === 0,
       compliancePercentage: (phCompliant / phReadings.length) * 100,
       violationCount: phViolations,
-  threshold: { min: WATER_QUALITY_THRESHOLDS.pH.min, max: WATER_QUALITY_THRESHOLDS.pH.max },
+      threshold: { min: 6.5, max: 8.5 },
       currentValue: averagePh,
       minValue: minPh,
       maxValue: maxPh,
@@ -253,18 +252,18 @@ const calculateComplianceStatus = (metrics: WaterQualityMetrics) => {
     });
   }
 
-  // TDS Compliance (WHO)
+  // TDS Compliance (WHO: ≤ 500 ppm)
   if (tdsReadings.length > 0) {
-    const tdsCompliant = tdsReadings.filter(tds => tds <= WATER_QUALITY_THRESHOLDS.tds.warning).length;
+    const tdsCompliant = tdsReadings.filter(tds => tds <= 500).length;
     const tdsViolations = tdsReadings.length - tdsCompliant;
-    const aboveMax = tdsReadings.filter(tds => tds > WATER_QUALITY_THRESHOLDS.tds.warning).length;
+    const aboveMax = tdsReadings.filter(tds => tds > 500).length;
     
     complianceStatus.push({
       parameter: 'tds' as const,
       compliant: tdsViolations === 0,
       compliancePercentage: (tdsCompliant / tdsReadings.length) * 100,
       violationCount: tdsViolations,
-  threshold: { max: WATER_QUALITY_THRESHOLDS.tds.warning },
+      threshold: { max: 500 },
       currentValue: averageTds,
       minValue: minTds,
       maxValue: maxTds,
@@ -272,11 +271,11 @@ const calculateComplianceStatus = (metrics: WaterQualityMetrics) => {
     });
   }
 
-  // Turbidity Compliance (WHO)
+  // Turbidity Compliance (WHO: ≤ 5 NTU)
   if (turbidityReadings.length > 0) {
-    const turbidityCompliant = turbidityReadings.filter(t => t <= WATER_QUALITY_THRESHOLDS.turbidity.warning).length;
+    const turbidityCompliant = turbidityReadings.filter(t => t <= 5).length;
     const turbidityViolations = turbidityReadings.length - turbidityCompliant;
-    const aboveMax = turbidityReadings.filter(t => t > WATER_QUALITY_THRESHOLDS.turbidity.warning).length;
+    const aboveMax = turbidityReadings.filter(t => t > 5).length;
     
     complianceStatus.push({
       parameter: 'turbidity' as const,

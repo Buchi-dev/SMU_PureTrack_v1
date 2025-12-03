@@ -57,36 +57,6 @@ export default defineConfig({
               },
             },
           },
-          // Cache Google APIs for Firebase
-          {
-            urlPattern: /^https:\/\/apis\.google\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'google-apis-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            },
-          },
-          // Cache Firebase APIs
-          {
-            urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'firebase-apis-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            },
-          },
         ],
       },
     }),

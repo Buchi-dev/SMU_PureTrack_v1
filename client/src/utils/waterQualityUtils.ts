@@ -4,10 +4,26 @@
  */
 
 import type { SensorReading } from '../schemas';
-import { WATER_QUALITY_THRESHOLDS } from '../constants/waterQualityStandards';
 
-// Re-export for backward compatibility
-export { WATER_QUALITY_THRESHOLDS };
+/**
+ * Water quality thresholds based on WHO guidelines
+ */
+export const WATER_QUALITY_THRESHOLDS = {
+  pH: {
+    min: 6.5,
+    max: 8.5,
+    critical_min: 6.0,
+    critical_max: 9.0,
+  },
+  turbidity: {
+    warning: 5,
+    critical: 10,
+  },
+  tds: {
+    warning: 500,
+    critical: 1000,
+  },
+} as const;
 
 /**
  * Device status type

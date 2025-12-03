@@ -22,6 +22,17 @@ const ensureApiKey = (req, res, next) => {
     });
   }
 
+  // Validate API key
+  const validApiKey = process.env.DEVICE_API_KEY;
+  
+  if (!validApiKey) {
+    logger.error('DEVICE_API_KEY not configured in environment');
+    return res.status(500).json({
+      success: false,
+      message: 'Server configuration error',
+    });
+  }
+
   if (apiKey !== validApiKey) {
     logger.warn('Invalid API key attempt', {
       ip: req.ip,
@@ -60,6 +71,13 @@ const ensureApiKeyWithTypes = (allowedTypes = []) => {
         message: 'API key is required',
       });
     }
+
+    // Map device types to environment variables
+    const apiKeyMap = {
+      'default': process.env.DEVICE_API_KEY,
+      'sensor': process.env.SENSOR_API_KEY || process.env.DEVICE_API_KEY,
+      'gateway': process.env.GATEWAY_API_KEY || process.env.DEVICE_API_KEY,
+    };
 
     const validApiKey = apiKeyMap[deviceType];
     

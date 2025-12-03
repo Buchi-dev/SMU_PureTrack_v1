@@ -3,8 +3,6 @@
  * Centralized configuration values to avoid magic numbers
  */
 
-const { WATER_QUALITY_THRESHOLDS } = require('../configs/waterQualityStandards');
-
 // Time constants (in milliseconds)
 const TIME = {
   ONE_SECOND: 1000,
@@ -20,8 +18,24 @@ const TIME = {
 };
 
 // Sensor thresholds (WHO/EPA Guidelines)
-// NOTE: Imported from centralized waterQualityStandards.js
-const SENSOR_THRESHOLDS = WATER_QUALITY_THRESHOLDS;
+const SENSOR_THRESHOLDS = {
+  pH: {
+    min: 6.5,
+    max: 8.5,
+    critical: {
+      min: 6.0,
+      max: 9.0,
+    },
+  },
+  turbidity: {
+    warning: 5, // NTU
+    critical: 10, // NTU
+  },
+  tds: {
+    warning: 500, // ppm
+    critical: 1000, // ppm
+  },
+};
 
 // Pagination defaults
 const PAGINATION = {
@@ -75,14 +89,12 @@ const EMAIL = {
   RETRY_DELAY: TIME.FIVE_MINUTES,
 };
 
-// MongoDB connection pool (optimized for MongoDB Atlas cloud + jittered device transmissions)
+// MongoDB connection pool (optimized for MongoDB Atlas cloud)
 const MONGO_POOL = {
-  MIN_POOL_SIZE: 10,               // Increased from 5 to handle baseline load
-  MAX_POOL_SIZE: 50,               // Increased from 10 to handle 100+ devices with jitter
+  MIN_POOL_SIZE: 5,
+  MAX_POOL_SIZE: 10,
   SERVER_SELECTION_TIMEOUT: 30000,  // 30 seconds for cloud MongoDB Atlas
-  SOCKET_TIMEOUT: 60000,            // 60 seconds for long-running queries
-  MAX_IDLE_TIME_MS: 300000,         // 5 minutes - close idle connections
-  WAIT_QUEUE_TIMEOUT_MS: 10000,     // 10 seconds - max wait for connection from pool
+  SOCKET_TIMEOUT: 60000,             // 60 seconds for long-running queries
 };
 
 // API versioning

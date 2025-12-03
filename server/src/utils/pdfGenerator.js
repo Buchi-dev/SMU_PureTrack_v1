@@ -97,8 +97,6 @@ function formatDateTime(date) {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-const { WATER_QUALITY_THRESHOLDS } = require('../configs/waterQualityStandards');
-
 /**
  * Determine overall water quality status based on summary metrics
  */
@@ -117,10 +115,9 @@ function getOverallStatus(summary) {
     return { status: 'NO DATA', color: [128, 128, 128] };
   }
 
-  const turbidityOk = (summary.averageTurbidity || 0) <= WATER_QUALITY_THRESHOLDS.turbidity.warning;
-  const tdsOk = (summary.averageTDS || 0) <= WATER_QUALITY_THRESHOLDS.tds.warning;
-  const phOk = (summary.averagePH || 0) >= WATER_QUALITY_THRESHOLDS.pH.min && 
-               (summary.averagePH || 0) <= WATER_QUALITY_THRESHOLDS.pH.max;
+  const turbidityOk = (summary.averageTurbidity || 0) <= 5;
+  const tdsOk = (summary.averageTDS || 0) <= 500;
+  const phOk = (summary.averagePH || 0) >= 6.5 && (summary.averagePH || 0) <= 8.5;
 
   const okCount = [turbidityOk, tdsOk, phOk].filter(Boolean).length;
 
@@ -146,10 +143,9 @@ function calculateComplianceMetrics(summary) {
   let compliantCount = 0;
   const totalCount = 3;
 
-  if ((summary.averageTurbidity || 0) <= WATER_QUALITY_THRESHOLDS.turbidity.warning) compliantCount++;
-  if ((summary.averageTDS || 0) <= WATER_QUALITY_THRESHOLDS.tds.warning) compliantCount++;
-  if ((summary.averagePH || 0) >= WATER_QUALITY_THRESHOLDS.pH.min && 
-      (summary.averagePH || 0) <= WATER_QUALITY_THRESHOLDS.pH.max) compliantCount++;
+  if ((summary.averageTurbidity || 0) <= 5) compliantCount++;
+  if ((summary.averageTDS || 0) <= 500) compliantCount++;
+  if ((summary.averagePH || 0) >= 6.5 && (summary.averagePH || 0) <= 8.5) compliantCount++;
 
   const rate = Math.round((compliantCount / totalCount) * 100);
 
@@ -164,30 +160,28 @@ function calculateDeviceCompliance(metrics) {
   const tdsValue = metrics.avgTDS || 0;
   const phValue = metrics.avgPH || 0;
 
-  const turbidityCompliance = turbidityValue <= WATER_QUALITY_THRESHOLDS.turbidity.warning ? 100 : 
-    Math.max(0, 100 - ((turbidityValue - WATER_QUALITY_THRESHOLDS.turbidity.warning) / WATER_QUALITY_THRESHOLDS.turbidity.warning) * 100);
-  const tdsCompliance = tdsValue <= WATER_QUALITY_THRESHOLDS.tds.warning ? 100 : 
-    Math.max(0, 100 - ((tdsValue - WATER_QUALITY_THRESHOLDS.tds.warning) / WATER_QUALITY_THRESHOLDS.tds.warning) * 100);
-  const phCompliance = (phValue >= WATER_QUALITY_THRESHOLDS.pH.min && phValue <= WATER_QUALITY_THRESHOLDS.pH.max) ? 100 : 
+  const turbidityCompliance = turbidityValue <= 5 ? 100 : Math.max(0, 100 - ((turbidityValue - 5) / 5) * 100);
+  const tdsCompliance = tdsValue <= 500 ? 100 : Math.max(0, 100 - ((tdsValue - 500) / 500) * 100);
+  const phCompliance = (phValue >= 6.5 && phValue <= 8.5) ? 100 : 
     Math.max(0, 100 - (Math.abs(phValue - 7.0) / 1.5) * 100);
 
   return {
     turbidity: {
-      value: `${turbidityValue.toFixed(2)} ${WATER_QUALITY_THRESHOLDS.turbidity.unit}`,
-      standard: `< ${WATER_QUALITY_THRESHOLDS.turbidity.warning} ${WATER_QUALITY_THRESHOLDS.turbidity.unit}`,
-      status: turbidityValue <= WATER_QUALITY_THRESHOLDS.turbidity.warning ? 'Compliant' : 'Non-Compliant',
+      value: `${turbidityValue.toFixed(2)} NTU`,
+      standard: '< 5 NTU',
+      status: turbidityValue <= 5 ? 'Compliant' : 'Non-Compliant',
       percentage: `${turbidityCompliance.toFixed(1)}%`
     },
     tds: {
-      value: `${tdsValue.toFixed(2)} ${WATER_QUALITY_THRESHOLDS.tds.unit}`,
-      standard: `< ${WATER_QUALITY_THRESHOLDS.tds.warning} ${WATER_QUALITY_THRESHOLDS.tds.unit}`,
-      status: tdsValue <= WATER_QUALITY_THRESHOLDS.tds.warning ? 'Compliant' : 'Non-Compliant',
+      value: `${tdsValue.toFixed(2)} ppm`,
+      standard: '< 500 ppm',
+      status: tdsValue <= 500 ? 'Compliant' : 'Non-Compliant',
       percentage: `${tdsCompliance.toFixed(1)}%`
     },
     ph: {
       value: phValue.toFixed(2),
-      standard: `${WATER_QUALITY_THRESHOLDS.pH.min} - ${WATER_QUALITY_THRESHOLDS.pH.max}`,
-      status: (phValue >= WATER_QUALITY_THRESHOLDS.pH.min && phValue <= WATER_QUALITY_THRESHOLDS.pH.max) ? 'Compliant' : 'Non-Compliant',
+      standard: '6.5 - 8.5',
+      status: (phValue >= 6.5 && phValue <= 8.5) ? 'Compliant' : 'Non-Compliant',
       percentage: `${phCompliance.toFixed(1)}%`
     }
   };
@@ -205,27 +199,27 @@ function generateRecommendations(reportData) {
 
   const summary = reportData.summary;
   
-  if (summary?.averageTurbidity && summary.averageTurbidity > WATER_QUALITY_THRESHOLDS.turbidity.warning) {
+  if (summary?.averageTurbidity && summary.averageTurbidity > 5) {
     recommendations.push(
-      `High turbidity detected (${summary.averageTurbidity.toFixed(2)} ${WATER_QUALITY_THRESHOLDS.turbidity.unit}). ` +
+      `High turbidity detected (${summary.averageTurbidity.toFixed(2)} NTU). ` +
       'Investigate potential contamination sources and consider filtration system maintenance.'
     );
   }
 
-  if (summary?.averageTDS && summary.averageTDS > WATER_QUALITY_THRESHOLDS.tds.warning) {
+  if (summary?.averageTDS && summary.averageTDS > 500) {
     recommendations.push(
-      `Elevated TDS levels detected (${summary.averageTDS.toFixed(2)} ${WATER_QUALITY_THRESHOLDS.tds.unit}). ` +
+      `Elevated TDS levels detected (${summary.averageTDS.toFixed(2)} ppm). ` +
       'Consider water treatment to reduce dissolved solids. Schedule pipe system inspection.'
     );
   }
 
   if (summary?.averagePH) {
-    if (summary.averagePH < WATER_QUALITY_THRESHOLDS.pH.min) {
+    if (summary.averagePH < 6.5) {
       recommendations.push(
         `Low pH detected (${summary.averagePH.toFixed(2)}). Water is acidic. ` +
         'Install pH adjustment system. Check for corrosion in pipes.'
       );
-    } else if (summary.averagePH > WATER_QUALITY_THRESHOLDS.pH.max) {
+    } else if (summary.averagePH > 8.5) {
       recommendations.push(
         `High pH detected (${summary.averagePH.toFixed(2)}). Water is alkaline. ` +
         'Install pH adjustment system. Test for mineral buildup.'

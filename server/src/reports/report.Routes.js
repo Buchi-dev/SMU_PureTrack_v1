@@ -61,13 +61,6 @@ router.get('/history', ensureAuthenticated, validatePagination, getReportHistory
 router.get('/download/:fileId', ensureAuthenticated, downloadReport);
 
 /**
- * @route   GET /api/v1/reports/:id
- * @desc    Get report by ID
- * @access  Authenticated users
- */
-router.get('/:id', ensureAuthenticated, validateMongoId, getReportById);
-
-/**
  * @route   DELETE /api/v1/reports/:id
  * @desc    Delete report
  * @access  Admin only

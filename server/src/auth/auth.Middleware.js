@@ -7,33 +7,20 @@ const asyncHandler = require('../middleware/asyncHandler');
 /**
  * Firebase Authentication Middleware
  * Verifies Firebase ID token and attaches user to request
- * 
- * Supports two authentication methods:
- * 1. Authorization header: "Bearer <token>" (preferred)
- * 2. Query parameter: ?token=<token> (for SSE/EventSource which can't send headers)
  */
 const authenticateFirebase = asyncHandler(async (req, res, next) => {
-  // Get token from Authorization header or query parameter
+  // Get token from Authorization header
   const authHeader = req.headers.authorization;
-  let idToken;
   
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    idToken = authHeader.split('Bearer ')[1];
-  } else if (req.query.token) {
-    // Support token in query parameter for SSE connections (EventSource limitation)
-    idToken = req.query.token;
-    logger.debug('[Auth Middleware] Using query parameter token', {
-      path: req.path,
-      tokenLength: idToken.length,
-    });
-  } else {
-    logger.warn('[Auth Middleware] No authorization header or token query param', {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    logger.warn('[Auth Middleware] No authorization header', {
       path: req.path,
       hasHeader: !!authHeader,
-      hasQueryToken: !!req.query.token,
     });
     throw AuthenticationError.missingToken();
   }
+
+  const idToken = authHeader.split('Bearer ')[1];
 
   if (!idToken || idToken.trim() === '') {
     logger.warn('[Auth Middleware] Empty token', { path: req.path });

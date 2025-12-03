@@ -27,18 +27,11 @@ RUN npm ci --only=production --ignore-scripts && \
 FROM node:18-alpine AS production
 
 # Install runtime dependencies only
-# NOTE: chrony is added for NTP time synchronization to prevent Firebase JWT signature failures
 RUN apk add --no-cache \
     wget \
     curl \
     tini \
-    dumb-init \
-    chrony \
-    tzdata
-
-# Configure timezone (set to UTC for consistency)
-ENV TZ=UTC
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+    dumb-init
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -58,9 +51,6 @@ RUN mkdir -p logs && \
     chown -R nodejs:nodejs logs && \
     chmod 755 logs
 
-# Make entrypoint script executable
-RUN chmod +x scripts/docker-entrypoint.sh
-
 # Set environment variables
 ENV NODE_ENV=production \
     PORT=5000 \
@@ -76,8 +66,8 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:5000/health || exit 1
 
-# Use custom entrypoint for time sync check, with tini for signal handling
-ENTRYPOINT ["/sbin/tini", "--", "/app/scripts/docker-entrypoint.sh"]
+# Use tini to handle signals properly
+ENTRYPOINT ["/sbin/tini", "--"]
 
 # Start the application
 CMD ["node", "src/index.js"]

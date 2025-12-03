@@ -10,13 +10,11 @@ const gridFSService = require('../utils/gridfs.service');
 const connectDB = async () => {
   try {
     const options = {
-      // Connection pool configuration (optimized for jittered device transmissions)
+      // Connection pool configuration
       minPoolSize: MONGO_POOL.MIN_POOL_SIZE,
       maxPoolSize: MONGO_POOL.MAX_POOL_SIZE,
       serverSelectionTimeoutMS: MONGO_POOL.SERVER_SELECTION_TIMEOUT,
       socketTimeoutMS: MONGO_POOL.SOCKET_TIMEOUT,
-      maxIdleTimeMS: MONGO_POOL.MAX_IDLE_TIME_MS,
-      waitQueueTimeoutMS: MONGO_POOL.WAIT_QUEUE_TIMEOUT_MS,
       
       // Recommended options for MongoDB Atlas
       retryWrites: true,
@@ -25,19 +23,12 @@ const connectDB = async () => {
       
       // Auto-reconnection (important for production stability)
       autoIndex: false, // Don't build indexes in production
+      maxIdleTimeMS: 300000, // Close idle connections after 5 minutes
       
       // Additional stability options for cloud MongoDB
       connectTimeoutMS: 30000, // 30 seconds to establish initial connection
       heartbeatFrequencyMS: 10000, // Check connection health every 10 seconds
-      maxConnecting: 5, // Increased from 2 to 5 for better concurrency
-      
-      // Write concern for better performance under load
-      journal: true, // Ensure writes are journaled for durability
-      writeConcern: {
-        w: 'majority',
-        j: true,
-        wtimeout: 5000 // 5 second timeout for write acknowledgment
-      },
+      maxConnecting: 2, // Limit concurrent connection attempts
     };
 
     const conn = await mongoose.connect(process.env.MONGO_URI, options);

@@ -52,8 +52,6 @@ export const DEVICE_ENDPOINTS = {
   UPDATE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
   DELETE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}`,
   PROCESS_READING: `${API_VERSION}/devices/readings`,
-  APPROVE: (deviceId: string) => `${API_VERSION}/devices/${deviceId}/approve`,
-  SEND_COMMAND: (deviceId: string) => `${API_VERSION}/devices/${deviceId}/command`,
 } as const;
 
 // ==================== REPORTS ====================
