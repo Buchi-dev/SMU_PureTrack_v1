@@ -129,8 +129,13 @@ export const AdminReports = () => {
       const startDate = dateRange?.[0]?.format('YYYY-MM-DD') || '';
       const endDate = dateRange?.[1]?.format('YYYY-MM-DD') || '';
 
+      // Step 1: Start generating
       message.loading({ content: 'Generating report...', key: 'report', duration: 0 });
-      setBackupProgress({ status: 'idle', message: '', percent: 0 });
+      setBackupProgress({ 
+        status: 'saving', 
+        message: 'Generating report...', 
+        percent: 20 
+      });
 
       if (import.meta.env.DEV) {
         console.log('[AdminReports] Generating report with params:', {
@@ -157,6 +162,16 @@ export const AdminReports = () => {
         console.log('[AdminReports] DEBUG - Total devices available:', devicesWithReadings.length);
       }
 
+      // Step 2: Update message - generating report
+      setTimeout(() => {
+        message.loading({ content: 'Processing data...', key: 'report', duration: 0 });
+        setBackupProgress({ 
+          status: 'saving', 
+          message: 'Processing data...', 
+          percent: 40 
+        });
+      }, 500);
+
       // Call backend API to generate report and store PDF
       const response = await reportsService.generateWaterQualityReport({
         startDate,
@@ -176,11 +191,12 @@ export const AdminReports = () => {
       }
 
       if (response.success) {
-        // Update progress - report generated
+        // Step 3: Update progress - saving to database
+        message.loading({ content: 'Saving to database...', key: 'report', duration: 0 });
         setBackupProgress({ 
           status: 'saving', 
           message: 'Saving to database...', 
-          percent: 50 
+          percent: 70 
         });
 
         // Check if PDF blob is included in response for instant download
@@ -192,6 +208,14 @@ export const AdminReports = () => {
               { type: response.pdfContentType || 'application/pdf' }
             );
 
+            // Step 4: Update progress - preparing download
+            message.loading({ content: 'Preparing download...', key: 'report', duration: 0 });
+            setBackupProgress({ 
+              status: 'saving', 
+              message: 'Preparing download...', 
+              percent: 90 
+            });
+
             // Create download link and trigger download
             const url = window.URL.createObjectURL(pdfBlob);
             const link = document.createElement('a');
@@ -202,15 +226,15 @@ export const AdminReports = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
-            // Update progress - download completed
+            // Step 5: Update progress - completed
             setBackupProgress({ 
               status: 'completed', 
-              message: 'Report downloaded and saved to database successfully!', 
+              message: 'Report generated, saved, and downloaded successfully!', 
               percent: 100 
             });
 
             message.success({
-              content: 'Report generated, downloaded, and saved to database!',
+              content: 'Report generated, saved to database, and downloaded!',
               key: 'report',
               duration: 5
             });
@@ -426,11 +450,11 @@ export const AdminReports = () => {
                         style={{ marginBottom: 20 }}
                       />
 
-                      {/* Backup Progress Indicator */}
+                      {/* Report Generation Progress Indicator */}
                       {backupProgress.status !== 'idle' && (
                         <Card size="small" style={{ marginBottom: 20 }}>
                           <Space direction="vertical" style={{ width: '100%' }}>
-                            <Text strong>Backup Progress</Text>
+                            <Text strong>Report Generation Progress</Text>
                             <Progress 
                               percent={backupProgress.percent} 
                               status={

@@ -48,8 +48,7 @@ export const getAnalyticsSummary = async (
     {
       $group: {
         _id: null,
-        avgTemperature: { $avg: '$temperature' },
-        avgPh: { $avg: '$ph' },
+        avgPh: { $avg: '$pH' },
         avgTurbidity: { $avg: '$turbidity' },
         avgTds: { $avg: '$tds' },
       },
@@ -64,7 +63,6 @@ export const getAnalyticsSummary = async (
   });
 
   const averages = avgData[0] || {
-    avgTemperature: 0,
     avgPh: 0,
     avgTurbidity: 0,
     avgTds: 0,
@@ -73,7 +71,6 @@ export const getAnalyticsSummary = async (
   return {
     totalReadings,
     devicesActive,
-    avgTemperature: Math.round(averages.avgTemperature * 100) / 100,
     avgPh: Math.round(averages.avgPh * 100) / 100,
     avgTurbidity: Math.round(averages.avgTurbidity * 100) / 100,
     avgTds: Math.round(averages.avgTds * 100) / 100,
@@ -130,8 +127,7 @@ export const getAnalyticsTrends = async (
     {
       $group: {
         _id: dateFormat,
-        avgTemperature: { $avg: '$temperature' },
-        avgPh: { $avg: '$ph' },
+        avgPh: { $avg: '$pH' },
         avgTurbidity: { $avg: '$turbidity' },
         avgTds: { $avg: '$tds' },
       },
@@ -140,10 +136,6 @@ export const getAnalyticsTrends = async (
   ]);
 
   return {
-    temperature: trends.map((t) => ({
-      timestamp: new Date(t._id),
-      value: Math.round(t.avgTemperature * 100) / 100,
-    })),
     ph: trends.map((t) => ({
       timestamp: new Date(t._id),
       value: Math.round(t.avgPh * 100) / 100,
@@ -184,12 +176,9 @@ export const getParameterStatistics = async (
     {
       $group: {
         _id: null,
-        minTemp: { $min: '$temperature' },
-        maxTemp: { $max: '$temperature' },
-        avgTemp: { $avg: '$temperature' },
-        minPh: { $min: '$ph' },
-        maxPh: { $max: '$ph' },
-        avgPh: { $avg: '$ph' },
+        minPh: { $min: '$pH' },
+        maxPh: { $max: '$pH' },
+        avgPh: { $avg: '$pH' },
         minTurbidity: { $min: '$turbidity' },
         maxTurbidity: { $max: '$turbidity' },
         avgTurbidity: { $avg: '$turbidity' },
@@ -208,14 +197,6 @@ export const getParameterStatistics = async (
   const data = stats[0];
 
   return [
-    {
-      parameter: 'temperature',
-      min: Math.round(data.minTemp * 100) / 100,
-      max: Math.round(data.maxTemp * 100) / 100,
-      avg: Math.round(data.avgTemp * 100) / 100,
-      count: data.count,
-      unit: '°C',
-    },
     {
       parameter: 'ph',
       min: Math.round(data.minPh * 100) / 100,

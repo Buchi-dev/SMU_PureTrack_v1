@@ -43,6 +43,7 @@ export interface UseAlertsReturn {
 export interface UseAlertMutationsReturn {
   acknowledgeAlert: (alertId: string) => Promise<void>;
   resolveAlert: (alertId: string, notes?: string) => Promise<void>;
+  resolveAllAlerts: (notes?: string, filters?: { severity?: string; parameter?: string; deviceId?: string }) => Promise<{ resolvedCount: number }>;
   isLoading: boolean;
   error: Error | null;
 }
@@ -258,9 +259,46 @@ export function useAlertMutations(): UseAlertMutationsReturn {
     }
   }, []);
 
+  const resolveAllAlerts = useCallback(async (
+    notes?: string,
+    filters?: { severity?: string; parameter?: string; deviceId?: string }
+  ) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Perform the API call
+      const response = await alertsService.resolveAllAlerts(notes, filters);
+      
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Resolve all response:', response);
+      }
+      
+      // Invalidate all alert caches to trigger full refetch
+      await mutate(
+        (key: any) => Array.isArray(key) && key[0] === 'alerts',
+        undefined,
+        { revalidate: true }
+      );
+      
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Cache invalidation complete');
+      }
+
+      return { resolvedCount: response.data.resolvedCount };
+    } catch (err) {
+      console.error('[useAlertMutations] Resolve all error:', err);
+      const error = err instanceof Error ? err : new Error('Failed to resolve all alerts');
+      setError(error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     acknowledgeAlert,
     resolveAlert,
+    resolveAllAlerts,
     isLoading,
     error,
   };

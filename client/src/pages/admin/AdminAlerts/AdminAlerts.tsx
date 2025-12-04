@@ -42,7 +42,8 @@ export const AdminAlerts = () => {
   // ✅ GLOBAL WRITE HOOK - Alert operations (acknowledge, resolve)
   const { 
     acknowledgeAlert, 
-    resolveAlert, 
+    resolveAlert,
+    resolveAllAlerts, 
     isLoading: isOperating,
     error: operationError,
   } = useAlertMutations();
@@ -141,6 +142,40 @@ export const AdminAlerts = () => {
     }
   };
 
+  // ✅ Resolve all alerts handler with optional filters
+  const handleResolveAll = async (notes?: string, currentFilters?: any) => {
+    try {
+      // Build filters based on current filter state if provided
+      const apiFilters: { severity?: string; parameter?: string } = {};
+      
+      // Admin filters are arrays, so we need to check if they exist and have values
+      if (currentFilters?.severity && Array.isArray(currentFilters.severity) && currentFilters.severity.length > 0) {
+        // Take the first filter value if it's an array
+        apiFilters.severity = currentFilters.severity[0];
+      }
+      if (currentFilters?.parameter && Array.isArray(currentFilters.parameter) && currentFilters.parameter.length > 0) {
+        // Take the first filter value if it's an array
+        apiFilters.parameter = currentFilters.parameter[0];
+      }
+
+      // Only pass filters if we have at least one filter value
+      const hasFilters = Object.keys(apiFilters).length > 0;
+      const result = await resolveAllAlerts(
+        notes || undefined, 
+        hasFilters ? apiFilters : undefined
+      );
+      message.success(`Successfully resolved ${result.resolvedCount} alert(s)`);
+      
+      // Force refetch to ensure UI is up-to-date
+      await refetch();
+      
+      return result;
+    } catch (error) {
+      message.error('Failed to resolve all alerts');
+      throw error;
+    }
+  };
+
   return (
     <AdminLayout>
       <div style={{ padding: '24px' }}>
@@ -182,6 +217,8 @@ export const AdminAlerts = () => {
             onViewDetails={viewAlertDetails}
             onAcknowledge={handleAcknowledge}
             onBatchAcknowledge={handleBatchAcknowledge}
+            onResolveAll={handleResolveAll}
+            currentFilters={filters}
             isAcknowledging={isOperating}
           />
         </Space>

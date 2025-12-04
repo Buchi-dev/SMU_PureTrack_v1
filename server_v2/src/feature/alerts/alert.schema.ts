@@ -46,6 +46,20 @@ export const resolveAlertSchema = z.object({
 });
 
 /**
+ * Resolve all alerts schema
+ */
+export const resolveAllAlertsSchema = z.object({
+  body: z.object({
+    resolutionNotes: z.string().min(1).max(1000).optional(),
+    filters: z.object({
+      severity: z.nativeEnum(AlertSeverity).optional(),
+      parameter: z.nativeEnum(AlertParameter).optional(),
+      deviceId: z.string().optional(),
+    }).optional(),
+  }).optional().default({}),
+});
+
+/**
  * Get alert by ID schema
  */
 export const getAlertByIdSchema = z.object({
@@ -92,6 +106,7 @@ export const alertStatisticsSchema = z.object({
 export type AlertFiltersInput = z.infer<typeof alertFiltersSchema>;
 export type AcknowledgeAlertInput = z.infer<typeof acknowledgeAlertSchema>;
 export type ResolveAlertInput = z.infer<typeof resolveAlertSchema>;
+export type ResolveAllAlertsInput = z.infer<typeof resolveAllAlertsSchema>;
 export type GetAlertByIdInput = z.infer<typeof getAlertByIdSchema>;
 export type DeleteAlertInput = z.infer<typeof deleteAlertSchema>;
 export type CreateAlertInput = z.infer<typeof createAlertSchema>;

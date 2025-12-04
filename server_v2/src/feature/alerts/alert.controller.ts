@@ -111,6 +111,26 @@ export const resolveAlert = asyncHandler(async (req: AuthRequest, res: Response)
 });
 
 /**
+ * Resolve all alerts
+ * @route PATCH /api/v1/alerts/resolve-all
+ */
+export const resolveAllAlerts = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const { resolutionNotes, filters } = req.body;
+  const userId = new Types.ObjectId(req.user!.userId);
+
+  const result = await alertService.resolveAllAlerts(userId, resolutionNotes, filters);
+
+  ResponseHandler.success(
+    res,
+    {
+      resolvedCount: result.resolvedCount,
+      alerts: result.alerts.map(alert => alert.toPublicProfile()),
+    },
+    `Successfully resolved ${result.resolvedCount} alert(s)`
+  );
+});
+
+/**
  * Get alert statistics
  * @route GET /api/v1/alerts/statistics
  */

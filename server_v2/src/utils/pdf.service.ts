@@ -23,6 +23,25 @@ interface IWaterQualityReportParams {
     turbidity: number;
     tds: number;
   }>;
+  alerts?: Array<{
+    createdAt: Date;
+    severity: string;
+    parameter: string;
+    message: string;
+    status: string;
+    value?: number;
+    threshold?: number;
+  }>;
+  alertSummary?: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    unacknowledged: number;
+    acknowledged: number;
+    resolved: number;
+  };
   statistics: {
     avgPh: number;
     avgTurbidity: number;
@@ -175,7 +194,9 @@ class PDFService {
    * Time-series charts for pH/turbidity/TDS with WHO standards compliance
    */
   private generateWaterQualityReport(params: IWaterQualityReportParams): jsPDF {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      compress: true,
+    });
     let yPos = 20;
 
     // ============================================================================
@@ -402,7 +423,6 @@ class PDFService {
       const phValue = reading.ph != null ? reading.ph.toFixed(2) : 'N/A';
       const turbValue = reading.turbidity != null ? reading.turbidity.toFixed(2) : 'N/A';
       const tdsValue = reading.tds != null ? reading.tds.toFixed(2) : 'N/A';
-      const tempValue = (reading as any).temperature != null ? (reading as any).temperature.toFixed(1) + '°C' : 'N/A';
       
       // Compliance indicators
       const phOk = reading.ph != null && reading.ph >= 6.5 && reading.ph <= 8.5 ? '✓' : '✗';
@@ -420,14 +440,13 @@ class PDFService {
         `${phValue} ${phOk}`,
         `${turbValue} ${turbOk}`,
         `${tdsValue} ${tdsOk}`,
-        tempValue,
       ];
     });
 
     autoTable(doc, {
       startY: yPos,
-      head: [['Timestamp', 'pH', 'Turbidity (NTU)', 'TDS (ppm)', 'Temp']],
-      body: readingsData.length > 0 ? readingsData : [['No readings available', '', '', '', '']],
+      head: [['Timestamp', 'pH', 'Turbidity (NTU)', 'TDS (ppm)']],
+      body: readingsData.length > 0 ? readingsData : [['No readings available', '', '', '']],
       theme: 'striped',
       headStyles: { 
         fillColor: this.BRAND_COLOR,
@@ -440,11 +459,10 @@ class PDFService {
         cellPadding: 2,
       },
       columnStyles: {
-        0: { cellWidth: 45 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 22 },
+        0: { cellWidth: 55 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 38 },
       },
       alternateRowStyles: {
         fillColor: '#f9fafb',
@@ -452,6 +470,113 @@ class PDFService {
     });
 
     yPos = (doc as any).lastAutoTable.finalY + 15;
+
+    // ============================================================================
+    // ALERTS SECTION
+    // ============================================================================
+    if (params.alerts && params.alerts.length > 0) {
+      if (yPos > 240) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setFontSize(14);
+      doc.setTextColor(this.BRAND_COLOR);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Alerts Summary', 14, yPos);
+      yPos += 8;
+
+      // Alert Summary Statistics
+      if (params.alertSummary) {
+        doc.setFontSize(10);
+        doc.setTextColor(this.GRAY_COLOR);
+        doc.setFont('helvetica', 'normal');
+        
+        const summary = params.alertSummary;
+        doc.text(`Total Alerts: ${summary.total}`, 14, yPos);
+        yPos += 6;
+        doc.text(`By Severity: Critical (${summary.critical}) | High (${summary.high}) | Medium (${summary.medium}) | Low (${summary.low})`, 14, yPos);
+        yPos += 6;
+        doc.text(`By Status: Unacknowledged (${summary.unacknowledged}) | Acknowledged (${summary.acknowledged}) | Resolved (${summary.resolved})`, 14, yPos);
+        yPos += 10;
+      }
+
+      // Alerts Table
+      const alertsData = params.alerts.slice(0, 50).map((alert) => {
+        const timestamp = new Date(alert.createdAt);
+        const severityColor = alert.severity === 'CRITICAL' ? '🔴' : 
+                             alert.severity === 'HIGH' ? '🟠' : 
+                             alert.severity === 'MEDIUM' ? '🟡' : '🟢';
+        
+        return [
+          timestamp.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          }),
+          `${severityColor} ${alert.severity}`,
+          alert.parameter?.toUpperCase() || 'N/A',
+          alert.value != null ? alert.value.toFixed(2) : 'N/A',
+          alert.threshold != null ? alert.threshold.toFixed(2) : 'N/A',
+          alert.status,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Time', 'Severity', 'Parameter', 'Value', 'Threshold', 'Status']],
+        body: alertsData.length > 0 ? alertsData : [['No alerts in this period', '', '', '', '', '']],
+        theme: 'striped',
+        headStyles: { 
+          fillColor: this.BRAND_COLOR,
+          textColor: '#ffffff',
+          fontStyle: 'bold',
+          fontSize: 9,
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 30 },
+        },
+        alternateRowStyles: {
+          fillColor: '#f9fafb',
+        },
+        didParseCell: (data) => {
+          // Color code severity column
+          if (data.column.index === 1 && data.section === 'body') {
+            const severity = data.cell.text[0];
+            if (severity && severity.includes('CRITICAL')) {
+              data.cell.styles.textColor = this.ERROR_COLOR;
+              data.cell.styles.fontStyle = 'bold';
+            } else if (severity && severity.includes('HIGH')) {
+              data.cell.styles.textColor = this.WARNING_COLOR;
+              data.cell.styles.fontStyle = 'bold';
+            } else if (severity && severity.includes('MEDIUM')) {
+              data.cell.styles.textColor = '#f59e0b'; // Amber
+            }
+          }
+          // Color code status column
+          if (data.column.index === 5 && data.section === 'body') {
+            const status = data.cell.text[0];
+            if (status === 'Resolved') {
+              data.cell.styles.textColor = this.SUCCESS_COLOR;
+            } else if (status === 'Unacknowledged') {
+              data.cell.styles.textColor = this.ERROR_COLOR;
+            }
+          }
+        },
+      });
+
+      yPos = (doc as any).lastAutoTable.finalY + 15;
+    }
 
     // ============================================================================
     // RECOMMENDATIONS SECTION
@@ -625,6 +750,28 @@ class PDFService {
       );
     }
 
+    // Alert-based recommendations
+    if (params.alertSummary) {
+      const alertSum = params.alertSummary;
+      if (alertSum.critical > 0) {
+        recommendations.push(
+          `[CRITICAL] ${alertSum.critical} critical alert(s) detected during this period. ` +
+          `Immediate attention required to address water quality violations.`
+        );
+      }
+      if (alertSum.unacknowledged > 0) {
+        recommendations.push(
+          `[WARNING] ${alertSum.unacknowledged} unacknowledged alert(s) pending review. ` +
+          `Ensure all alerts are reviewed and appropriate actions are taken.`
+        );
+      }
+      if (alertSum.total === 0) {
+        recommendations.push(
+          `[INFO] No alerts triggered during this period. Water quality parameters remained within acceptable ranges.`
+        );
+      }
+    }
+
     // Positive recommendation if all is well
     if (compliance.overallStatus === 'Safe' && compliance.complianceRate === 100) {
       recommendations.push(
@@ -669,7 +816,9 @@ class PDFService {
    * Online/offline summary table
    */
   private generateDeviceStatusReport(params: IDeviceStatusReportParams): jsPDF {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      compress: true,
+    });
 
     // Header
     this.addHeader(doc, 'Device Status Report');
@@ -735,7 +884,9 @@ class PDFService {
    * Threshold violation timeline
    */
   private generateComplianceReport(params: IComplianceReportParams): jsPDF {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      compress: true,
+    });
 
     // Header
     this.addHeader(doc, 'Compliance Report');
@@ -802,7 +953,9 @@ class PDFService {
    * Alert statistics with charts
    */
   private generateAlertSummaryReport(params: IAlertSummaryReportParams): jsPDF {
-    const doc = new jsPDF();
+    const doc = new jsPDF({
+      compress: true,
+    });
 
     // Header
     this.addHeader(doc, 'Alert Summary Report');

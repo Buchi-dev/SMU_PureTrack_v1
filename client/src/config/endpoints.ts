@@ -47,6 +47,7 @@ export const ALERT_ENDPOINTS = {
   BY_ID: (alertId: string) => `${API_VERSION}/alerts/${alertId}`,
   ACKNOWLEDGE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/acknowledge`,
   RESOLVE: (alertId: string) => `${API_VERSION}/alerts/${alertId}/resolve`,
+  RESOLVE_ALL: `${API_VERSION}/alerts/resolve-all`,
   CREATE: `${API_VERSION}/alerts`,
   DELETE: (alertId: string) => `${API_VERSION}/alerts/${alertId}`,
 } as const;

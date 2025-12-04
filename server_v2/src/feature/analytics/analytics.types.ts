@@ -9,7 +9,6 @@
 export interface AnalyticsSummary {
   totalReadings: number;
   devicesActive: number;
-  avgTemperature: number;
   avgPh: number;
   avgTurbidity: number;
   avgTds: number;
@@ -21,7 +20,6 @@ export interface AnalyticsSummary {
  * Analytics trends response
  */
 export interface AnalyticsTrends {
-  temperature: TrendData[];
   ph: TrendData[];
   turbidity: TrendData[];
   tds: TrendData[];

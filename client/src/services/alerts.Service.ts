@@ -133,6 +133,46 @@ export class AlertsService {
   }
 
   /**
+   * Resolve all unresolved alerts with optional filters
+   * Marks all matching alerts as resolved
+   * 
+   * @param notes - Optional resolution notes for all alerts
+   * @param filters - Optional filters to limit which alerts to resolve
+   * @throws {Error} If bulk resolution fails
+   * @example
+   * await alertsService.resolveAllAlerts('All issues addressed', { severity: 'Warning' });
+   */
+  async resolveAllAlerts(
+    notes?: string,
+    filters?: { severity?: string; parameter?: string; deviceId?: string }
+  ): Promise<{ success: boolean; data: { resolvedCount: number; alerts: WaterQualityAlert[] }; message: string }> {
+    try {
+      // Build request body, only including fields that have values
+      const body: { resolutionNotes?: string; filters?: typeof filters } = {};
+      
+      if (notes && notes.trim().length > 0) {
+        body.resolutionNotes = notes;
+      }
+      
+      if (filters && Object.keys(filters).length > 0) {
+        body.filters = filters;
+      }
+      
+      const response = await apiClient.patch<any>(
+        ALERT_ENDPOINTS.RESOLVE_ALL,
+        body
+      );
+      
+      // ✅ V2 backend returns data in standard format: { success, data, message }
+      return response.data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Resolve all error:', message);
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Delete an alert (admin only)
    * 
    * @param alertId - ID of the alert to delete

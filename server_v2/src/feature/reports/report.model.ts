@@ -129,6 +129,20 @@ const toFirebaseTimestamp = (date: Date | undefined): { seconds: number; nanosec
  * Convert document to public profile
  */
 reportSchema.methods.toPublicProfile = function (): IReportPublic {
+  // Handle populated generatedBy field
+  let generatedByInfo: any;
+  if (this.generatedBy && typeof this.generatedBy === 'object') {
+    // generatedBy is populated with user object
+    generatedByInfo = {
+      id: this.generatedBy._id?.toString() || this.generatedBy.toString(),
+      displayName: (this.generatedBy as any).displayName || 'Unknown User',
+      email: (this.generatedBy as any).email || '',
+    };
+  } else {
+    // generatedBy is just an ObjectId string
+    generatedByInfo = this.generatedBy?.toString() || '';
+  }
+
   return {
     id: this._id.toString(),
     type: this.type,
@@ -146,7 +160,7 @@ reportSchema.methods.toPublicProfile = function (): IReportPublic {
           mimeType: this.file.mimeType,
         }
       : undefined,
-    generatedBy: this.generatedBy.toString(),
+    generatedBy: generatedByInfo,
     generatedAt: toFirebaseTimestamp(this.generatedAt),
     errorMessage: this.errorMessage,
     expiresAt: toFirebaseTimestamp(this.expiresAt),

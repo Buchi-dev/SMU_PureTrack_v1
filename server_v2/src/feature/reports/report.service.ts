@@ -98,6 +98,12 @@ export class ReportService {
     // Pagination and sorting
     query.paginate(page, limit).sortBy('-createdAt');
 
+    // Populate generatedBy with user details
+    query.populateFields({
+      path: 'generatedBy',
+      select: 'displayName email'
+    } as any);
+
     return query.execute();
   }
 
@@ -410,12 +416,23 @@ export class ReportService {
 
     switch (report.type) {
       case ReportType.WATER_QUALITY: {
-        // Fetch actual Device document first for accurate device information
+        // Fetch actual Device document(s) first for accurate device information
         const Device = (await import('@feature/devices/device.model')).default;
         let deviceInfo: any = null;
+        let deviceInfos: any[] = [];
         
+        // Support both single device and multiple devices
         if (parameters.deviceId) {
           deviceInfo = await Device.findOne({ deviceId: parameters.deviceId }).lean();
+          if (deviceInfo) {
+            deviceInfos = [deviceInfo];
+          }
+        } else if (parameters.deviceIds && parameters.deviceIds.length > 0) {
+          deviceInfos = await Device.find({ deviceId: { $in: parameters.deviceIds } }).lean();
+          // Use the first device info for single-device fields
+          if (deviceInfos.length > 0) {
+            deviceInfo = deviceInfos[0];
+          }
         }
 
         // Fetch sensor readings for device(s) in date range
@@ -439,6 +456,27 @@ export class ReportService {
           .limit(1000) // Increased limit for better statistics
           .lean();
 
+        // Fetch alerts for the device(s) in date range
+        const Alert = (await import('@feature/alerts/alert.model')).default;
+        const alertQuery: any = {
+          createdAt: {
+            $gte: parameters.startDate,
+            $lte: parameters.endDate,
+          },
+        };
+
+        // Support both single device and multiple devices
+        if (parameters.deviceId) {
+          alertQuery.deviceId = parameters.deviceId;
+        } else if (parameters.deviceIds && parameters.deviceIds.length > 0) {
+          alertQuery.deviceId = { $in: parameters.deviceIds };
+        }
+
+        const alerts = await Alert.find(alertQuery)
+          .sort({ createdAt: -1 })
+          .limit(100) // Limit to last 100 alerts
+          .lean();
+
         // Helper function to safely filter and validate numeric values
         const getValidNumbers = (values: any[]): number[] => {
           return values
@@ -447,10 +485,9 @@ export class ReportService {
         };
 
         // Extract valid values for each parameter
-        const phValues = getValidNumbers(readings.map((r: any) => r.ph));
+        const phValues = getValidNumbers(readings.map((r: any) => r.pH));
         const turbidityValues = getValidNumbers(readings.map((r: any) => r.turbidity));
         const tdsValues = getValidNumbers(readings.map((r: any) => r.tds));
-        const temperatureValues = getValidNumbers(readings.map((r: any) => r.temperature));
 
         // Helper function to calculate statistics safely
         const calculateStats = (values: number[]) => {
@@ -492,32 +529,61 @@ export class ReportService {
         const phStats = calculateStats(phValues);
         const turbidityStats = calculateStats(turbidityValues);
         const tdsStats = calculateStats(tdsValues);
-        const temperatureStats = calculateStats(temperatureValues);
 
-        // Determine device name with proper fallback
-        const deviceName = deviceInfo?.name || parameters.deviceName || parameters.deviceId || 'Unknown Device';
-        const deviceLocation = deviceInfo?.location || 'Not specified';
+        // Determine device name and location with proper fallback
+        // If single device or first device from multiple devices
+        const deviceName = deviceInfo?.name || 
+                          (deviceInfos.length > 0 ? deviceInfos[0].name : null) || 
+                          parameters.deviceName || 
+                          parameters.deviceId || 
+                          (parameters.deviceIds && parameters.deviceIds.length > 0 ? parameters.deviceIds[0] : null) || 
+                          'Unknown Device';
+                          
+        const deviceLocation = deviceInfo?.location || 
+                              (deviceInfos.length > 0 ? deviceInfos[0].location : null) || 
+                              'Not specified';
+                              
+        const deviceStatus = deviceInfo?.status || 
+                            (deviceInfos.length > 0 ? deviceInfos[0].status : null) || 
+                            'UNKNOWN';
 
         return {
-          deviceId: parameters.deviceId || 'multiple',
+          deviceId: parameters.deviceId || (parameters.deviceIds && parameters.deviceIds.length > 0 ? parameters.deviceIds[0] : 'multiple'),
           deviceName: deviceName,
           deviceLocation: deviceLocation,
-          deviceStatus: deviceInfo?.status || 'unknown',
+          deviceStatus: deviceStatus,
           startDate: parameters.startDate,
           endDate: parameters.endDate,
           totalReadings: readings.length,
           readings: readings.slice(0, 50).map((r: any) => ({
             timestamp: r.timestamp,
-            ph: r.ph != null ? Math.round(r.ph * 100) / 100 : null,
+            ph: r.pH != null ? Math.round(r.pH * 100) / 100 : null,
             turbidity: r.turbidity != null ? Math.round(r.turbidity * 100) / 100 : null,
             tds: r.tds != null ? Math.round(r.tds * 100) / 100 : null,
-            temperature: r.temperature != null ? Math.round(r.temperature * 100) / 100 : null,
           })),
+          alerts: alerts.map((a: any) => ({
+            createdAt: a.createdAt,
+            severity: a.severity,
+            parameter: a.parameter,
+            message: a.message,
+            status: a.status,
+            value: a.value,
+            threshold: a.threshold,
+          })),
+          alertSummary: {
+            total: alerts.length,
+            critical: alerts.filter((a: any) => a.severity === 'CRITICAL').length,
+            high: alerts.filter((a: any) => a.severity === 'HIGH').length,
+            medium: alerts.filter((a: any) => a.severity === 'MEDIUM').length,
+            low: alerts.filter((a: any) => a.severity === 'LOW').length,
+            unacknowledged: alerts.filter((a: any) => a.status === 'Unacknowledged').length,
+            acknowledged: alerts.filter((a: any) => a.status === 'Acknowledged').length,
+            resolved: alerts.filter((a: any) => a.status === 'Resolved').length,
+          },
           statistics: {
             ph: phStats,
             turbidity: turbidityStats,
             tds: tdsStats,
-            temperature: temperatureStats,
             // Legacy format for backward compatibility
             avgPh: phStats.avg,
             avgTurbidity: turbidityStats.avg,

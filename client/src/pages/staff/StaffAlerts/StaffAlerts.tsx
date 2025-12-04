@@ -56,6 +56,7 @@ export const StaffAlerts = () => {
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
+  const [resolveAllModalVisible, setResolveAllModalVisible] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -78,6 +79,7 @@ export const StaffAlerts = () => {
   const { 
     acknowledgeAlert, 
     resolveAlert, 
+    resolveAllAlerts,
     isLoading: mutationLoading 
   } = useAlertMutations();
 
@@ -158,6 +160,29 @@ export const StaffAlerts = () => {
     } catch (error) {
       message.error('Failed to resolve alert');
       console.error('Resolve error:', error);
+    }
+  };
+
+  // Handle resolve all alerts
+  const handleResolveAll = async () => {
+    try {
+      // Build filters based on current filter state
+      const filters: { severity?: string; parameter?: string } = {};
+      if (severityFilter !== 'all') {
+        filters.severity = severityFilter;
+      }
+      if (parameterFilter !== 'all') {
+        filters.parameter = parameterFilter;
+      }
+
+      const result = await resolveAllAlerts(resolutionNotes, filters);
+      message.success(`Successfully resolved ${result.resolvedCount} alert(s)`);
+      setResolveAllModalVisible(false);
+      setResolutionNotes('');
+      await refetch();
+    } catch (error) {
+      message.error('Failed to resolve all alerts');
+      console.error('Resolve all error:', error);
     }
   };
 
@@ -537,6 +562,21 @@ export const StaffAlerts = () => {
               <Text strong>Alerts ({filteredAlerts.length})</Text>
             </Space>
           }
+          extra={
+            <Space>
+              {(statusFilter !== 'Resolved' && filteredAlerts.length > 0) && (
+                <Button
+                  type="primary"
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  onClick={() => setResolveAllModalVisible(true)}
+                  disabled={mutationLoading}
+                >
+                  Resolve All Alerts
+                </Button>
+              )}
+            </Space>
+          }
         >
           <Table
             columns={columns}
@@ -801,6 +841,70 @@ export const StaffAlerts = () => {
                 value={resolutionNotes}
                 onChange={(e) => setResolutionNotes(e.target.value)}
                 placeholder="Enter resolution notes..."
+                style={{ marginTop: 8 }}
+              />
+            </div>
+          </Space>
+        </Modal>
+
+        {/* Resolve All Alerts Modal */}
+        <Modal
+          title={
+            <Space>
+              <CloseCircleOutlined />
+              <span>Resolve All Alerts</span>
+            </Space>
+          }
+          open={resolveAllModalVisible}
+          onOk={handleResolveAll}
+          onCancel={() => {
+            setResolveAllModalVisible(false);
+            setResolutionNotes('');
+          }}
+          okText="Resolve All"
+          okButtonProps={{ 
+            icon: <CloseCircleOutlined />,
+            loading: mutationLoading,
+            danger: true,
+          }}
+        >
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Text strong style={{ color: token.colorWarning }}>
+              ⚠️ Are you sure you want to resolve all alerts?
+            </Text>
+            <Text>
+              This action will resolve <Text strong>{filteredAlerts.filter(a => a.status !== ALERT_STATUS.RESOLVED).length}</Text> unresolved alert(s).
+            </Text>
+            {(severityFilter !== 'all' || parameterFilter !== 'all') && (
+              <div style={{ 
+                padding: 12, 
+                background: token.colorInfoBg, 
+                borderRadius: 6,
+                border: `1px solid ${token.colorInfoBorder}`
+              }}>
+                <Text strong>Active Filters:</Text>
+                <div style={{ marginTop: 8 }}>
+                  {severityFilter !== 'all' && (
+                    <Tag color={getSeverityColor(severityFilter as any)}>
+                      {severityFilter}
+                    </Tag>
+                  )}
+                  {parameterFilter !== 'all' && (
+                    <Tag color="blue">{parameterFilter.toUpperCase()}</Tag>
+                  )}
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Only alerts matching these filters will be resolved.
+                </Text>
+              </div>
+            )}
+            <div>
+              <Text strong>Resolution Notes (Optional)</Text>
+              <TextArea
+                rows={4}
+                value={resolutionNotes}
+                onChange={(e) => setResolutionNotes(e.target.value)}
+                placeholder="Enter resolution notes for all alerts..."
                 style={{ marginTop: 8 }}
               />
             </div>

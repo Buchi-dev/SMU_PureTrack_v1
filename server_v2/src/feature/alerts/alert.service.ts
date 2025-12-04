@@ -534,6 +534,72 @@ export class AlertService {
   }
 
   /**
+   * Resolve all unresolved alerts (unacknowledged or acknowledged)
+   * @param userId - User performing the bulk resolve
+   * @param resolutionNotes - Optional notes for bulk resolution
+   * @param filters - Optional filters to limit which alerts to resolve
+   * @returns Number of alerts resolved
+   */
+  async resolveAllAlerts(
+    userId: Types.ObjectId,
+    resolutionNotes?: string,
+    filters?: Partial<IAlertFilters>
+  ): Promise<{ resolvedCount: number; alerts: IAlertDocument[] }> {
+    // Build query to find all unresolved alerts
+    const query: any = {
+      status: { $in: [AlertStatus.UNACKNOWLEDGED, AlertStatus.ACKNOWLEDGED] },
+    };
+
+    // Apply optional filters
+    if (filters?.severity) {
+      query.severity = filters.severity;
+    }
+    if (filters?.parameter) {
+      query.parameter = filters.parameter;
+    }
+    if (filters?.deviceId) {
+      query.deviceId = filters.deviceId;
+    }
+
+    // Find all matching alerts
+    const alertsToResolve = await Alert.find(query);
+    
+    if (alertsToResolve.length === 0) {
+      return { resolvedCount: 0, alerts: [] };
+    }
+
+    // Bulk update all alerts
+    const now = new Date();
+    const updateResult = await Alert.updateMany(
+      query,
+      {
+        $set: {
+          status: AlertStatus.RESOLVED,
+          acknowledged: true,
+          resolvedAt: now,
+          resolvedBy: userId,
+          ...(resolutionNotes && { resolutionNotes }),
+          // Set acknowledgedAt/By if not already set
+          acknowledgedAt: now,
+          acknowledgedBy: userId,
+        },
+      }
+    );
+
+    // Fetch and return updated alerts
+    const updatedAlerts = await Alert.find({ _id: { $in: alertsToResolve.map(a => a._id) } })
+      .populate('acknowledgedBy', 'displayName email')
+      .populate('resolvedBy', 'displayName email');
+
+    logger.info(`Bulk resolve: ${updateResult.modifiedCount} alerts resolved by user ${userId}`);
+
+    return {
+      resolvedCount: updateResult.modifiedCount,
+      alerts: updatedAlerts,
+    };
+  }
+
+  /**
    * Get alert statistics
    */
   async getAlertStatistics(deviceId?: string): Promise<any> {

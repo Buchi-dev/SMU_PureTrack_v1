@@ -1,4 +1,4 @@
-import { Card, Table, Tag, Button, Space, Typography, Tooltip, Empty, message } from 'antd';
+import { Card, Table, Tag, Button, Space, Typography, Tooltip, Empty, message, Modal, Input } from 'antd';
 import { useState } from 'react';
 import {
   CheckCircleOutlined,
@@ -23,6 +23,7 @@ import type { WaterQualityAlert } from '../../../../schemas';
 import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
+const { TextArea } = Input;
 
 interface AlertsTableProps {
   alerts: WaterQualityAlert[];
@@ -30,6 +31,8 @@ interface AlertsTableProps {
   onViewDetails: (alert: WaterQualityAlert) => void;
   onAcknowledge: (alertId: string) => void;
   onBatchAcknowledge?: (alertIds: string[]) => Promise<void>;
+  onResolveAll?: (notes?: string, filters?: any) => Promise<{ resolvedCount: number }>;
+  currentFilters?: any;
   isAcknowledging?: boolean; // ✅ Updated to boolean for global hook compatibility
 }
 
@@ -43,11 +46,16 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
   onViewDetails,
   onAcknowledge,
   onBatchAcknowledge,
+  onResolveAll,
+  currentFilters,
 }) => {
   const token = useThemeToken();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [acknowledgingAlertId, setAcknowledgingAlertId] = useState<string | null>(null);
+  const [resolveAllModalVisible, setResolveAllModalVisible] = useState(false);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
 
   const handleAcknowledgeClick = async (alertId: string) => {
     setAcknowledgingAlertId(alertId);
@@ -77,6 +85,26 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
       setBatchLoading(false);
     }
   };
+
+  const handleResolveAll = async () => {
+    if (!onResolveAll) return;
+    
+    setIsResolving(true);
+    try {
+      await onResolveAll(resolutionNotes, currentFilters);
+      setResolveAllModalVisible(false);
+      setResolutionNotes('');
+      // Success message is handled in parent
+    } catch (error) {
+      console.error('Resolve all error:', error);
+      // Error is handled in parent
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
+  // Count unresolved alerts
+  const unresolvedCount = alerts.filter(a => a.status !== ALERT_STATUS.RESOLVED).length;
 
   const rowSelection: TableRowSelection<WaterQualityAlert> = {
     selectedRowKeys,
@@ -245,7 +273,21 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
   ];
 
   return (
-    <Card>
+    <Card
+      extra={
+        onResolveAll && unresolvedCount > 0 && (
+          <Button
+            type="primary"
+            danger
+            icon={<CloseCircleOutlined />}
+            onClick={() => setResolveAllModalVisible(true)}
+            disabled={loading || isResolving}
+          >
+            Resolve All Alerts
+          </Button>
+        )
+      }
+    >
       {/* Batch Actions Bar */}
       {selectedRowKeys.length > 0 && onBatchAcknowledge && (
         <div
@@ -297,6 +339,77 @@ const AlertsTable: React.FC<AlertsTableProps> = ({
           ),
         }}
       />
+
+      {/* Resolve All Alerts Modal */}
+      <Modal
+        title={
+          <Space>
+            <CloseCircleOutlined />
+            <span>Resolve All Alerts</span>
+          </Space>
+        }
+        open={resolveAllModalVisible}
+        onOk={handleResolveAll}
+        onCancel={() => {
+          setResolveAllModalVisible(false);
+          setResolutionNotes('');
+        }}
+        okText="Resolve All"
+        okButtonProps={{ 
+          icon: <CloseCircleOutlined />,
+          loading: isResolving,
+          danger: true,
+        }}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Text strong style={{ color: token.colorWarning }}>
+            ⚠️ Are you sure you want to resolve all alerts?
+          </Text>
+          <Text>
+            This action will resolve <Text strong>{unresolvedCount}</Text> unresolved alert(s).
+          </Text>
+          {currentFilters && (
+            (Array.isArray(currentFilters.severity) && currentFilters.severity.length > 0) || 
+            (Array.isArray(currentFilters.parameter) && currentFilters.parameter.length > 0)
+          ) && (
+            <div style={{ 
+              padding: 12, 
+              background: token.colorInfoBg, 
+              borderRadius: 6,
+              border: `1px solid ${token.colorInfoBorder}`
+            }}>
+              <Text strong>Active Filters:</Text>
+              <div style={{ marginTop: 8 }}>
+                {Array.isArray(currentFilters.severity) && currentFilters.severity.length > 0 && 
+                  currentFilters.severity.map((sev: string) => (
+                    <Tag key={sev} color={getSeverityColor(sev as any)}>
+                      {sev}
+                    </Tag>
+                  ))
+                }
+                {Array.isArray(currentFilters.parameter) && currentFilters.parameter.length > 0 && 
+                  currentFilters.parameter.map((param: string) => (
+                    <Tag key={param} color="blue">{param.toUpperCase()}</Tag>
+                  ))
+                }
+              </div>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Only alerts matching these filters will be resolved.
+              </Text>
+            </div>
+          )}
+          <div>
+            <Text strong>Resolution Notes (Optional)</Text>
+            <TextArea
+              rows={4}
+              value={resolutionNotes}
+              onChange={(e) => setResolutionNotes(e.target.value)}
+              placeholder="Enter resolution notes for all alerts..."
+              style={{ marginTop: 8 }}
+            />
+          </div>
+        </Space>
+      </Modal>
     </Card>
   );
 };

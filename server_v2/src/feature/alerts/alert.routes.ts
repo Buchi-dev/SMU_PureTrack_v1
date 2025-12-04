@@ -9,6 +9,7 @@ import {
   getAlertById,
   acknowledgeAlert,
   resolveAlert,
+  resolveAllAlerts,
   getAlertStatistics,
   deleteAlert,
   getAlertsByDevice,
@@ -20,6 +21,7 @@ import {
   getAlertByIdSchema,
   acknowledgeAlertSchema,
   resolveAlertSchema,
+  resolveAllAlertsSchema,
   deleteAlertSchema,
 } from './alert.schema';
 
@@ -52,6 +54,13 @@ router.get('/unacknowledged/count', requireStaff, getUnacknowledgedCount);
  * @access  Protected (Staff/Admin)
  */
 router.get('/device/:deviceId', requireStaff, getAlertsByDevice);
+
+/**
+ * @route   PATCH /api/v1/alerts/resolve-all
+ * @desc    Resolve all alerts (with optional filters)
+ * @access  Protected (Staff/Admin)
+ */
+router.patch('/resolve-all', requireStaff, validateRequest(resolveAllAlertsSchema), resolveAllAlerts);
 
 /**
  * @route   GET /api/v1/alerts/:id
