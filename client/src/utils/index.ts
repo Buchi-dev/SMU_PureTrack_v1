@@ -7,3 +7,4 @@ export * from './errorHelpers';
 export * from './swrMonitoring';
 export * from './waterQualityUtils';
 export * from './validation.util';
+export * from './deviceStatus.util';

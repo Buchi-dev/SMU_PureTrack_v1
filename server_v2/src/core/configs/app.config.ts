@@ -31,8 +31,8 @@ interface Config {
 export const appConfig: Config = {
   server: {
     port: parseInt(process.env.PORT || '', 10),
-    nodeEnv: process.env.NODE_ENV || '',
-    apiVersion: process.env.API_VERSION || 'v2',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    apiVersion: process.env.API_VERSION || 'v1',
   },
   database: {
     uri: process.env.MONGODB_URI || '',

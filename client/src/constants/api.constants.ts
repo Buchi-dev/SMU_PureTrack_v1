@@ -66,6 +66,42 @@ export const RETRY_CONFIG = {
 /**
  * SWR Configuration
  * Data fetching and caching behavior
+ * 
+ * POLLING STRATEGY GUIDE:
+ * ----------------------
+ * REALTIME (5s):
+ *   - Real-time sensor readings that change second-to-second
+ *   - Live alert notifications that require immediate display
+ *   - Critical data where stale information causes user confusion
+ *   Example: StaffReadings sensor data stream
+ * 
+ * FREQUENT (30s):
+ *   - Device status lists (online/offline changes are minute-to-minute)
+ *   - Alert lists (new alerts appear but not as rapidly as sensor data)
+ *   - Dashboard statistics that update regularly
+ *   Example: StaffDevices device list, StaffAlerts alert list
+ * 
+ * MODERATE (60s):
+ *   - Analytics charts and graphs (hourly aggregations)
+ *   - Device statistics (averages, counts)
+ *   - Report previews
+ *   Example: AdminAnalytics charts, device uptime stats
+ * 
+ * INFREQUENT (300s / 5 min):
+ *   - User management lists (rarely change)
+ *   - System settings
+ *   - Historical reports
+ *   Example: AdminUserManagement, system config
+ * 
+ * PERFORMANCE IMPACT:
+ * - Backend load: Each poll = database query + response serialization
+ * - Frontend performance: Frequent re-renders and state updates
+ * - Network usage: Bandwidth consumption on slow connections
+ * 
+ * VISIBILITY POLLING:
+ * - useVisibilityPolling hook pauses polling when tab is hidden
+ * - Resumes with immediate refetch when tab becomes visible
+ * - Reduces unnecessary backend load when user is not viewing data
  */
 export const SWR_CONFIG = {
   // Revalidation intervals (milliseconds)
@@ -89,6 +125,9 @@ export const SWR_CONFIG = {
   ERROR_RETRY_COUNT: 3, // Max retries on error
   ERROR_RETRY_INTERVAL: 5000, // 5 seconds between retries
   SHOULD_RETRY_ON_ERROR: true, // Enable automatic error retry
+  
+  // Performance optimizations
+  KEEP_PREVIOUS_DATA: true, // Keep previous data while revalidating (smoother UX)
 } as const;
 
 /**

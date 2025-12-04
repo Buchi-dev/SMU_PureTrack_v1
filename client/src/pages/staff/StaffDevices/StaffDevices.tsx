@@ -34,7 +34,6 @@ import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
 import { useDevices } from '../../../hooks';
-import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -63,7 +62,7 @@ export const StaffDevices = () => {
   
   // ✅ GLOBAL HOOK - Real-time device data with SWR polling
   const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 15000 // Poll every 15 seconds
+    pollInterval: 30000 // 30 seconds - use SWR_CONFIG.REFRESH_INTERVAL.FREQUENT for device lists
   });
 
   // Handle refresh with loading state
@@ -80,11 +79,12 @@ export const StaffDevices = () => {
     }
   };
 
-  // Transform devices for display using utility function
+  // Transform devices for display using centralized uiStatus
   const devices: Device[] = useMemo(() => {
     return realtimeDevices.map((device) => {
       const reading = device.latestReading;
-      const status = calculateDeviceStatus(device.status, reading);
+      // Use centralized uiStatus computed by useDevices hook
+      const status = device.uiStatus || 'offline';
       
       const uptime = status === 'online' ? '99.5%' : status === 'warning' ? '95.0%' : '0%';
       

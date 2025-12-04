@@ -130,6 +130,7 @@ export const requireStaff = async (
 /**
  * Optional authentication (doesn't fail if no token)
  * Useful for endpoints that work differently for authenticated users
+ * Sets req.user with Firebase data even if user doesn't exist in database
  */
 export const optionalAuth = async (
   req: AuthRequest,
@@ -150,12 +151,23 @@ export const optionalAuth = async (
     const user = await userService.getUserByFirebaseUid(decodedToken.uid);
 
     if (user) {
+      // User exists in database - use database data
       req.user = {
         uid: user.firebaseUid || decodedToken.uid,
         email: user.email,
         name: user.displayName,
         role: user.role,
         userId: user._id.toString(),
+      };
+    } else {
+      // User authenticated with Firebase but not in database - use Firebase data
+      // Role will be assigned when they complete account registration
+      req.user = {
+        uid: decodedToken.uid,
+        email: decodedToken.email || '',
+        name: decodedToken.name || decodedToken.email?.split('@')[0] || '',
+        role: UserRole.STAFF, // Temporary role until account completion
+        userId: '', // No database ID yet
       };
     }
 

@@ -21,7 +21,8 @@ import {
   buildDevicesUrl,
   buildDeviceReadingsUrl,
 } from '../config/endpoints';
-import type { Device, SensorReading } from '../schemas';
+import type { Device, SensorReading, CommandOptions, CommandResult } from '../schemas';
+import { COMMAND_CONFIG, COMMAND_TIMEOUTS } from '../constants/deviceCommand.constants';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -135,7 +136,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Update error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Update error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -173,7 +176,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Delete error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Delete error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -198,7 +203,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Get devices error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Get devices error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -219,7 +226,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Get device error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Get device error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -248,7 +257,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Get readings error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Get readings error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -284,7 +295,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Get stats error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Get stats error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -297,7 +310,7 @@ export class DevicesService {
    * @deprecated Use getDevices() instead
    * Legacy method for backwards compatibility
    */
-  async listDevices(): Promise<Device[]> {
+    async listDevices(): Promise<Device[]> {
     const response = await this.getDevices();
     return response.data;
   }
@@ -306,7 +319,7 @@ export class DevicesService {
    * @deprecated Use getLatestReading() instead  
    * Legacy method for backwards compatibility
    */
-  async getSensorReadings(deviceId: string): Promise<SensorReading | null> {
+    async getSensorReadings(deviceId: string): Promise<SensorReading | null> {
     const response = await this.getLatestReading(deviceId);
     return response.data[0] || null;
   }
@@ -315,7 +328,7 @@ export class DevicesService {
    * @deprecated Use getDeviceReadings() instead
    * Legacy method for backwards compatibility
    */
-  async getSensorHistory(deviceId: string, limit: number = 50): Promise<SensorReading[]> {
+    async getSensorHistory(deviceId: string, limit: number = 50): Promise<SensorReading[]> {
     const response = await this.getDeviceReadings(deviceId, { limit });
     return response.data;
   }
@@ -349,7 +362,9 @@ export class DevicesService {
       return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
-      console.error('[DevicesService] Approve registration error:', message);
+      if (import.meta.env.DEV) {
+        console.error('[DevicesService] Approve registration error:', message);
+      }
       throw new Error(message);
     }
   }
@@ -360,42 +375,126 @@ export class DevicesService {
 
   /**
    * Send command to device via MQTT (Admin only)
+   * Enhanced with structured status tracking, timeout handling, and retry logic
    * Backend handles MQTT publishing to device
    * 
    * @param deviceId - Device ID to send command to
-   * @param command - Command type (send_now, restart, go, wait, deregister)
-   * @param data - Optional command data
-   * @returns Promise with command status
+   * @param command - Command type (send_now, restart, go, wait, deregister, calibrate)
+   * @param options - Command execution options (timeout, retries, waitForAck)
+   * @param data - Optional command data payload
+   * @returns Promise with structured command result
+   * 
    * @example
-   * await devicesService.sendDeviceCommand('WQ-001', 'restart');
-   * await devicesService.sendDeviceCommand('WQ-001', 'send_now');
+   * // Simple fire-and-forget command
+   * const result = await devicesService.sendDeviceCommand('WQ-001', 'send_now');
+   * 
+   * @example
+   * // Wait for acknowledgment with custom timeout
+   * const result = await devicesService.sendDeviceCommand('WQ-001', 'restart', {
+   *   timeout: 60000,
+   *   waitForAck: true,
+   *   retryAttempts: 2
+   * });
+   * 
+   * @example
+   * // Check result status
+   * if (result.success && result.queued) {
+   *   if (result.acknowledged) {
+   *     console.log('Device acknowledged command');
+   *   } else {
+   *     console.log('Command queued, waiting for device');
+   *   }
+   * }
    */
   async sendDeviceCommand(
     deviceId: string,
-    command: 'send_now' | 'restart' | 'go' | 'wait' | 'deregister',
+    command: 'send_now' | 'restart' | 'go' | 'wait' | 'deregister' | 'calibrate',
+    options: CommandOptions = {},
     data: Record<string, any> = {}
-  ): Promise<{
-    success: boolean;
-    data: {
-      deviceId: string;
-      command: string;
-      status: string;
-      timestamp: string;
-      deviceStatus: string;
-    };
-    message: string;
-  }> {
-    try {
-      const response = await apiClient.post(
-        `${DEVICE_ENDPOINTS.BY_ID(deviceId)}/commands`,
-        { command, data }
-      );
-      return response.data;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      console.error('[DevicesService] Send command error:', message);
-      throw new Error(message);
+  ): Promise<CommandResult> {
+    const {
+      timeout = COMMAND_TIMEOUTS[command] || COMMAND_CONFIG.DEFAULT_TIMEOUT,
+      retryAttempts = COMMAND_CONFIG.DEFAULT_RETRIES,
+      waitForAck = false,
+    } = options;
+
+    let lastError: Error | null = null;
+    
+    // Retry logic
+    for (let attempt = 0; attempt <= retryAttempts; attempt++) {
+      try {
+        const startTime = Date.now();
+        
+        // Send command to backend
+        const response = await apiClient.post(
+          `${DEVICE_ENDPOINTS.BY_ID(deviceId)}/commands`,
+          { command, data },
+          { timeout } // Axios timeout
+        );
+
+        // Backend should return command ID and status
+        const backendData = response.data?.data || response.data;
+        
+        // Construct structured result
+        const result: CommandResult = {
+          success: true,
+          queued: backendData.status === 'queued' || backendData.status === 'sent',
+          acknowledged: waitForAck ? (backendData.acknowledged === true) : null,
+          error: null,
+          commandId: backendData.commandId || backendData.command || `${deviceId}-${command}-${Date.now()}`,
+          timestamp: Date.now(),
+          deviceStatus: backendData.deviceStatus,
+        };
+
+        // If waiting for acknowledgment and not received, check for timeout
+        if (waitForAck && !result.acknowledged) {
+          const elapsed = Date.now() - startTime;
+          if (elapsed >= timeout) {
+            result.acknowledged = false;
+            result.error = `Device did not acknowledge command within ${timeout / 1000} seconds`;
+          }
+        }
+
+        return result;
+
+      } catch (error) {
+        lastError = error as Error;
+        const message = getErrorMessage(error);
+        
+        if (import.meta.env.DEV) {
+          console.error(
+            `[DevicesService] Command attempt ${attempt + 1}/${retryAttempts + 1} failed:`,
+            message
+          );
+        }
+
+        // If not last attempt, wait before retry
+        if (attempt < retryAttempts) {
+          await new Promise(resolve => setTimeout(resolve, COMMAND_CONFIG.RETRY_DELAY));
+          continue;
+        }
+
+        // Last attempt failed - return error result
+        return {
+          success: false,
+          queued: false,
+          acknowledged: null,
+          error: message,
+          commandId: `failed-${deviceId}-${command}-${Date.now()}`,
+          timestamp: Date.now(),
+        };
+      }
     }
+
+    // Should never reach here, but TypeScript needs it
+    return {
+      success: false,
+      queued: false,
+      acknowledged: null,
+      error: lastError ? getErrorMessage(lastError) : 'Unknown error',
+      commandId: `failed-${deviceId}-${command}-${Date.now()}`,
+      timestamp: Date.now(),
+    };
   }
 }
 

@@ -15,6 +15,7 @@ const API_VERSION = '/api/v1';
 // ==================== AUTHENTICATION ====================
 export const AUTH_ENDPOINTS = {
   VERIFY_TOKEN: '/auth/verify-token',
+  COMPLETE_ACCOUNT: '/auth/complete-account',
   CURRENT_USER: '/auth/current-user',
   STATUS: '/auth/status',
   LOGOUT: '/auth/logout',
@@ -121,11 +122,12 @@ export const buildQuery = (params: Record<string, string | number | boolean | st
 
 /**
  * Build alerts list URL with filters
- * ✅ V2 Backend expects: status, severity, deviceId, startDate, endDate, page, limit
+ * ✅ V2 Backend expects: status, severity, parameter, deviceId, startDate, endDate, page, limit
  */
 export const buildAlertsUrl = (filters?: {
   status?: string;
   severity?: string;
+  parameter?: string;
   deviceId?: string;
   startDate?: string;
   endDate?: string;

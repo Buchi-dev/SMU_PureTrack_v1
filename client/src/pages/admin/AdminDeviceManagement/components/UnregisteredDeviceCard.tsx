@@ -2,23 +2,31 @@ import { Card, Space, Tag, Button, Typography, Tooltip } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  WarningOutlined,
   WifiOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus } from '../../../../schemas';
+import type { DeviceWithReadings, DeviceStatus, DeviceUIStatus } from '../../../../schemas';
 import { useThemeToken } from '../../../../theme';
 
 const { Text, Title } = Typography;
 
-// Status color mapping
-const statusConfig: Record<DeviceStatus, { color: string; icon: React.ReactNode }> = {
+// ✅ UI Status color mapping (uses centralized deviceStatus.util uiStatus)
+const uiStatusConfig: Record<DeviceUIStatus, { color: string; icon: React.ReactNode }> = {
+  online: { color: 'success', icon: <CheckCircleOutlined /> },
+  offline: { color: 'default', icon: <CloseCircleOutlined /> },
+  warning: { color: 'warning', icon: <WarningOutlined /> },
+};
+
+// Legacy status config for devices without uiStatus (fallback only)
+const legacyStatusConfig: Record<DeviceStatus, { color: string; icon: React.ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
 };
 
 interface UnregisteredDeviceCardProps {
-  device: Device;
-  onRegister: (device: Device) => void;
+  device: DeviceWithReadings;
+  onRegister: (device: DeviceWithReadings) => void;
 }
 
 export const UnregisteredDeviceCard = ({ device, onRegister }: UnregisteredDeviceCardProps) => {
@@ -52,13 +60,25 @@ export const UnregisteredDeviceCard = ({ device, onRegister }: UnregisteredDevic
                 <Tag color="blue" style={{ fontSize: '11px' }}>
                   {device.type}
                 </Tag>
-                <Tag
-                  icon={statusConfig[device.status].icon}
-                  color={statusConfig[device.status].color}
-                  style={{ fontSize: '11px' }}
-                >
-                  {device.status.toUpperCase()}
-                </Tag>
+                {/* ✅ Use centralized uiStatus from deviceStatus.util */}
+                {(() => {
+                  const status = device.uiStatus || device.status; // Fallback to backend status
+                  const config = device.uiStatus 
+                    ? uiStatusConfig[device.uiStatus] 
+                    : legacyStatusConfig[device.status];
+                  
+                  return (
+                    <Tooltip title={device.statusReason || `Device is ${status}`}>
+                      <Tag
+                        icon={config.icon}
+                        color={config.color}
+                        style={{ fontSize: '11px' }}
+                      >
+                        {status.toUpperCase()}
+                      </Tag>
+                    </Tooltip>
+                  );
+                })()}
               </Space>
             </Space>
           </div>

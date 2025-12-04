@@ -3,7 +3,7 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import type { Device } from '../../../../schemas';
+import type { DeviceWithReadings } from '../../../../schemas';
 import { useThemeToken } from '../../../../theme';
 import { useDeviceColumns } from './DeviceTableColumns';
 import { UnregisteredDevicesGrid } from './UnregisteredDevicesGrid';
@@ -13,15 +13,15 @@ const { Text } = Typography;
 interface DeviceTableProps {
   activeTab: 'registered' | 'unregistered';
   onTabChange: (key: 'registered' | 'unregistered') => void;
-  filteredDevices: Device[];
+  filteredDevices: DeviceWithReadings[];
   loading: boolean;
   stats: {
     registered: number;
     unregistered: number;
   };
-  onView: (device: Device) => void;
-  onDelete: (device: Device) => void;
-  onRegister: (device: Device) => void;
+  onView: (device: DeviceWithReadings) => void;
+  onDelete: (device: DeviceWithReadings) => void;
+  onRegister: (device: DeviceWithReadings) => void;
 }
 
 export const DeviceTable = ({

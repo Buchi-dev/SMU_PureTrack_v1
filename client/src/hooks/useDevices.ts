@@ -18,7 +18,7 @@
  */
 
 import useSWR from 'swr';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   devicesService,
   type DeviceFilters,
@@ -26,8 +26,10 @@ import {
   type DeviceStats,
   type UpdateDevicePayload,
 } from '../services/devices.Service';
+import { SWR_CONFIG } from '../constants/api.constants';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
 import { useVisibilityPolling } from './useVisibilityPolling';
+import { calculateDeviceUIStatus } from '../utils/deviceStatus.util';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -91,7 +93,7 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = 30000, // 30 seconds - faster updates for device registration/status changes
+    pollInterval = SWR_CONFIG.REFRESH_INTERVAL.FREQUENT, // Use centralized SWR refresh interval
     enabled = true,
   } = options;
 
@@ -103,7 +105,7 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
     ? ['devices', 'list', JSON.stringify(filters)]
     : null;
 
-  // Fetch devices with SWR - NO CACHING for fresh data
+  // Fetch devices with SWR
   const {
     data: devicesData,
     error: devicesError,
@@ -148,12 +150,12 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
     },
     {
       refreshInterval: adjustedPollInterval, // HTTP polling interval
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
-      keepPreviousData: false, // DISABLED: Don't show stale data
-      revalidateIfStale: true, // Always revalidate stale data
-      revalidateOnMount: true, // Always fetch on mount
+      revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
+      revalidateOnReconnect: SWR_CONFIG.REVALIDATE_ON_RECONNECT,
+      dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
+      keepPreviousData: true,
+      revalidateIfStale: SWR_CONFIG.REVALIDATE_IF_STALE,
+      revalidateOnMount: true,
     }
   );
 
@@ -170,11 +172,11 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
     },
     {
       refreshInterval: adjustedPollInterval, // Use same interval as device list
-      revalidateOnFocus: false,
-      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
-      keepPreviousData: false, // DISABLED: Don't show stale data
-      revalidateIfStale: true, // Always revalidate stale data
-      revalidateOnMount: true, // Always fetch on mount
+      revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
+      dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
+      keepPreviousData: true,
+      revalidateIfStale: SWR_CONFIG.REVALIDATE_IF_STALE,
+      revalidateOnMount: true,
     }
   );
 
@@ -182,8 +184,35 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
     await mutate();
   }, [mutate]);
 
+  // Enrich devices with computed uiStatus
+  const enrichedDevices = useMemo(() => {
+    if (!devicesData || !Array.isArray(devicesData)) return [];
+    
+    return devicesData.map((device) => {
+      // Cast to DeviceWithReadings since API might include latestReading
+      const deviceWithReading = device as DeviceWithReadings;
+      
+      // Calculate UI status using centralized helper
+      const statusResult = calculateDeviceUIStatus({
+        status: device.status,
+        lastSeen: device.lastSeen,
+        deviceId: device.deviceId,
+        latestReading: deviceWithReading.latestReading || null,
+      });
+      
+      return {
+        ...deviceWithReading,
+        uiStatus: statusResult.uiStatus,
+        statusReason: statusResult.statusReason,
+        hasRecentData: statusResult.hasRecentData,
+        hasQualityWarnings: statusResult.hasQualityWarnings,
+        lastSeenMs: statusResult.lastSeenMs,
+      };
+    });
+  }, [devicesData]);
+
   return {
-    devices: (devicesData || []) as DeviceWithReadings[],
+    devices: enrichedDevices as DeviceWithReadings[],
     stats: statsData || null,
     isLoading: devicesLoading || statsLoading,
     error: devicesError || statsError || null,

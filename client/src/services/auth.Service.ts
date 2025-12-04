@@ -45,9 +45,42 @@ export interface AuthUser {
 export interface AuthStatusResponse {
   authenticated: boolean;
   user: AuthUser | null;
+  requiresAccountCompletion?: boolean;
+  firebaseEmail?: string;
 }
 
 export interface VerifyTokenResponse {
+  success: boolean;
+  user?: AuthUser;
+  message: string;
+  requiresAccountCompletion?: boolean;
+  firebaseEmail?: string;
+  firebaseUid?: string;
+  displayName?: string;
+  profilePicture?: string;
+}
+
+export interface CompleteAccountData {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  department: string;
+  phoneNumber: string;
+  roleRequest: 'admin' | 'staff';
+  notificationPreferences?: {
+    emailNotifications: boolean;
+    pushNotifications: boolean;
+    sendScheduledAlerts: boolean;
+    alertSeverities: ('Critical' | 'Warning' | 'Advisory')[];
+    parameters: ('pH' | 'Turbidity' | 'TDS')[];
+    devices: string[];
+    quietHoursEnabled: boolean;
+    quietHoursStart: string;
+    quietHoursEnd: string;
+  };
+}
+
+export interface CompleteAccountResponse {
   success: boolean;
   user: AuthUser;
   message: string;
@@ -83,7 +116,7 @@ export class AuthService {
    */
   async verifyToken(idToken: string): Promise<VerifyTokenResponse> {
     try {
-      const response = await apiClient.post<VerifyTokenResponse>(
+      const response = await apiClient.post<{ status: string; message: string; data: { user: AuthUser } }>(
         AUTH_ENDPOINTS.VERIFY_TOKEN,
         { idToken },
         {
@@ -96,7 +129,12 @@ export class AuthService {
           timeout: REQUEST_TIMEOUT.DEFAULT,
         }
       );
-      return response.data;
+      // Extract user from nested data structure
+      return {
+        success: response.data.status === 'success',
+        user: response.data.data.user,
+        message: response.data.message
+      };
     } catch (error: any) {
       // Check for specific error codes from backend
       if (error.response?.data?.errorCode === 'AUTH_INVALID_DOMAIN') {
@@ -125,10 +163,11 @@ export class AuthService {
    */
   async checkStatus(): Promise<AuthStatusResponse> {
     try {
-      const response = await apiClient.get<AuthStatusResponse>(
+      const response = await apiClient.get<{ status: string; message: string; data: AuthStatusResponse }>(
         AUTH_ENDPOINTS.STATUS
       );
-      return response.data;
+      // Extract from nested data structure
+      return response.data.data;
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('[AuthService] Check status error:', error);
@@ -208,6 +247,58 @@ export class AuthService {
   }
 
   /**
+   * Complete account registration
+   * Creates user in database after Firebase authentication
+   * 
+   * @param accountData - Account completion data
+   * @returns Promise with user data
+   * @throws {Error} If account completion fails
+   * @example
+   * const user = await authService.completeAccount({
+   *   firstName: 'John',
+   *   lastName: 'Doe',
+   *   department: 'IT',
+   *   phoneNumber: '09171234567',
+   *   roleRequest: 'staff'
+   * });
+   */
+  async completeAccount(accountData: CompleteAccountData): Promise<CompleteAccountResponse> {
+    try {
+      // Get current Firebase user to get fresh token
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+        throw new Error('Not authenticated with Firebase');
+      }
+
+      // Get fresh ID token
+      const idToken = await firebaseUser.getIdToken();
+
+      const response = await apiClient.post<{ status: string; message: string; data: { user: AuthUser } }>(
+        AUTH_ENDPOINTS.COMPLETE_ACCOUNT,
+        accountData,
+        {
+          headers: {
+            'Authorization': `Bearer ${idToken}`
+          },
+          timeout: REQUEST_TIMEOUT.DEFAULT,
+        }
+      );
+
+      return {
+        success: response.data.status === 'success',
+        user: response.data.data.user,
+        message: response.data.message
+      };
+    } catch (error: any) {
+      const message = getErrorMessage(error);
+      if (import.meta.env.DEV) {
+        console.error('[AuthService] Complete account error:', message);
+      }
+      throw new Error(message);
+    }
+  }
+
+  /**
    * Logout user
    * Signs out from both Firebase and backend
    * 
@@ -221,11 +312,15 @@ export class AuthService {
       await firebaseSignOut(auth);
       
       // Notify backend
-      const response = await apiClient.post<LogoutResponse>(
+      const response = await apiClient.post<{ status: string; message: string; data: { success: boolean } }>(
         AUTH_ENDPOINTS.LOGOUT
       );
       
-      return response.data;
+      // Extract from nested data structure
+      return {
+        success: response.data.data.success,
+        message: response.data.message
+      };
     } catch (error) {
       const message = getErrorMessage(error);
       if (import.meta.env.DEV) {

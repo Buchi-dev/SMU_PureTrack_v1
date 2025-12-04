@@ -11,7 +11,7 @@ import {
 } from './components';
 import { useDeviceFilter } from './hooks';
 import { useDevices, useDeviceMutations } from '../../../hooks';
-import type { Device } from '../../../schemas';
+import type { DeviceWithReadings } from '../../../schemas';
 import './DeviceManagement.css';
 
 const { Content } = Layout;
@@ -30,14 +30,14 @@ const { Search } = Input;
 export const AdminDeviceManagement = () => {
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState<'registered' | 'unregistered'>('registered');
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<DeviceWithReadings | null>(null);
   const [isViewModalVisible, setIsViewModalVisible] = useState(false);
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ✅ GLOBAL HOOK - Real-time device data
-  // Use more aggressive polling (5s) when on unregistered tab to catch new devices quickly
-  const pollInterval = activeTab === 'unregistered' ? 5000 : 15000;
+  // Use standard polling (15s) even for unregistered tab - registration approvals don't need sub-15s updates
+  const pollInterval = 15000; // 15 seconds for all tabs - reduced from 5s for unregistered
   
   // Don't pass any filters - get ALL devices and filter client-side
   // This ensures we get both registered and unregistered devices
@@ -56,9 +56,9 @@ export const AdminDeviceManagement = () => {
     registerDevice,
   } = useDeviceMutations();
 
-  // Extract Device objects - devices already have metadata
+  // Extract devices - useDevices now returns enriched DeviceWithReadings with uiStatus
   const devices = useMemo(() => {
-    return devicesWithSensorData as Device[];
+    return devicesWithSensorData; // Already DeviceWithReadings[] with computed uiStatus
   }, [devicesWithSensorData]);
 
   // ✅ LOCAL HOOK - UI-specific filtering logic
@@ -82,12 +82,12 @@ export const AdminDeviceManagement = () => {
   }, [activeTab, refetch, stats.unregistered]);
 
   // Device action handlers
-  const handleView = (device: Device) => {
+  const handleView = (device: DeviceWithReadings) => {
     setSelectedDevice(device);
     setIsViewModalVisible(true);
   };
 
-  const handleDelete = (device: Device) => {
+  const handleDelete = (device: DeviceWithReadings) => {
     Modal.confirm({
       title: 'Delete Device',
       content: (
@@ -124,7 +124,7 @@ export const AdminDeviceManagement = () => {
     });
   };
 
-  const handleRegister = (device: Device) => {
+  const handleRegister = (device: DeviceWithReadings) => {
     setSelectedDevice(device);
     setIsRegisterModalVisible(true);
   };

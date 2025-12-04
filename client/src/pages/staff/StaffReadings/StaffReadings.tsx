@@ -63,7 +63,7 @@ export const StaffReadings = () => {
   
   // ✅ GLOBAL HOOK - Real-time device data with SWR polling
   const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 10000 // Poll every 10 seconds for readings
+    pollInterval: 30000 // 30 seconds - device list doesn't need 10s updates
   });
 
   // Handle refresh with loading state

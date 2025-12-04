@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState, useCallback } from 'react';
 import {
   Modal,
   Descriptions,
@@ -9,11 +10,12 @@ import {
   Typography,
   Alert,
   message,
-  Popconfirm,
+  Tooltip,
 } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  WarningOutlined,
   WifiOutlined,
   ApiOutlined,
   EnvironmentOutlined,
@@ -21,37 +23,163 @@ import {
   DashboardOutlined,
   ReloadOutlined,
   SettingOutlined,
+  ClockCircleOutlined,
+  LoadingOutlined,
+  SendOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus } from '../../../../schemas';
+import type { DeviceWithReadings, DeviceStatus, DeviceUIStatus, CommandResult } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 import { useThemeToken } from '../../../../theme';
 import { devicesService } from '../../../../services/devices.Service';
+import { formatLastSeen } from '../../../../utils/deviceStatus.util';
+import {
+  DEVICE_COMMANDS,
+  COMMAND_LABELS,
+  COMMAND_DESCRIPTIONS,
+} from '../../../../constants/deviceCommand.constants';
 
 const { Text } = Typography;
 
 interface ViewDeviceModalProps {
   visible: boolean;
-  device: Device | null;
+  device: DeviceWithReadings | null;
   onClose: () => void;
 }
 
-const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
+// ✅ UI Status color mapping (uses centralized deviceStatus.util uiStatus)
+const uiStatusConfig: Record<DeviceUIStatus, { color: string; icon: ReactNode }> = {
+  online: { color: 'success', icon: <CheckCircleOutlined /> },
+  offline: { color: 'default', icon: <CloseCircleOutlined /> },
+  warning: { color: 'warning', icon: <WarningOutlined /> },
+};
+
+// Legacy status config for devices without uiStatus (fallback only)
+const legacyStatusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
 };
 
 export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalProps) => {
   const token = useThemeToken();
+  const [commandState, setCommandState] = useState<{
+    status: 'idle' | 'sending' | 'queued' | 'acknowledged' | 'timeout' | 'failed';
+    command: string | null;
+    error: string | null;
+    result: CommandResult | null;
+  }>({
+    status: 'idle',
+    command: null,
+    error: null,
+    result: null,
+  });
 
   if (!device) return null;
 
-  // Command handlers
-  const handleRestartDevice = async () => {
+  // Check if device is likely offline
+  const isDeviceOffline = device.uiStatus === 'offline' || device.status === 'offline';
+  const isDeviceWarning = device.uiStatus === 'warning';
+  const lastSeenText = device.lastSeenMs !== null && device.lastSeenMs !== undefined
+    ? formatLastSeen(device.lastSeenMs)
+    : 'Unknown';
+
+  // Generic command handler with offline check and status tracking
+  const handleSendCommand = useCallback(async (
+    command: 'send_now' | 'restart' | 'go' | 'wait' | 'deregister' | 'calibrate'
+  ) => {
+    // Reset previous command state
+    setCommandState({
+      status: 'sending',
+      command: COMMAND_LABELS[command as keyof typeof COMMAND_LABELS] || command,
+      error: null,
+      result: null,
+    });
+
     try {
-      await devicesService.sendDeviceCommand(device.deviceId, 'restart');
-      message.success(`Restart command sent to ${device.name}`);
+      // Send command with appropriate timeout
+      const result = await devicesService.sendDeviceCommand(
+        device.deviceId,
+        command,
+        { waitForAck: false } // Fire-and-forget for now
+      );
+
+      if (result.success && result.queued) {
+        setCommandState({
+          status: 'queued',
+          command: COMMAND_LABELS[command as keyof typeof COMMAND_LABELS] || command,
+          error: null,
+          result,
+        });
+        
+        message.success({
+          content: (
+            <span>
+              {COMMAND_LABELS[command as keyof typeof COMMAND_LABELS]} queued successfully
+              {isDeviceOffline && ' (device offline, will execute when online)'}
+            </span>
+          ),
+          duration: 4,
+        });
+
+        // Auto-clear command state after 5 seconds
+        setTimeout(() => {
+          setCommandState(prev => prev.status === 'queued' ? { ...prev, status: 'idle' } : prev);
+        }, 5000);
+      } else {
+        throw new Error(result.error || 'Command failed');
+      }
     } catch (error) {
-      message.error(`Failed to send restart command: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setCommandState({
+        status: 'failed',
+        command: COMMAND_LABELS[command as keyof typeof COMMAND_LABELS] || command,
+        error: errorMessage,
+        result: null,
+      });
+      
+      message.error({
+        content: `Failed to send command: ${errorMessage}`,
+        duration: 5,
+      });
+
+      // Auto-clear error after 5 seconds
+      setTimeout(() => {
+        setCommandState(prev => prev.status === 'failed' ? { ...prev, status: 'idle' } : prev);
+      }, 5000);
+    }
+  }, [device.deviceId, isDeviceOffline]);
+
+  // Command handlers
+  const handleRestartDevice = () => handleSendCommand('restart');
+  const handleSendNow = () => handleSendCommand('send_now');
+
+  // Confirmation for offline devices
+  const confirmOfflineCommand = (command: () => void) => {
+    if (isDeviceOffline || isDeviceWarning) {
+      Modal.confirm({
+        title: 'Device May Be Offline',
+        content: (
+          <div>
+            <p>
+              <strong>{device.name}</strong> appears to be{' '}
+              {isDeviceOffline ? 'offline' : 'experiencing issues'}.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              Last seen: <strong>{lastSeenText}</strong>
+            </p>
+            <p style={{ marginTop: 8 }}>
+              The command will be queued but may not execute immediately.
+              Do you want to continue?
+            </p>
+          </div>
+        ),
+        icon: <WarningOutlined style={{ color: token.colorWarning }} />,
+        okText: 'Send Anyway',
+        okButtonProps: { danger: true },
+        cancelText: 'Cancel',
+        onOk: command,
+      });
+    } else {
+      command();
     }
   };
 
@@ -61,6 +189,16 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
         <Space>
           <ApiOutlined style={{ color: token.colorPrimary }} />
           <span>Device Details - {device.name}</span>
+          {commandState.status === 'sending' && (
+            <Tag icon={<LoadingOutlined />} color="processing">
+              Sending Command...
+            </Tag>
+          )}
+          {commandState.status === 'queued' && (
+            <Tag icon={<ClockCircleOutlined />} color="default">
+              Command Queued
+            </Tag>
+          )}
         </Space>
       }
       open={visible}
@@ -68,17 +206,34 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
       width={900}
       footer={[
         <Space key="commands">
-          <Popconfirm
-            title="Restart Device"
-            description="Are you sure you want to restart this device?"
-            onConfirm={handleRestartDevice}
-            okText="Restart"
-            cancelText="Cancel"
-          >
-            <Button icon={<ReloadOutlined />} danger>
+          <Tooltip title={COMMAND_DESCRIPTIONS[DEVICE_COMMANDS.SEND_NOW]}>
+            <Button
+              icon={<SendOutlined />}
+              onClick={(e) => {
+                e.stopPropagation();
+                confirmOfflineCommand(handleSendNow);
+              }}
+              disabled={commandState.status === 'sending'}
+              loading={commandState.status === 'sending'}
+            >
+              Send Now
+            </Button>
+          </Tooltip>
+          
+          <Tooltip title={COMMAND_DESCRIPTIONS[DEVICE_COMMANDS.RESTART]}>
+            <Button
+              icon={<ReloadOutlined />}
+              danger
+              onClick={(e) => {
+                e.stopPropagation();
+                confirmOfflineCommand(handleRestartDevice);
+              }}
+              disabled={commandState.status === 'sending'}
+              loading={commandState.status === 'sending'}
+            >
               Restart
             </Button>
-          </Popconfirm>
+          </Tooltip>
 
           <Button key="close" type="primary" onClick={onClose}>
             Close
@@ -87,6 +242,47 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
       ]}
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {/* Command Status Display */}
+        {commandState.status !== 'idle' && (
+          <Alert
+            message={
+              commandState.status === 'sending'
+                ? `Sending ${commandState.command}...`
+                : commandState.status === 'queued'
+                ? `${commandState.command} Queued`
+                : commandState.status === 'failed'
+                ? `${commandState.command} Failed`
+                : `${commandState.command} Status`
+            }
+            description={
+              commandState.status === 'sending'
+                ? 'Command is being sent to the device via MQTT broker'
+                : commandState.status === 'queued'
+                ? `Command queued successfully. ${isDeviceOffline ? 'Device is offline - command will execute when device comes online.' : 'Device will execute command shortly.'}`
+                : commandState.status === 'failed'
+                ? commandState.error
+                : null
+            }
+            type={
+              commandState.status === 'sending'
+                ? 'info'
+                : commandState.status === 'queued'
+                ? 'success'
+                : 'error'
+            }
+            showIcon
+            icon={
+              commandState.status === 'sending'
+                ? <LoadingOutlined />
+                : commandState.status === 'queued'
+                ? <CheckCircleOutlined />
+                : <CloseCircleOutlined />
+            }
+            closable
+            onClose={() => setCommandState({ status: 'idle', command: null, error: null, result: null })}
+          />
+        )}
+
         {/* Device Information */}
         <Card title={<><DashboardOutlined /> Device Information</>} size="small">
           <Descriptions bordered column={2} size="small">
@@ -100,9 +296,21 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
               <Tag color="blue">{device.type}</Tag>
             </Descriptions.Item>
             <Descriptions.Item label="Status">
-              <Tag icon={statusConfig[device.status].icon} color={statusConfig[device.status].color}>
-                {device.status.toUpperCase()}
-              </Tag>
+              {/* ✅ Use centralized uiStatus from deviceStatus.util (computed in useDevices) */}
+              {(() => {
+                const status = device.uiStatus || device.status; // Fallback to backend status
+                const config = device.uiStatus 
+                  ? uiStatusConfig[device.uiStatus] 
+                  : legacyStatusConfig[device.status];
+                
+                return (
+                  <Tooltip title={device.statusReason || `Device is ${status}`}>
+                    <Tag icon={config.icon} color={config.color}>
+                      {status.toUpperCase()}
+                    </Tag>
+                  </Tooltip>
+                );
+              })()}
             </Descriptions.Item>
             <Descriptions.Item label="MAC Address">
               <Text code>{device.macAddress}</Text>
@@ -129,7 +337,10 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
                 : 'N/A'}
             </Descriptions.Item>
             <Descriptions.Item label="Last Seen" span={2}>
-              {device.lastSeen?.seconds
+              {/* ✅ Use centralized lastSeenMs from deviceStatus.util */}
+              {device.lastSeenMs !== undefined && device.lastSeenMs !== null
+                ? formatLastSeen(device.lastSeenMs)
+                : device.lastSeen?.seconds
                 ? new Date(device.lastSeen.seconds * 1000).toLocaleString()
                 : 'Never'}
             </Descriptions.Item>
@@ -213,11 +424,19 @@ export const ViewDeviceModal = ({ visible, device, onClose }: ViewDeviceModalPro
           </Space>
         </Card>
 
-        {/* Status Messages */}
-        {device.status === 'offline' && (
+        {/* Status Messages - Use centralized uiStatus */}
+        {(device.uiStatus === 'offline' || device.status === 'offline') && (
           <Alert
             message="Device Offline"
             description="This device is currently offline. Sensor data is not available."
+            type="warning"
+            showIcon
+          />
+        )}
+        {device.uiStatus === 'warning' && device.statusReason && (
+          <Alert
+            message="Device Warning"
+            description={device.statusReason}
             type="warning"
             showIcon
           />

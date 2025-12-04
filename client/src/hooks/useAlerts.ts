@@ -146,25 +146,34 @@ export function useAlertMutations(): UseAlertMutationsReturn {
     try {
       // Perform the API call
       const response = await alertsService.acknowledgeAlert(alertId);
-      console.log('[useAlertMutations] Acknowledge response:', response);
+      
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Acknowledge response:', response);
+      }
       
       // Update all alert list caches with server response and revalidate
       await mutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'list',
         async (currentData: WaterQualityAlert[] | undefined) => {
-          console.log('[useAlertMutations] Current cache data:', currentData);
+          if (import.meta.env.DEV) {
+            console.log('[useAlertMutations] Current cache data:', currentData);
+          }
           if (!currentData) return currentData;
           
           // Update the specific alert in the list with server response
           const updated = currentData.map(alert => {
             if (alert.id === alertId) {
-              console.log('[useAlertMutations] Updating alert:', alert.id, 'from', alert.status, 'to Acknowledged');
+              if (import.meta.env.DEV) {
+                console.log('[useAlertMutations] Updating alert:', alert.id, 'from', alert.status, 'to Acknowledged');
+              }
               // Use the full server response to ensure consistency
               return { ...alert, ...response.data };
             }
             return alert;
           });
-          console.log('[useAlertMutations] Updated cache:', updated);
+          if (import.meta.env.DEV) {
+            console.log('[useAlertMutations] Updated cache:', updated);
+          }
           return updated;
         },
         { revalidate: true } // Revalidate to ensure UI is in sync with server
@@ -177,7 +186,9 @@ export function useAlertMutations(): UseAlertMutationsReturn {
         { revalidate: true } // Revalidate stats from server
       );
       
-      console.log('[useAlertMutations] Cache update complete');
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Cache update complete');
+      }
     } catch (err) {
       console.error('[useAlertMutations] Acknowledge error:', err);
       const error = err instanceof Error ? err : new Error('Failed to acknowledge alert');
@@ -194,25 +205,34 @@ export function useAlertMutations(): UseAlertMutationsReturn {
     try {
       // Perform the API call
       const response = await alertsService.resolveAlert(alertId, notes);
-      console.log('[useAlertMutations] Resolve response:', response);
+      
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Resolve response:', response);
+      }
       
       // Update all alert list caches with server response and revalidate
       await mutate(
         (key: any) => Array.isArray(key) && key[0] === 'alerts' && key[1] === 'list',
         async (currentData: WaterQualityAlert[] | undefined) => {
-          console.log('[useAlertMutations] Current cache data:', currentData);
+          if (import.meta.env.DEV) {
+            console.log('[useAlertMutations] Current cache data:', currentData);
+          }
           if (!currentData) return currentData;
           
           // Update the specific alert in the list with server response
           const updated = currentData.map(alert => {
             if (alert.id === alertId) {
-              console.log('[useAlertMutations] Updating alert:', alert.id, 'from', alert.status, 'to Resolved');
+              if (import.meta.env.DEV) {
+                console.log('[useAlertMutations] Updating alert:', alert.id, 'from', alert.status, 'to Resolved');
+              }
               // Use the full server response to ensure consistency
               return { ...alert, ...response.data };
             }
             return alert;
           });
-          console.log('[useAlertMutations] Updated cache:', updated);
+          if (import.meta.env.DEV) {
+            console.log('[useAlertMutations] Updated cache:', updated);
+          }
           return updated;
         },
         { revalidate: true } // Revalidate to ensure UI is in sync with server
@@ -225,7 +245,9 @@ export function useAlertMutations(): UseAlertMutationsReturn {
         { revalidate: true } // Revalidate stats from server
       );
       
-      console.log('[useAlertMutations] Cache update complete');
+      if (import.meta.env.DEV) {
+        console.log('[useAlertMutations] Cache update complete');
+      }
     } catch (err) {
       console.error('[useAlertMutations] Resolve error:', err);
       const error = err instanceof Error ? err : new Error('Failed to resolve alert');

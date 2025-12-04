@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import type { Device } from '../../../../schemas';
+import type { DeviceWithReadings } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 
 interface UseDeviceFilterProps {
-  devices: Device[];
+  devices: DeviceWithReadings[];
   activeTab: 'registered' | 'unregistered';
   searchText: string;
 }

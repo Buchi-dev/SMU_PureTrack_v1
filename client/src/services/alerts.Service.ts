@@ -31,6 +31,7 @@ import type {
 export interface AlertFilters {
   status?: 'Unacknowledged' | 'Acknowledged' | 'Resolved';
   severity?: 'Critical' | 'Warning' | 'Advisory';
+  parameter?: 'pH' | 'Turbidity' | 'TDS';
   deviceId?: string;
   startDate?: string;
   endDate?: string;

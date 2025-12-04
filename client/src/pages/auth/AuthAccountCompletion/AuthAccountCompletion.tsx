@@ -6,53 +6,55 @@
  * Architecture: Uses global hooks for authentication and user mutations
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Typography, Space, Button, Form, Input, Select, Alert, message } from "antd";
+import { Card, Typography, Space, Button, Form, Input, Select, Alert, message, Modal } from "antd";
 import { 
   UserOutlined, 
   PhoneOutlined, 
-  CheckCircleOutlined 
+  CheckCircleOutlined,
+  LogoutOutlined 
 } from "@ant-design/icons";
 import { useAuth } from "../../../hooks";
-import { useUserMutations } from "../../../hooks";
+import { authService, type CompleteAccountData } from "../../../services/auth.Service";
 import { isValidSMUEmail } from "../../../utils/validation.util";
+import { auth } from "../../../config/firebase.config";
 
 const { Title, Text } = Typography;
 
 export const AuthAccountCompletion = () => {
-  const { user, loading: authLoading, isAuthenticated, refetchUser } = useAuth();
-  const { completeUserProfile, isLoading, error: mutationError } = useUserMutations();
+  const { user, loading: authLoading, requiresAccountCompletion, firebaseEmail, refetchUser, logout } = useAuth();
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Display mutation errors
+  // Display errors
   useEffect(() => {
-    if (mutationError) {
-      message.error(mutationError.message || 'Failed to complete profile');
+    if (error) {
+      message.error(error);
     }
-  }, [mutationError]);
+  }, [error]);
 
-  // Pre-fill form with user data
+  // Pre-fill form with Firebase data if available
   useEffect(() => {
-    if (user) {
-      form.setFieldsValue({
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        middleName: user.middleName || '',
-      });
+    if (firebaseEmail) {
+      const displayName = auth.currentUser?.displayName;
+      if (displayName) {
+        const nameParts = displayName.split(' ');
+        form.setFieldsValue({
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+        });
+      }
     }
-  }, [user, form]);
+  }, [firebaseEmail, form]);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (!isAuthenticated) {
-      navigate("/auth/login");
-      return;
-    }
-
-    if (user) {
+    // If user is authenticated and has a complete profile, redirect to dashboard
+    if (user && !requiresAccountCompletion) {
       // CRITICAL: Domain validation - block personal accounts
       if (!user.email || !isValidSMUEmail(user.email)) {
         if (import.meta.env.DEV) {
@@ -63,25 +65,8 @@ export const AuthAccountCompletion = () => {
         return;
       }
       
-      // If user already has department and phone, skip to appropriate page
-      if (user.department && user.phoneNumber) {
-        // Profile already complete, redirect based on status
-        if (user.status === "active") {
-          if (user.role === "admin") {
-            navigate("/admin/dashboard");
-          } else if (user.role === "staff") {
-            navigate("/staff/dashboard");
-          } else {
-            navigate("/dashboard");
-          }
-        } else if (user.status === "suspended") {
-          navigate("/auth/account-suspended");
-        } else if (user.status === "pending") {
-          navigate("/auth/pending-approval");
-        }
-      }
-      // If user is already active (not a new user), redirect to dashboard
-      else if (user.status === "active") {
+      // Profile already complete, redirect based on status
+      if (user.status === "active") {
         if (user.role === "admin") {
           navigate("/admin/dashboard");
         } else if (user.role === "staff") {
@@ -89,14 +74,37 @@ export const AuthAccountCompletion = () => {
         } else {
           navigate("/dashboard");
         }
-      }
-      // If suspended, redirect to suspended page
-      else if (user.status === "suspended") {
+      } else if (user.status === "suspended") {
         navigate("/auth/account-suspended");
+      } else if (user.status === "pending") {
+        navigate("/auth/pending-approval");
       }
-      // Otherwise, stay on this page to complete profile (pending new user)
+    } else if (!auth.currentUser) {
+      // Not authenticated with Firebase, redirect to login
+      navigate("/auth/login");
     }
-  }, [authLoading, isAuthenticated, user, navigate]);
+    // If requiresAccountCompletion is true, stay on this page
+  }, [authLoading, user, requiresAccountCompletion, navigate]);
+
+  const handleSignOut = () => {
+    Modal.confirm({
+      title: 'Switch to a different account?',
+      content: 'Any information you entered will be lost. Are you sure you want to sign out?',
+      okText: 'Yes, Sign Out',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await logout();
+          message.success('Signed out successfully');
+          navigate('/auth/login');
+        } catch (err) {
+          console.error('Sign out error:', err);
+          message.error('Failed to sign out. Please try again.');
+        }
+      },
+    });
+  };
 
   const handleSubmit = async (values: {
     firstName: string;
@@ -105,29 +113,36 @@ export const AuthAccountCompletion = () => {
     department: string;
     phoneNumber: string;
   }) => {
-    if (!user) return;
+    setSubmitting(true);
+    setError(null);
 
     try {
-      await completeUserProfile(user._id, {
+      const accountData: CompleteAccountData = {
         firstName: values.firstName,
         lastName: values.lastName,
         middleName: values.middleName,
         department: values.department,
         phoneNumber: values.phoneNumber,
-      });
+        roleRequest: 'staff', // Default role for all new users
+      };
 
-      message.success('Profile completed successfully!');
+      await authService.completeAccount(accountData);
+
+      message.success('Account registration completed! Your account is pending admin approval.');
 
       // Refresh user data
       await refetchUser();
 
       // Navigate to pending approval
       navigate("/auth/pending-approval");
-    } catch (err) {
-      // Error is already handled by useUserMutations hook
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to complete account registration';
+      setError(errorMessage);
       if (import.meta.env.DEV) {
-        console.error("Error completing profile:", err);
+        console.error("Error completing account:", err);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -158,6 +173,7 @@ export const AuthAccountCompletion = () => {
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
           backgroundColor: "rgba(255, 255, 255, 0.98)",
           backdropFilter: "blur(10px)",
+          position: "relative",
         }}
       >
         <Space 
@@ -165,6 +181,44 @@ export const AuthAccountCompletion = () => {
           size={24} 
           style={{ width: "100%", padding: "8px 0" }}
         >
+          {/* Signed in as Alert with Sign Out Button */}
+          {firebaseEmail && (
+            <Alert
+              message={
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  justifyContent: "space-between",
+                  gap: "12px"
+                }}>
+                  <span>
+                    <strong>Signed in as:</strong> {firebaseEmail}
+                  </span>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<LogoutOutlined />}
+                    onClick={handleSignOut}
+                    style={{
+                      fontSize: 12,
+                      height: "auto",
+                      padding: "0",
+                      color: "#1890ff",
+                    }}
+                  >
+                    Use Different Account
+                  </Button>
+                </div>
+              }
+              type="info"
+              showIcon
+              style={{
+                borderRadius: 8,
+                marginBottom: -8,
+              }}
+            />
+          )}
+
           {/* Header */}
           <div style={{ textAlign: "center" }}>
             <img 
@@ -325,11 +379,23 @@ export const AuthAccountCompletion = () => {
               </Form.Item>
             </div>
 
+            {error && (
+              <Alert
+                message="Error"
+                description={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError(null)}
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
             <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={isLoading}
+                loading={submitting}
                 icon={<CheckCircleOutlined />}
                 block
                 style={{
@@ -340,13 +406,13 @@ export const AuthAccountCompletion = () => {
                   boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                 }}
               >
-                Complete Profile
+                Complete Registration
               </Button>
             </Form.Item>
           </Form>
 
           {/* User Info */}
-          {user && (
+          {firebaseEmail && (
             <div style={{ textAlign: "center", marginTop: 8 }}>
               <Text 
                 type="secondary" 
@@ -355,7 +421,7 @@ export const AuthAccountCompletion = () => {
                   display: "block",
                 }}
               >
-                Logged in as: {user.email}
+                Registering as: {firebaseEmail}
               </Text>
             </div>
           )}

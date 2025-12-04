@@ -25,6 +25,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [firebaseReady, setFirebaseReady] = useState(false);
+  const [requiresAccountCompletion, setRequiresAccountCompletion] = useState(false);
+  const [firebaseEmail, setFirebaseEmail] = useState<string | null>(null);
   
   // Track if listener has been initialized to prevent duplicates
   const listenerInitialized = useRef(false);
@@ -34,16 +36,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const fetchUser = useCallback(async () => {
     try {
-      const { authenticated, user: userData } = await authService.checkStatus();
+      const response = await authService.checkStatus();
       
-      if (authenticated && userData) {
-        setUser(userData);
+      if (response.requiresAccountCompletion) {
+        // Firebase authenticated but no database record
+        setRequiresAccountCompletion(true);
+        setFirebaseEmail(response.firebaseEmail || null);
+        setUser(null);
+      } else if (response.authenticated && response.user) {
+        setUser(response.user);
+        setRequiresAccountCompletion(false);
+        setFirebaseEmail(null);
       } else {
         setUser(null);
+        setRequiresAccountCompletion(false);
+        setFirebaseEmail(null);
       }
     } catch (error) {
       console.error("[AuthContext] Error fetching user:", error);
       setUser(null);
+      setRequiresAccountCompletion(false);
+      setFirebaseEmail(null);
     } finally {
       setLoading(false);
     }
@@ -55,6 +68,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refetchUser = useCallback(async () => {
     await fetchUser();
   }, [fetchUser]);
+
+  /**
+   * Logout function - signs out from Firebase and clears all auth state
+   */
+  const logout = useCallback(async () => {
+    try {
+      if (import.meta.env.DEV) {
+        console.log('[AuthContext] Logging out user...');
+      }
+
+      // Sign out from Firebase
+      await auth.signOut();
+
+      // Clear all auth state
+      setUser(null);
+      setFirebaseReady(false);
+      setRequiresAccountCompletion(false);
+      setFirebaseEmail(null);
+
+      // Clear any localStorage (if you're using it)
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
+
+      // Optionally call backend logout endpoint (don't fail if it errors)
+      try {
+        await authService.logout();
+      } catch (backendError) {
+        if (import.meta.env.DEV) {
+          console.warn('[AuthContext] Backend logout failed (non-critical):', backendError);
+        }
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[AuthContext] Logout successful');
+      }
+    } catch (error) {
+      console.error('[AuthContext] Logout error:', error);
+      // Even if logout fails, clear local state
+      setUser(null);
+      setFirebaseReady(false);
+      setRequiresAccountCompletion(false);
+      setFirebaseEmail(null);
+      throw error;
+    }
+  }, []);
 
   // Listen to Firebase auth state changes (SINGLE INITIALIZATION)
   useEffect(() => {
@@ -165,7 +223,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSuspended,
     isAdmin,
     isStaff,
+    requiresAccountCompletion,
+    firebaseEmail,
     refetchUser,
+    logout,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

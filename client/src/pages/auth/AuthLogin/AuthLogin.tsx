@@ -22,7 +22,7 @@ const { Title, Text } = Typography;
 export default function AuthLogin() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, user, refetchUser } = useAuth();
+  const { isAuthenticated, loading, user, refetchUser, requiresAccountCompletion } = useAuth();
   const { token } = theme.useToken();
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -34,39 +34,55 @@ export default function AuthLogin() {
       setError('Authentication failed. Please try again.');
     }
 
-    // Redirect if already authenticated
-    if (!loading && isAuthenticated && user) {
-      if (import.meta.env.DEV) {
-        console.log('[AuthLogin] User authenticated, redirecting...', user);
+    // Add 500ms delay before redirect to prevent jarring instant-redirects
+    const redirectTimer = setTimeout(() => {
+      // If Firebase authenticated but no database record, go to account completion
+      if (!loading && requiresAccountCompletion && !user) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] Account completion required, redirecting...');
+        }
+        navigate('/auth/account-completion');
+        setIsLoggingIn(false);
+        return;
       }
       
-      // Route based on user role and status
-      if (user.status === 'suspended') {
-        navigate('/auth/account-suspended');
-      } else if (user.status === 'pending') {
-        // Check if profile is complete (has department and phone)
-        if (!user.department || !user.phoneNumber) {
-          // New user without complete profile - go to account completion
-          navigate('/auth/account-completion');
-        } else {
-          // Profile complete - go to pending approval
-          navigate('/auth/pending-approval');
+      // Redirect if already authenticated
+      if (!loading && isAuthenticated && user) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] User authenticated, redirecting...', user);
         }
-      } else if (user.status === 'active') {
-        // Active user - redirect to appropriate dashboard
-        if (user.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else if (user.role === 'staff') {
-          navigate('/staff/dashboard');
-        } else {
-          navigate('/dashboard');
+        
+        // Route based on user role and status
+        if (user.status === 'suspended') {
+          navigate('/auth/account-suspended');
+        } else if (user.status === 'pending') {
+          // Check if profile is complete (has department and phone)
+          if (!user.department || !user.phoneNumber) {
+            // New user without complete profile - go to account completion
+            navigate('/auth/account-completion');
+          } else {
+            // Profile complete - go to pending approval
+            navigate('/auth/pending-approval');
+          }
+        } else if (user.status === 'active') {
+          // Active user - redirect to appropriate dashboard
+          if (user.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (user.role === 'staff') {
+            navigate('/staff/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         }
+        
+        // Stop loading state after navigation
+        setIsLoggingIn(false);
       }
-      
-      // Stop loading state after navigation
-      setIsLoggingIn(false);
-    }
-  }, [isAuthenticated, loading, user, navigate, searchParams]);
+    }, 500);
+
+    // Cleanup timer on unmount or when dependencies change
+    return () => clearTimeout(redirectTimer);
+  }, [isAuthenticated, loading, user, navigate, searchParams, requiresAccountCompletion]);
 
   /**
    * Handle Google OAuth login
@@ -120,9 +136,18 @@ export default function AuthLogin() {
         console.log('[AuthLogin] User refetched successfully');
       }
       
-      // If we reach here and still not authenticated, something is wrong
-      // Navigate manually based on the login response
-      if (!isAuthenticated) {
+      // Check if account completion is required
+      if (response.requiresAccountCompletion) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] Account completion required, redirecting...');
+        }
+        navigate('/auth/account-completion');
+        setIsLoggingIn(false);
+        return;
+      }
+      
+      // User exists in database, navigate based on status
+      if (!isAuthenticated && response.user) {
         if (import.meta.env.DEV) {
           console.warn('[AuthLogin] AuthContext not updated, navigating manually');
         }
@@ -131,11 +156,8 @@ export default function AuthLogin() {
         if (loggedInUser.status === 'suspended') {
           navigate('/auth/account-suspended');
         } else if (loggedInUser.status === 'pending') {
-          if (!loggedInUser.department || !loggedInUser.phoneNumber) {
-            navigate('/auth/account-completion');
-          } else {
-            navigate('/auth/pending-approval');
-          }
+          // Profile complete but awaiting approval
+          navigate('/auth/pending-approval');
         } else if (loggedInUser.status === 'active') {
           if (loggedInUser.role === 'admin') {
             navigate('/admin/dashboard');

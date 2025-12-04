@@ -78,14 +78,14 @@ const combinedFileTransport = new DailyRotateFile({
  */
 const consoleTransport = new winston.transports.Console({
   format: consoleFormat,
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'http'), // Changed to 'http' in dev
 });
 
 /**
  * Winston Logger Instance
  */
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || 'http', // Changed default from 'info' to 'http' to show HTTP requests
   format: logFormat,
   defaultMeta: { service: 'water-quality-api' },
   transports: [

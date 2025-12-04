@@ -46,7 +46,7 @@ export const StaffDashboard = () => {
     isLoading: devicesLoading, 
     error: devicesError,
     refetch: refetchDevices 
-  } = useDevices({ pollInterval: 10000 }); // Poll every 10 seconds
+  } = useDevices({ pollInterval: 30000 }); // 30 seconds - device status doesn't change that rapidly
   
   const { 
     alerts, 

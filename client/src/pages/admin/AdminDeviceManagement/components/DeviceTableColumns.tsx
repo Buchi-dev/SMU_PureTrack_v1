@@ -9,15 +9,23 @@ import {
   WifiOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus } from '../../../../schemas';
+import type { DeviceWithReadings, DeviceStatus, DeviceUIStatus } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 import type { ReactNode } from 'react';
 
 const { Text } = Typography;
 
-// Status color mapping
-const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
+// ✅ UI Status color mapping (uses centralized deviceStatus.util uiStatus)
+const uiStatusConfig: Record<DeviceUIStatus, { color: string; icon: ReactNode }> = {
+  online: { color: 'success', icon: <CheckCircleOutlined /> },
+  offline: { color: 'default', icon: <CloseCircleOutlined /> },
+  warning: { color: 'warning', icon: <WarningOutlined /> },
+};
+
+// Legacy status config for devices without uiStatus (fallback only)
+const legacyStatusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
 };
@@ -25,9 +33,9 @@ const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
 interface UseDeviceColumnsProps {
   activeTab: 'registered' | 'unregistered';
   token: GlobalToken;
-  onView: (device: Device) => void;
-  onDelete: (device: Device) => void;
-  onRegister: (device: Device) => void;
+  onView: (device: DeviceWithReadings) => void;
+  onDelete: (device: DeviceWithReadings) => void;
+  onRegister: (device: DeviceWithReadings) => void;
 }
 
 export const useDeviceColumns = ({
@@ -38,7 +46,7 @@ export const useDeviceColumns = ({
   onRegister,
 }: UseDeviceColumnsProps) => {
   // Table columns for registered devices
-  const registeredColumns: ColumnsType<Device> = [
+  const registeredColumns: ColumnsType<DeviceWithReadings> = [
     {
       title: 'Device ID',
       dataIndex: 'deviceId',
@@ -74,24 +82,35 @@ export const useDeviceColumns = ({
     },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: 'uiStatus',
+      key: 'uiStatus',
       width: 120,
       align: 'center',
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
+        { text: 'Warning', value: 'warning' },
       ],
-      onFilter: (value, record) => record.status === value,
-      render: (status: DeviceStatus) => (
-        <Tag
-          icon={statusConfig[status].icon}
-          color={statusConfig[status].color}
-          style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
-        >
-          {status.toUpperCase()}
-        </Tag>
-      ),
+      onFilter: (value, record) => (record.uiStatus || record.status) === value,
+      render: (_: unknown, record: DeviceWithReadings) => {
+        // Use centralized uiStatus from deviceStatus.util (computed in useDevices)
+        const status = record.uiStatus || record.status; // Fallback to backend status
+        const config = record.uiStatus 
+          ? uiStatusConfig[record.uiStatus] 
+          : legacyStatusConfig[record.status];
+        
+        return (
+          <Tooltip title={record.statusReason || `Device is ${status}`}>
+            <Tag
+              icon={config.icon}
+              color={config.color}
+              style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
+            >
+              {status.toUpperCase()}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Registration',
@@ -232,7 +251,7 @@ export const useDeviceColumns = ({
   ];
 
   // Simplified columns for unregistered devices
-  const unregisteredColumns: ColumnsType<Device> = [
+  const unregisteredColumns: ColumnsType<DeviceWithReadings> = [
     {
       title: 'Device ID',
       dataIndex: 'deviceId',
@@ -286,15 +305,18 @@ export const useDeviceColumns = ({
         { text: 'Offline', value: 'offline' },
       ],
       onFilter: (value, record) => record.status === value,
-      render: (status: DeviceStatus) => (
-        <Tag
-          icon={statusConfig[status].icon}
-          color={statusConfig[status].color}
-          style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
-        >
-          {status.toUpperCase()}
-        </Tag>
-      ),
+      render: (status: DeviceStatus) => {
+        const config = legacyStatusConfig[status]; // Use legacy config for unregistered devices
+        return (
+          <Tag
+            icon={config.icon}
+            color={config.color}
+            style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
+          >
+            {status.toUpperCase()}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Sensors Detected',

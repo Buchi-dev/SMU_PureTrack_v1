@@ -17,8 +17,7 @@
 
 import { apiClient, getErrorMessage } from '../config/api.config';
 import { REPORT_ENDPOINTS, buildReportsUrl } from '../config/endpoints';
-import { ERROR_MESSAGES } from '../constants/errorMessages.constants';
-import { REQUEST_TIMEOUT } from '../constants/api.constants';
+import { ERROR_MESSAGES, REQUEST_TIMEOUT, REPORT_TYPES, REPORT_STATUS } from '../constants';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -37,8 +36,8 @@ export interface DeviceStatusReportRequest {
 }
 
 export interface ReportFilters {
-  type?: 'water-quality' | 'device-status';
-  status?: 'generating' | 'completed' | 'failed';
+  type?: typeof REPORT_TYPES[keyof typeof REPORT_TYPES];
+  status?: typeof REPORT_STATUS[keyof typeof REPORT_STATUS];
   generatedBy?: string;
   startDate?: string;
   endDate?: string;
@@ -54,7 +53,7 @@ export interface Report {
   generatedBy: string;
   startDate: string;
   endDate: string;
-  status: 'generating' | 'completed' | 'failed';
+  status: typeof REPORT_STATUS[keyof typeof REPORT_STATUS];
   data: Record<string, unknown>;
   summary?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -150,14 +149,16 @@ export class ReportsService {
     request: WaterQualityReportRequest
   ): Promise<ReportResponse> {
     try {
-      // DEBUG: Log request being sent to backend
-      console.log('[ReportsService] DEBUG - Sending request to backend:', {
-        endpoint: REPORT_ENDPOINTS.WATER_QUALITY,
-        startDate: request.startDate,
-        endDate: request.endDate,
-        deviceIds: request.deviceIds,
-        deviceCount: request.deviceIds?.length || 0,
-      });
+      if (import.meta.env.DEV) {
+        // DEBUG: Log request being sent to backend
+        console.log('[ReportsService] DEBUG - Sending request to backend:', {
+          endpoint: REPORT_ENDPOINTS.WATER_QUALITY,
+          startDate: request.startDate,
+          endDate: request.endDate,
+          deviceIds: request.deviceIds,
+          deviceCount: request.deviceIds?.length || 0,
+        });
+      }
 
       const response = await apiClient.post<ReportResponse>(
         REPORT_ENDPOINTS.WATER_QUALITY,
@@ -167,15 +168,17 @@ export class ReportsService {
         }
       );
 
-      // DEBUG: Log response from backend
-      console.log('[ReportsService] DEBUG - Response from backend:', {
-        success: response.data.success,
-        message: response.data.message,
-        hasPdfBlob: !!response.data.pdfBlob,
-        pdfBlobSize: response.data.pdfBlob?.length,
-        hasData: !!response.data.data,
-        summary: response.data.data?.summary,
-      });
+      if (import.meta.env.DEV) {
+        // DEBUG: Log response from backend
+        console.log('[ReportsService] DEBUG - Response from backend:', {
+          success: response.data.success,
+          message: response.data.message,
+          hasPdfBlob: !!response.data.pdfBlob,
+          pdfBlobSize: response.data.pdfBlob?.length,
+          hasData: !!response.data.data,
+          summary: response.data.data?.summary,
+        });
+      }
 
       return response.data;
     } catch (error) {
@@ -372,20 +375,6 @@ export class ReportsService {
       console.error('[ReportsService] Download error:', message);
       throw new Error(message);
     }
-  }
-
-  /**
-   * @deprecated Use generateDataSummaryReport() - not yet implemented on server
-   */
-  async generateDataSummaryReport(): Promise<ReportListResponse> {
-    throw new Error(ERROR_MESSAGES.GENERAL.NOT_IMPLEMENTED);
-  }
-
-  /**
-   * @deprecated Use generateComplianceReport() - not yet implemented on server
-   */
-  async generateComplianceReport(): Promise<ReportListResponse> {
-    throw new Error(ERROR_MESSAGES.GENERAL.NOT_IMPLEMENTED);
   }
 }
 

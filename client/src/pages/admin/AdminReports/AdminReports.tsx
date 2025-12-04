@@ -132,26 +132,30 @@ export const AdminReports = () => {
       message.loading({ content: 'Generating report...', key: 'report', duration: 0 });
       setBackupProgress({ status: 'idle', message: '', percent: 0 });
 
-      console.log('[AdminReports] Generating report with params:', {
-        startDate,
-        endDate,
-        deviceIds,
-        deviceCount: deviceIds?.length || 0,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[AdminReports] Generating report with params:', {
+          startDate,
+          endDate,
+          deviceIds,
+          deviceCount: deviceIds?.length || 0,
+        });
+      }
 
-      // DEBUG: Log device data being sent
-      const selectedDevices = deviceIds?.map(id => {
-        const device = devicesWithReadings.find(d => d.deviceId === id);
-        return {
-          deviceId: id,
-          name: device?.name,
-          hasReadings: device?.latestReading ? true : false,
-          latestReading: device?.latestReading,
-        };
-      }) || [];
-      
-      console.log('[AdminReports] DEBUG - Selected devices with readings:', selectedDevices);
-      console.log('[AdminReports] DEBUG - Total devices available:', devicesWithReadings.length);
+      if (import.meta.env.DEV) {
+        // DEBUG: Log device data being sent
+        const selectedDevices = deviceIds?.map(id => {
+          const device = devicesWithReadings.find(d => d.deviceId === id);
+          return {
+            deviceId: id,
+            name: device?.name,
+            hasReadings: device?.latestReading ? true : false,
+            latestReading: device?.latestReading,
+          };
+        }) || [];
+        
+        console.log('[AdminReports] DEBUG - Selected devices with readings:', selectedDevices);
+        console.log('[AdminReports] DEBUG - Total devices available:', devicesWithReadings.length);
+      }
 
       // Call backend API to generate report and store PDF
       const response = await reportsService.generateWaterQualityReport({
@@ -160,14 +164,16 @@ export const AdminReports = () => {
         deviceIds: deviceIds || [],
       });
 
-      // DEBUG: Log response data
-      console.log('[AdminReports] DEBUG - Response received:', {
-        success: response.success,
-        hasPdfBlob: !!response.pdfBlob,
-        pdfBlobSize: response.pdfBlob?.length,
-        hasGridFsFileId: !!response.data?.gridFsFileId,
-        reportData: response.data,
-      });
+      if (import.meta.env.DEV) {
+        // DEBUG: Log response data
+        console.log('[AdminReports] DEBUG - Response received:', {
+          success: response.success,
+          hasPdfBlob: !!response.pdfBlob,
+          pdfBlobSize: response.pdfBlob?.length,
+          hasGridFsFileId: !!response.data?.gridFsFileId,
+          reportData: response.data,
+        });
+      }
 
       if (response.success) {
         // Update progress - report generated

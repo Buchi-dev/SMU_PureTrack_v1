@@ -38,6 +38,7 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { reportsService } from '../../../services/reports.Service';
+import { getReportTypeColor, getReportTypeLabel } from '../../../constants';
 
 // Extend dayjs with relativeTime plugin for fromNow() function
 dayjs.extend(relativeTime);
@@ -101,7 +102,9 @@ const ReportHistory: React.FC = () => {
         total: response.pagination.total,
       });
     } catch (error) {
-      console.error('Failed to load report history:', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to load report history:', error);
+      }
       message.error('Failed to load report history');
     } finally {
       setLoading(false);
@@ -153,7 +156,9 @@ const ReportHistory: React.FC = () => {
 
       message.success({ content: 'Download completed successfully', key: 'download' });
     } catch (error) {
-      console.error('Download failed:', error);
+      if (import.meta.env.DEV) {
+        console.error('Download failed:', error);
+      }
       message.error({ 
         content: error instanceof Error ? error.message : 'Download failed', 
         key: 'download' 
@@ -195,8 +200,8 @@ const ReportHistory: React.FC = () => {
         <Space direction="vertical" size={2}>
           <Space size={8}>
             <Text strong>{record.title}</Text>
-            <Tag color={record.type === 'water-quality' ? 'blue' : 'green'} style={{ margin: 0 }}>
-              {record.type.replace('-', ' ').toUpperCase()}
+            <Tag color={getReportTypeColor(record.type)} style={{ margin: 0 }}>
+              {getReportTypeLabel(record.type).toUpperCase()}
             </Tag>
           </Space>
           <Text type="secondary" style={{ fontSize: '12px' }}>

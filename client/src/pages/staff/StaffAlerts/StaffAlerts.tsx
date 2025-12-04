@@ -32,7 +32,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
-import { ALERT_STATUS, ALERT_SEVERITY } from '../../../constants';
+import { ALERT_STATUS } from '../../../constants';
 import { useThemeToken } from '../../../theme';
 import { useAlerts, useAlertMutations } from '../../../hooks';
 import { PageHeader, StatsCard } from '../../../components/staff';
@@ -60,12 +60,19 @@ export const StaffAlerts = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   // ✅ GLOBAL HOOKS - Real-time alert data with SWR polling
+  // Pass filters to backend for server-side filtering
   const { 
-    alerts: allAlerts, 
+    alerts: filteredAlerts,
+    stats,
     isLoading, 
     refetch 
   } = useAlerts({ 
-    pollInterval: 10000 // Poll every 10 seconds
+    filters: {
+      status: statusFilter !== 'all' ? statusFilter as any : undefined,
+      severity: severityFilter !== 'all' ? severityFilter as any : undefined,
+      parameter: parameterFilter !== 'all' ? parameterFilter as any : undefined,
+    },
+    pollInterval: 30000 // Alert status updates (not sensor data, reduced from 10s)
   });
   
   const { 
@@ -88,35 +95,42 @@ export const StaffAlerts = () => {
     }
   };
 
-  // Filter alerts based on selected filters
-  const filteredAlerts = useMemo(() => {
-    return allAlerts.filter((alert) => {
-      if (statusFilter !== 'all' && alert.status !== statusFilter) return false;
-      if (severityFilter !== 'all' && alert.severity !== severityFilter) return false;
-      if (parameterFilter !== 'all' && alert.parameter !== parameterFilter) return false;
-      return true;
-    });
-  }, [allAlerts, statusFilter, severityFilter, parameterFilter]);
-
-  // Calculate filtered stats
+  // ✅ Use backend-provided stats instead of client-side calculation
+  // Backend returns aggregated statistics with the filtered data
   const filteredStats = useMemo(() => {
-    const active = filteredAlerts.filter(a => a.status === ALERT_STATUS.UNACKNOWLEDGED).length;
-    const acknowledged = filteredAlerts.filter(a => a.status === ALERT_STATUS.ACKNOWLEDGED).length;
-    const resolved = filteredAlerts.filter(a => a.status === ALERT_STATUS.RESOLVED).length;
-    const critical = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.CRITICAL).length;
-    const warning = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.WARNING).length;
-    const advisory = filteredAlerts.filter(a => a.severity === ALERT_SEVERITY.ADVISORY).length;
+    if (!stats) {
+      return {
+        total: filteredAlerts.length,
+        active: 0,
+        acknowledged: 0,
+        resolved: 0,
+        critical: 0,
+        warning: 0,
+        advisory: 0,
+      };
+    }
+
+    // Map backend stats to UI display format
+    const byStatus = stats.byStatus.reduce((acc, item) => {
+      acc[item._id.toLowerCase()] = item.count;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const bySeverity = stats.bySeverity.reduce((acc, item) => {
+      acc[item._id.toLowerCase()] = item.count;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
       total: filteredAlerts.length,
-      active,
-      acknowledged,
-      resolved,
-      critical,
-      warning,
-      advisory,
+      active: byStatus['unacknowledged'] || 0,
+      acknowledged: byStatus['acknowledged'] || 0,
+      resolved: byStatus['resolved'] || 0,
+      critical: bySeverity['critical'] || 0,
+      warning: bySeverity['warning'] || 0,
+      advisory: bySeverity['advisory'] || 0,
     };
-  }, [filteredAlerts]);
+  }, [filteredAlerts.length, stats]);
 
   // Handle alert acknowledgment
   const handleAcknowledge = async (alertId: string) => {

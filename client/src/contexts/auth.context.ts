@@ -16,7 +16,10 @@ export interface AuthContextType {
   isSuspended: boolean;
   isAdmin: boolean;
   isStaff: boolean;
+  requiresAccountCompletion: boolean;
+  firebaseEmail: string | null;
   refetchUser: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 // Create context with undefined default

@@ -19,6 +19,12 @@ import { SENSOR_THRESHOLDS } from '../constants/waterQuality.constants';
 export const DeviceStatusSchema = z.enum(['online', 'offline']);
 
 /**
+ * Device UI Status (computed client-side by deviceStatus.util)
+ * Extended status that includes 'warning' state for quality issues
+ */
+export const DeviceUIStatusSchema = z.enum(['online', 'offline', 'warning']);
+
+/**
  * Device Registration Status  
  * ✅ V2 Backend: 'registered' | 'pending'
  */
@@ -146,6 +152,7 @@ export const DeviceResponseSchema = z.object({
 // ============================================================================
 
 export type DeviceStatus = z.infer<typeof DeviceStatusSchema>;
+export type DeviceUIStatus = z.infer<typeof DeviceUIStatusSchema>;
 export type DeviceRegistrationStatus = z.infer<typeof DeviceRegistrationStatusSchema>;
 export type DeviceLocation = z.infer<typeof DeviceLocationSchema>;
 export type DeviceMetadata = z.infer<typeof DeviceMetadataSchema>;
@@ -160,11 +167,64 @@ export type DeviceResponse = z.infer<typeof DeviceResponseSchema>;
 // ============================================================================
 
 /**
+ * Command Options for sendDeviceCommand
+ */
+export interface CommandOptions {
+  /** Timeout in milliseconds (default: 30000) */
+  timeout?: number;
+  /** Number of retry attempts on failure (default: 3) */
+  retryAttempts?: number;
+  /** Wait for device acknowledgment before resolving (default: false) */
+  waitForAck?: boolean;
+}
+
+/**
+ * Command Result from sendDeviceCommand
+ */
+export interface CommandResult {
+  /** Whether command was sent successfully to backend */
+  success: boolean;
+  /** Whether command was queued in MQTT broker */
+  queued: boolean;
+  /** Whether device acknowledged the command (null if waitForAck=false or still pending) */
+  acknowledged: boolean | null;
+  /** Error message if command failed */
+  error: string | null;
+  /** Backend-provided command ID for tracking */
+  commandId: string;
+  /** Timestamp when command was sent */
+  timestamp: number;
+  /** Backend device status at time of command */
+  deviceStatus?: string;
+}
+
+/**
+ * Command History Entry (for UI display)
+ */
+export interface CommandHistoryEntry {
+  /** Backend command ID */
+  commandId: string;
+  /** Command type (restart, send_now, etc.) */
+  command: string;
+  /** Command status (sending/queued/acknowledged/timeout/failed) */
+  status: 'sending' | 'queued' | 'acknowledged' | 'timeout' | 'failed' | 'completed';
+  /** Timestamp when command was sent */
+  timestamp: number;
+  /** Error message if failed */
+  error?: string;
+  /** Device acknowledgment timestamp (if received) */
+  acknowledgedAt?: number;
+}
+
+/**
  * Device enriched with severity information and active alerts
  * Used in AdminDeviceReadings and other monitoring pages
  * 
+ * ✅ Now includes computed uiStatus from centralized deviceStatus.util
+ * 
  * @see AdminDeviceReadings
  * @see useDeviceSeverityCalculator
+ * @see utils/deviceStatus.util
  */
 export interface DeviceWithReadings extends Device {
   /** Latest sensor reading from RTDB */
@@ -175,6 +235,16 @@ export interface DeviceWithReadings extends Device {
   severityScore: number;
   /** Severity level based on score and alerts */
   severityLevel: 'critical' | 'warning' | 'normal' | 'offline';
+  /** Computed UI status (online/offline/warning) from centralized helper */
+  uiStatus?: 'online' | 'offline' | 'warning';
+  /** Human-readable status reason */
+  statusReason?: string;
+  /** Whether device has recent data */
+  hasRecentData?: boolean;
+  /** Whether sensor readings indicate quality issues */
+  hasQualityWarnings?: boolean;
+  /** Milliseconds since last activity */
+  lastSeenMs?: number | null;
 }
 
 // ============================================================================

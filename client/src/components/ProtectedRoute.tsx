@@ -267,11 +267,16 @@ export function RoleRoute({ children, allowedRoles }: RoleRouteProps) {
  * Redirects based on user status and profile completeness
  */
 export function AccountCompletionRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, user, loading, isPending, isSuspended, isActive } = useAuth();
+  const { isAuthenticated, user, loading, isPending, isSuspended, isActive, requiresAccountCompletion } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <LoadingScreen />;
+  }
+
+  // Allow access if Firebase authenticated but database record doesn't exist yet
+  if (requiresAccountCompletion && !user) {
+    return <>{children}</>;
   }
 
   if (!isAuthenticated) {
