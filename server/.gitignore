@@ -40,3 +40,5 @@ logs/
 # Docker
 docker-compose.override.yml
 .dockerignore.local
+.vercel
+.env*.local

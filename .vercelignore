@@ -1,0 +1,12 @@
+client
+device_config
+.git
+.gitignore
+node_modules
+*.log
+.env.example
+server/src
+server/tsconfig.json
+server/nodemon.json
+server/logs
+server/.vercel

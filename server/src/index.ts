@@ -77,8 +77,8 @@ app.use(helmet());
 // Middleware
 app.use(cors(appConfig.cors));
 
-// Explicit OPTIONS handler for preflight requests
-app.options('*', cors(appConfig.cors));
+// Explicit OPTIONS handler for preflight requests (Express 5.x compatible)
+app.options('/(.*)', cors(appConfig.cors));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
