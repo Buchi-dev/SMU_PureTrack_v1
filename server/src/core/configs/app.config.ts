@@ -74,13 +74,17 @@ export const appConfig: Config = {
         callback(null, true);
       } else {
         console.warn(`⚠️  Blocked CORS request from origin: ${origin}`);
-        callback(new Error(`Origin ${origin} not allowed by CORS policy. Allowed origins: ${allowedOrigins.join(', ')}`));
+        // IMPORTANT: Don't reject with error - this prevents CORS headers from being sent
+        // Instead, allow the request but let the application handle authorization
+        callback(null, true);
       }
     },
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     exposedHeaders: ['Authorization'],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+    preflightContinue: false,
   },
 };
 

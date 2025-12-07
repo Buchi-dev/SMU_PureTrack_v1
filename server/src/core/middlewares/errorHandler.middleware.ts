@@ -8,7 +8,7 @@ interface ApiError extends Error {
 
 export const errorHandler = (
   err: ApiError,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
@@ -19,6 +19,16 @@ export const errorHandler = (
     statusCode,
     isOperational,
   });
+
+  // Ensure CORS headers are set for error responses
+  // This is critical for OPTIONS preflight and authentication errors
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  }
 
   res.status(statusCode).json({
     status: 'error',
