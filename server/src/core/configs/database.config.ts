@@ -62,7 +62,10 @@ export class DatabaseConnection {
   }
 
   public getConnectionStatus(): boolean {
-    return this.isConnected;
+    // Check both internal flag and mongoose connection state
+    // readyState: 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+    const mongooseConnected = mongoose.connection.readyState === 1;
+    return this.isConnected && mongooseConnected;
   }
 
   public getConnection(): mongoose.Connection {

@@ -2,6 +2,7 @@ import './moduleAlias';
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 import { appConfig, dbConnection, initializeFirebase } from '@core/configs';
 import { errorHandler, requestLogger } from '@core/middlewares';
 import { NotFoundError } from '@utils/errors.util';
@@ -33,11 +34,17 @@ app.use(requestLogger);
 
 // Health check route
 app.get('/health', (_req: Request, res: Response) => {
+  const dbStatus = dbConnection.getConnectionStatus();
+  const mongooseState = ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState];
+  
   res.status(200).json({
     status: 'OK',
     message: 'Server is running',
     timestamp: new Date().toISOString(),
-    database: dbConnection.getConnectionStatus() ? 'connected' : 'disconnected',
+    database: dbStatus ? 'connected' : 'disconnected',
+    mongooseState: mongooseState,
+    hasMongoURI: !!process.env.MONGODB_URI,
+    nodeEnv: process.env.NODE_ENV,
   });
 });
 
