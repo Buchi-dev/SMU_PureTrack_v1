@@ -10,10 +10,38 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
 import fs from 'fs';
 
-// Ensure logs directory exists
-const logsDir = path.join(process.cwd(), 'logs');
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
+// Determine logs directory based on environment
+// In serverless/production environments (Lambda, etc.), use /tmp which is writable
+// In development, use local logs directory
+const getLogsDirectory = (): string => {
+  // Check if running in serverless environment (AWS Lambda, etc.)
+  if (process.env.LAMBDA_TASK_ROOT || process.env.AWS_EXECUTION_ENV) {
+    return '/tmp/logs';
+  }
+  
+  // Check if running in production-like environment with read-only filesystem
+  if (process.cwd().startsWith('/var/task')) {
+    return '/tmp/logs';
+  }
+  
+  // Default to local logs directory for development
+  return path.join(process.cwd(), 'logs');
+};
+
+// Ensure logs directory exists (with error handling)
+let logsDir: string;
+let canWriteLogs = true;
+
+try {
+  logsDir = getLogsDirectory();
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+} catch (error) {
+  // If we can't create logs directory, fall back to console-only logging
+  console.warn('Unable to create logs directory, falling back to console-only logging:', error);
+  canWriteLogs = false;
+  logsDir = '/tmp'; // Fallback path (won't be used for file logging)
 }
 
 /**
@@ -59,21 +87,21 @@ const dailyRotateFileConfig = {
 };
 
 /**
- * Error log transport - Only logs errors
+ * Error log transport - Only logs errors (only if file logging is enabled)
  */
-const errorFileTransport = new DailyRotateFile({
+const errorFileTransport = canWriteLogs ? new DailyRotateFile({
   ...dailyRotateFileConfig,
   filename: path.join(logsDir, 'error-%DATE%.log'),
   level: 'error',
-});
+}) : null;
 
 /**
- * Combined log transport - All log levels
+ * Combined log transport - All log levels (only if file logging is enabled)
  */
-const combinedFileTransport = new DailyRotateFile({
+const combinedFileTransport = canWriteLogs ? new DailyRotateFile({
   ...dailyRotateFileConfig,
   filename: path.join(logsDir, 'combined-%DATE%.log'),
-});
+}) : null;
 
 /**
  * Console transport - Development only
@@ -91,8 +119,9 @@ const logger = winston.createLogger({
   format: logFormat,
   defaultMeta: { service: 'water-quality-api' },
   transports: [
-    errorFileTransport,
-    combinedFileTransport,
+    // Add file transports only if file logging is available
+    ...(canWriteLogs && errorFileTransport ? [errorFileTransport] : []),
+    ...(canWriteLogs && combinedFileTransport ? [combinedFileTransport] : []),
     // Console transport only in non-production or when explicitly enabled
     ...(process.env.NODE_ENV !== 'production' || process.env.CONSOLE_LOGS === 'true'
       ? [consoleTransport]
@@ -103,30 +132,34 @@ const logger = winston.createLogger({
 });
 
 /**
- * Handle uncaught exceptions
+ * Handle uncaught exceptions (only if file logging is available)
  */
-logger.exceptions.handle(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'exceptions-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    maxFiles: '14d',
-    zippedArchive: true,
-    format: logFormat,
-  })
-);
+if (canWriteLogs) {
+  logger.exceptions.handle(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'exceptions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxFiles: '14d',
+      zippedArchive: true,
+      format: logFormat,
+    })
+  );
+}
 
 /**
- * Handle unhandled promise rejections
+ * Handle unhandled promise rejections (only if file logging is available)
  */
-logger.rejections.handle(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'rejections-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    maxFiles: '14d',
-    zippedArchive: true,
-    format: logFormat,
-  })
-);
+if (canWriteLogs) {
+  logger.rejections.handle(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'rejections-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxFiles: '14d',
+      zippedArchive: true,
+      format: logFormat,
+    })
+  );
+}
 
 /**
  * Log stream for Morgan HTTP logger
