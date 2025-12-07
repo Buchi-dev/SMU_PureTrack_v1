@@ -302,9 +302,16 @@ export class DeviceService {
   /**
    * Check offline devices
    * Marks devices as offline if lastSeen exceeds threshold
+   * 🔥 FIX: Now broadcasts status changes via WebSocket
    */
   async checkOfflineDevices(): Promise<number> {
     const offlineThreshold = new Date(Date.now() - DEVICE.OFFLINE_THRESHOLD);
+
+    // Find devices that will be marked offline
+    const devicesToMarkOffline = await Device.find({
+      lastSeen: { $lt: offlineThreshold },
+      status: DeviceStatus.ONLINE,
+    });
 
     const result = await Device.updateMany(
       {
@@ -315,6 +322,14 @@ export class DeviceService {
         $set: { status: DeviceStatus.OFFLINE },
       }
     );
+
+    // 🔥 FIX: Broadcast offline status for each device
+    if (result.modifiedCount > 0) {
+      const { websocketService } = await import('@utils/websocket.service');
+      devicesToMarkOffline.forEach((device) => {
+        websocketService.broadcastDeviceStatus(device.deviceId, 'offline', device);
+      });
+    }
 
     return result.modifiedCount;
   }

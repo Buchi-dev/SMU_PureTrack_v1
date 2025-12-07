@@ -28,11 +28,9 @@ const { Text } = Typography;
 
 export const AdminDeviceReadings = () => {
   // ✅ DEVICE LIST: Fetch once on mount, no polling needed
-  const { devices: devicesData, isLoading: devicesLoading, error: devicesError } = useDevices({ 
-    pollInterval: 0, // ❌ NO POLLING - WebSocket provides real-time updates
-  });
+  const { devices: devicesData, isLoading: devicesLoading, error: devicesError } = useDevices(); // 🔥 NO POLLING
   
-  const { alerts, isLoading: alertsLoading, error: alertsError, refetch: refetchAlerts } = useAlerts({ pollInterval: 5000 });
+  const { alerts, isLoading: alertsLoading, error: alertsError, refetch: refetchAlerts } = useAlerts(); // 🔥 NO POLLING
   
   // ✅ REAL-TIME SENSOR DATA: WebSocket connection for instant updates
   const deviceIds = useMemo(() => devicesData.map(d => d.deviceId), [devicesData]);

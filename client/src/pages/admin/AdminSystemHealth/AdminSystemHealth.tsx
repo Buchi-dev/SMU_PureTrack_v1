@@ -15,7 +15,7 @@
  */
 
 import { memo, useMemo } from 'react';
-import { Card, Row, Col, Statistic, Badge, Button, Space, Typography, Alert, Spin } from 'antd';
+import { Card, Row, Col, Statistic, Badge, Space, Typography, Alert, Spin } from 'antd';
 import {
   ApiOutlined,
   DatabaseOutlined,
@@ -126,10 +126,8 @@ HealthCard.displayName = 'HealthCard';
  * Main Component
  */
 export const AdminSystemHealth = memo(() => {
-  // Fetch health metrics with 30-second auto-refresh
-  const { health, isLoading } = useHealth({
-    refreshInterval: 30000,
-  });
+  // Fetch health metrics via WebSocket (10s server broadcast)
+  const { health, isLoading } = useHealth(); // 🔥 NO POLLING - WebSocket broadcasts system:health every 10s
   
   // Error state - derive from health data
   const error = !health && !isLoading ? new Error('Failed to load health data') : null;
@@ -161,20 +159,16 @@ export const AdminSystemHealth = memo(() => {
         <PageHeader
           title="System Health Monitor"
           icon={<ThunderboltOutlined />}
-          extra={
-            <Space>
-              <Text type="secondary">
-                Last updated: {lastUpdatedText}
-              </Text>
-              <Button
-                icon={<ReloadOutlined spin={isLoading} />}
-                onClick={handleRefresh}
-                loading={isLoading}
-              >
-                Refresh
-              </Button>
-            </Space>
-          }
+          description={`Real-time system health monitoring • Last updated: ${lastUpdatedText}`}
+          actions={[
+            {
+              key: 'refresh',
+              label: 'Refresh',
+              icon: <ReloadOutlined spin={isLoading} />,
+              onClick: handleRefresh,
+              loading: isLoading,
+            },
+          ]}
         />
 
         {/* Error Alert */}

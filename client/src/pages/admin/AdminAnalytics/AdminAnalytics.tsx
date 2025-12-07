@@ -48,29 +48,29 @@ import {
 const { Content } = Layout;
 
 export const AdminAnalytics = memo(() => {
-  // ✅ GLOBAL READ HOOKS - Real-time data from service layer
+  // ✅ GLOBAL READ HOOKS - Real-time data via WebSocket
   const {
     devices,
     isLoading: devicesLoading,
     refetch: refetchDevices,
-  } = useDevices({ pollInterval: 15000 });
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time device updates
 
   const {
     alerts,
     isLoading: alertsLoading,
     refetch: refetchAlerts,
-  } = useAlerts({ pollInterval: 5000 });
+  } = useAlerts(); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved
 
   const {
     health: systemHealthData,
     isLoading: healthLoading,
-  } = useHealth({ refreshInterval: 30000 });
+  } = useHealth(); // 🔥 NO POLLING - WebSocket broadcasts system:health every 10s
 
   const {
     summary: analyticsSummary,
     isLoading: summaryLoading,
     refetch: refetchSummary,
-  } = useAnalyticsSummary({ pollInterval: 60000 });
+  } = useAnalyticsSummary(); // 🔥 NO POLLING - WebSocket broadcasts analytics:update every 45s
 
   // Enrich devices with required properties for analytics
   const enrichedDevices = useMemo<DeviceWithReadings[]>(() => {

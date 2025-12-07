@@ -3,6 +3,8 @@
  * TypeScript interfaces for backup management
  */
 
+import { Document, Types } from 'mongoose';
+
 /**
  * Backup metadata stored in backup file
  */
@@ -40,7 +42,7 @@ export enum BackupStatus {
 }
 
 /**
- * Backup record
+ * Backup record stored in MongoDB
  */
 export interface IBackup {
   id: string;
@@ -48,10 +50,26 @@ export interface IBackup {
   type: BackupType;
   status: BackupStatus;
   size: number;
+  fileId: Types.ObjectId;
   metadata: IBackupMetadata;
-  googleDriveFileId?: string;
   createdAt: Date;
   error?: string;
+}
+
+/**
+ * Backup document interface (Mongoose)
+ */
+export interface IBackupDocument extends Document {
+  _id: Types.ObjectId;
+  filename: string;
+  type: BackupType;
+  status: BackupStatus;
+  size: number;
+  fileId: Types.ObjectId;
+  metadata: IBackupMetadata;
+  error?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -77,12 +95,11 @@ export interface IBackupFilters {
 }
 
 /**
- * Google Drive upload result
+ * GridFS upload result for backups
  */
-export interface IGoogleDriveUploadResult {
-  fileId: string;
-  name: string;
+export interface IBackupUploadResult {
+  fileId: Types.ObjectId;
+  filename: string;
   size: number;
-  webViewLink?: string;
-  verified: boolean;
+  uploadedAt: Date;
 }

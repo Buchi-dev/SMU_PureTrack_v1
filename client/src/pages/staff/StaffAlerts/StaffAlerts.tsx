@@ -60,7 +60,7 @@ export const StaffAlerts = () => {
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOKS - Real-time alert data with SWR polling
+  // ✅ GLOBAL HOOKS - Real-time alert data via WebSocket
   // Pass filters to backend for server-side filtering
   const { 
     alerts: filteredAlerts,
@@ -73,7 +73,7 @@ export const StaffAlerts = () => {
       severity: severityFilter !== 'all' ? severityFilter as any : undefined,
       parameter: parameterFilter !== 'all' ? parameterFilter as any : undefined,
     },
-    pollInterval: 30000 // Alert status updates (not sensor data, reduced from 10s)
+    // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved instantly
   });
   
   const { 

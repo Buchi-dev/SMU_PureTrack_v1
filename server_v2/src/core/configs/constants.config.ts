@@ -336,6 +336,7 @@ export const COLLECTIONS = {
   ALERTS: 'alerts',
   REPORTS: 'reports',
   SENSOR_READINGS: 'sensorreadings',
+  BACKUPS: 'backups',
 } as const;
 
 export default {

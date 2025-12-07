@@ -61,10 +61,8 @@ export const StaffReadings = () => {
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 30000 // 30 seconds - device list doesn't need 10s updates
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   // Handle refresh with loading state
   const handleRefresh = async () => {

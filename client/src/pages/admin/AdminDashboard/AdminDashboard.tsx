@@ -40,14 +40,14 @@ export const AdminDashboard = memo(() => {
   const {
     health: systemHealth,
     isLoading: healthLoading,
-  } = useHealth({ refreshInterval: 10000 });
+  } = useHealth(); // 🔥 NO POLLING - WebSocket broadcasts every 10s
 
   const {
     devices,
     isLoading: devicesLoading,
     error: devicesError,
     refetch: devicesRefetch,
-  } = useDevices({ pollInterval: 15000 });
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   const {
     alerts,
@@ -56,8 +56,7 @@ export const AdminDashboard = memo(() => {
     refetch: alertsRefetch,
   } = useAlerts({ 
     filters: { limit: 50 },
-    pollInterval: 10000 
-  });
+  }); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved
 
   // ✅ LOCAL HOOK - UI-specific statistics calculation
   const { deviceStats, alertStats } = useDashboardStats(devices, alerts);

@@ -53,7 +53,7 @@ export const AdminUserManagement: React.FC = () => {
     error: realtimeError,
     refetch 
   } = useUsers({ 
-    pollInterval: 15000,
+    pollInterval: 15000, // ⚠️ User data still polls (not critical real-time data)
     enabled: !authLoading && !!userProfile, // Only fetch when auth is ready
   });
 

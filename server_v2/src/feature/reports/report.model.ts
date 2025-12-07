@@ -95,7 +95,6 @@ const reportSchema = new Schema<IReportDocument>(
     expiresAt: {
       type: Date,
       required: false,
-      index: true,
     },
   },
   {

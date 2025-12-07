@@ -38,10 +38,8 @@ const { Text } = Typography;
 export const StaffAnalytics = () => {
   const token = useThemeToken();
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 30000 // Poll every 30 seconds for analytics
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   const handleRefresh = async () => {
     await refetch();

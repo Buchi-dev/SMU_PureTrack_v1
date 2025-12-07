@@ -60,10 +60,8 @@ export const StaffDevices = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 30000 // 30 seconds - use SWR_CONFIG.REFRESH_INTERVAL.FREQUENT for device lists
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   // Handle refresh with loading state
   const handleRefresh = async () => {

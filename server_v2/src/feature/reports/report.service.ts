@@ -160,8 +160,6 @@ export class ReportService {
       format: ReportFormat;
       size: number;
       mimeType: string;
-      googleDriveFileId?: string;
-      googleDriveWebViewLink?: string;
     }
   ): Promise<IReportDocument> {
     const report = await Report.findByIdAndUpdate(
@@ -185,7 +183,7 @@ export class ReportService {
 
   /**
    * Delete report
-   * Also deletes associated file from GridFS and Google Drive
+   * Also deletes associated file from GridFS
    */
   async deleteReport(reportId: string): Promise<void> {
     // Get report to check for file
@@ -195,18 +193,6 @@ export class ReportService {
     if (report.file?.fileId) {
       const { gridfsService } = await import('@utils');
       await gridfsService.deleteFile(report.file.fileId);
-    }
-
-    // Delete file from Google Drive if exists
-    if (report.file?.googleDriveFileId) {
-      try {
-        const { googleDriveService } = await import('@utils');
-        await googleDriveService.deleteFile(report.file.googleDriveFileId);
-        logger.info(`Deleted report from Google Drive: ${report.file.googleDriveFileId}`);
-      } catch (error) {
-        logger.error('Failed to delete report from Google Drive', error);
-        // Don't throw - continue with local deletion
-      }
     }
 
     await Report.findByIdAndDelete(reportId);
@@ -233,23 +219,6 @@ export class ReportService {
       if (fileIds.length > 0) {
         const { gridfsService } = await import('@utils');
         await gridfsService.deleteFiles(fileIds);
-      }
-
-      // Delete files from Google Drive
-      const driveFileIds = expiredReports
-        .filter((report) => report.file?.googleDriveFileId)
-        .map((report) => report.file!.googleDriveFileId!);
-
-      if (driveFileIds.length > 0) {
-        const { googleDriveService } = await import('@utils');
-        for (const driveFileId of driveFileIds) {
-          try {
-            await googleDriveService.deleteFile(driveFileId);
-          } catch (error) {
-            logger.error(`Failed to delete expired report from Google Drive: ${driveFileId}`, error);
-            // Continue with other deletions
-          }
-        }
       }
     }
 
@@ -369,33 +338,13 @@ export class ReportService {
         uploadedAt: new Date(),
       });
 
-      // Upload to Google Drive (using shared PureTrack_Backups folder)
-      // Reports are stored in Manual folder (same as manual backups)
-      // Note: Service accounts need to upload to shared folders, not their own storage
-      const { googleDriveService } = await import('@utils');
-      const folderPath = ['PureTrack_Backups', 'Manual'];
-      const driveResult = await googleDriveService.uploadFile(pdfBuffer, filename, {
-        mimeType: 'application/pdf',
-        folderPath,
-        description: `Report: ${report.title} | Type: ${report.type} | Generated: ${new Date().toISOString()}`,
-      });
-
-      // Log Google Drive upload status
-      if (driveResult) {
-        logger.info(`✅ Report uploaded to Google Drive: ${driveResult.fileId}`);
-      } else {
-        logger.warn('⚠️ Failed to upload report to Google Drive. Report saved locally only.');
-      }
-
-      // Attach file to report (with Google Drive info if available)
+      // Attach file to report
       await this.attachFile(reportId.toString(), {
         fileId: uploadResult.fileId,
         filename: uploadResult.filename,
         format: ReportFormat.PDF,
         size: uploadResult.size,
         mimeType: 'application/pdf',
-        googleDriveFileId: driveResult?.fileId,
-        googleDriveWebViewLink: driveResult?.webViewLink,
       });
     } catch (error) {
       await this.updateReportStatus(

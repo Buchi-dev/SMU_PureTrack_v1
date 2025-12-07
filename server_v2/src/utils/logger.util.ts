@@ -31,17 +31,19 @@ const logFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.printf(({ timestamp, level, message, ...meta }) => {
+  winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
+    // Filter out 'service' and empty fields from metadata
     let metaStr = '';
-    if (Object.keys(meta).length > 0) {
-      // Remove empty fields
-      const cleanMeta = Object.fromEntries(
-        Object.entries(meta).filter(([_, v]) => v !== undefined && v !== null && v !== '')
-      );
-      if (Object.keys(cleanMeta).length > 0) {
-        metaStr = `\n${JSON.stringify(cleanMeta, null, 2)}`;
-      }
+    const cleanMeta = Object.fromEntries(
+      Object.entries(meta).filter(([key, v]) => 
+        key !== 'service' && v !== undefined && v !== null && v !== ''
+      )
+    );
+    
+    if (Object.keys(cleanMeta).length > 0) {
+      metaStr = ` ${JSON.stringify(cleanMeta)}`;
     }
+    
     return `${timestamp} [${level}]: ${message}${metaStr}`;
   })
 );

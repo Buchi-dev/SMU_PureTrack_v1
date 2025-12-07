@@ -86,7 +86,7 @@ export const AdminReports = () => {
   });
 
   // Global hooks
-  const { devices: devicesWithReadings, isLoading: devicesLoading } = useDevices({ pollInterval: 0 });
+  const { devices: devicesWithReadings, isLoading: devicesLoading } = useDevices(); // 🔥 NO POLLING
   const { 
     isLoading: generating,
   } = useReportMutations();

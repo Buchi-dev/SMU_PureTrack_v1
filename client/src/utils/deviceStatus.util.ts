@@ -18,15 +18,17 @@ import { SENSOR_THRESHOLDS } from '../constants/waterQuality.constants';
 /**
  * Device Offline Threshold
  * Time in milliseconds before device is considered offline
- * Matches V2 backend threshold (10 minutes)
+ * MUST MATCH backend threshold (2 minutes)
+ * Backend: DEVICE.OFFLINE_THRESHOLD = 2 * TIME.ONE_MINUTE
  */
-export const DEVICE_OFFLINE_THRESHOLD = 10 * 60 * 1000; // 10 minutes
+export const DEVICE_OFFLINE_THRESHOLD = 2 * 60 * 1000; // 2 minutes
 
 /**
  * Warning threshold for lastSeen
  * Time in milliseconds before device shows warning status
+ * Set to 1 minute - shows warning before offline threshold
  */
-export const DEVICE_WARNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+export const DEVICE_WARNING_THRESHOLD = 1 * 60 * 1000; // 1 minute
 
 /**
  * Device UI Status Type

@@ -95,29 +95,3 @@ export const getBackupStatus = asyncHandler(async (_req: Request, res: Response)
     status: lastBackup ? 'OK' : 'No backups found',
   }, 'Backup status retrieved successfully');
 });
-
-/**
- * Share Google Drive backup folder with user
- * @route POST /api/v1/backups/share-folder
- */
-export const shareBackupFolder = asyncHandler(async (req: Request, res: Response) => {
-  const { email } = req.body;
-
-  if (!email) {
-    throw new Error('Email address is required');
-  }
-
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    throw new Error('Invalid email address format');
-  }
-
-  const result = await backupService.shareBackupFolder(email);
-
-  if (result.success) {
-    ResponseHandler.success(res, result, result.message);
-  } else {
-    throw new Error(result.message);
-  }
-});

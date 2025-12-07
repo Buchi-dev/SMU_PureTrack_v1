@@ -17,9 +17,13 @@
  */
 
 import useSWR, { mutate } from 'swr';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { alertsService, type AlertFilters, type AlertStats } from '../services/alerts.Service';
 import type { WaterQualityAlert } from '../schemas';
+import { io, Socket } from 'socket.io-client';
+import { auth } from '../config/firebase.config';
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -108,6 +112,85 @@ export function useAlerts(options: UseAlertsOptions = {}): UseAlertsReturn {
       keepPreviousData: true, // Keep showing old data while fetching
     }
   );
+
+  // 🔥 WebSocket: Real-time alert updates
+  useEffect(() => {
+    if (!enabled) return;
+
+    let socket: Socket | null = null;
+
+    const setupWebSocket = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          console.log('📡 [useAlerts] No authenticated user, skipping WebSocket setup');
+          return;
+        }
+
+        const token = await currentUser.getIdToken();
+        
+        socket = io(WS_URL, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+        });
+
+        socket.on('connect', () => {
+          console.log('✅ [useAlerts] WebSocket connected', socket?.id);
+          socket?.emit('subscribe:alerts');
+        });
+
+        // Listen for new alerts
+        socket.on('alert:new', (payload: { alert: WaterQualityAlert; timestamp: number }) => {
+          console.log('📡 [useAlerts] New alert received via WebSocket:', payload.alert._id);
+          
+          mutate((currentAlerts) => {
+            if (!currentAlerts || !Array.isArray(currentAlerts)) return [payload.alert];
+            
+            // Check if alert already exists (prevent duplicates)
+            const exists = currentAlerts.some(a => a._id === payload.alert._id);
+            if (exists) return currentAlerts;
+            
+            // Add new alert to the beginning of the list
+            return [payload.alert, ...currentAlerts];
+          }, false); // false = don't revalidate, just update cache
+        });
+
+        // Listen for alert resolutions
+        socket.on('alert:resolved', (payload: { alertId: string; deviceId: string; timestamp: number }) => {
+          console.log('📡 [useAlerts] Alert resolved via WebSocket:', payload.alertId);
+          
+          mutate((currentAlerts) => {
+            if (!currentAlerts || !Array.isArray(currentAlerts)) return currentAlerts;
+            
+            // Remove resolved alert from list
+            return currentAlerts.filter(a => a._id !== payload.alertId);
+          }, false);
+        });
+
+        socket.on('connect_error', (error) => {
+          console.error('❌ [useAlerts] WebSocket connection error:', error);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.log('🔌 [useAlerts] WebSocket disconnected:', reason);
+        });
+
+      } catch (error) {
+        console.error('❌ [useAlerts] WebSocket setup error:', error);
+      }
+    };
+
+    setupWebSocket();
+
+    return () => {
+      if (socket) {
+        console.log('🔌 [useAlerts] Disconnecting WebSocket');
+        socket.emit('unsubscribe:alerts');
+        socket.disconnect();
+      }
+    };
+  }, [enabled, mutate]);
 
   const refetch = useCallback(async () => {
     await mutate();

@@ -22,13 +22,14 @@ import { websocketService } from '@utils/websocket.service';
  * MQTT Topics
  * FIXED: Removed 'water-quality/' prefix to match Arduino device topics
  * Device publishes to: devices/{deviceId}/data, devices/{deviceId}/register, devices/{deviceId}/presence
- * FIXED: Added LWT status topic for offline detection
+ * FIXED: Added presence/response for server polling (who_is_online responses)
  */
 const TOPICS = {
   SENSOR_DATA: 'devices/+/data',
   DEVICE_REGISTRATION: 'devices/+/register',
   DEVICE_PRESENCE: 'devices/+/presence',
   DEVICE_STATUS: 'devices/+/status', // LWT - Last Will Testament
+  PRESENCE_RESPONSE: 'presence/response', // Devices respond to who_is_online query
   DEVICE_COMMANDS: (deviceId: string) => `devices/${deviceId}/commands`,
 } as const;
 
@@ -70,14 +71,35 @@ class MQTTService {
 
     this.client = mqtt.connect(mqttConfig.brokerUrl, options);
 
-    this.client.on('connect', () => {
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.reconnectDelay = RECONNECT_CONFIG.INITIAL_DELAY;
-      logger.info('✅ MQTT: Connected to HiveMQ Cloud');
-      this.subscribeToTopics();
+    // Wait for connection to be established
+    await new Promise<void>((resolve, reject) => {
+      if (!this.client) {
+        reject(new Error('MQTT client initialization failed'));
+        return;
+      }
+
+      const connectionTimeout = setTimeout(() => {
+        reject(new Error('MQTT connection timeout after 30 seconds'));
+      }, 30000);
+
+      this.client.once('connect', () => {
+        clearTimeout(connectionTimeout);
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+        this.reconnectDelay = RECONNECT_CONFIG.INITIAL_DELAY;
+        logger.info('✅ MQTT: Connected to HiveMQ Cloud');
+        this.subscribeToTopics();
+        resolve();
+      });
+
+      this.client.once('error', (error) => {
+        clearTimeout(connectionTimeout);
+        logger.error('❌ MQTT Connection Error', { error: error.message, stack: error.stack });
+        reject(error);
+      });
     });
 
+    // Set up persistent event handlers after initial connection
     this.client.on('error', (error) => {
       logger.error('❌ MQTT Error', { error: error.message, stack: error.stack });
       this.isConnected = false;
@@ -107,8 +129,9 @@ class MQTTService {
     const topics = [
       TOPICS.SENSOR_DATA,
       TOPICS.DEVICE_REGISTRATION,
-      TOPICS.DEVICE_PRESENCE, // For "who_is_online" responses only
-      // REMOVED: TOPICS.DEVICE_STATUS (No LWT - using server polling)
+      TOPICS.DEVICE_PRESENCE, // For individual device presence announcements
+      TOPICS.PRESENCE_RESPONSE, // For "who_is_online" query responses (CRITICAL for heartbeat)
+
     ];
 
     topics.forEach((topic) => {
@@ -126,8 +149,6 @@ class MQTTService {
    * Handle incoming MQTT messages
    */
   private async handleMessage(topic: string, payload: Buffer): Promise<void> {
-    const deviceId = this.extractDeviceId(topic);
-    
     try {
       // Convert buffer to string first
       const payloadString = payload.toString();
@@ -135,6 +156,19 @@ class MQTTService {
       // Try to parse JSON
       const message = JSON.parse(payloadString);
 
+      // Special handling for presence/response (no deviceId in topic)
+      if (topic === 'presence/response') {
+        const deviceId = message.deviceId;
+        if (deviceId) {
+          await this.handleDevicePresence(deviceId, message);
+        } else {
+          logger.error('❌ MQTT: presence/response missing deviceId', { message });
+        }
+        return;
+      }
+
+      // Extract deviceId from topic for device-specific topics
+      const deviceId = this.extractDeviceId(topic);
       if (!deviceId) {
         logger.error('❌ MQTT: Invalid topic format', { topic });
         return;
@@ -155,7 +189,6 @@ class MQTTService {
       logger.error('❌ MQTT: Message handling error', { 
         error: error.message, 
         topic,
-        deviceId,
         payloadLength: payload.length,
         payloadPreview,
         stack: error.stack 
@@ -319,9 +352,12 @@ class MQTTService {
   private async handleDevicePresence(deviceId: string, data: any): Promise<void> {
     try {
       // Update device status to ONLINE and lastSeen timestamp
-      await deviceService.updateDeviceStatus(deviceId, DeviceStatus.ONLINE);
+      const updatedDevice = await deviceService.updateDeviceStatus(deviceId, DeviceStatus.ONLINE);
       await deviceService.updateHeartbeat(deviceId);
-      logger.info(`� MQTT: Device ${deviceId} is ONLINE (presence confirmed)`);
+      logger.info(`💚 MQTT: Device ${deviceId} is ONLINE (presence confirmed)`);
+      
+      // 🔥 FIX: Broadcast device status change to WebSocket clients
+      websocketService.broadcastDeviceStatus(deviceId, 'online', updatedDevice);
     } catch (error: any) {
       // Auto-register device if not found
       if (error.message === 'Device not found' || error.message?.includes('not found')) {
@@ -336,8 +372,11 @@ class MQTTService {
           logger.info(`✅ MQTT: Auto-registered device ${deviceId} from presence`);
           
           // Retry presence update after registration
-          await deviceService.updateDeviceStatus(deviceId, DeviceStatus.ONLINE);
+          const updatedDevice = await deviceService.updateDeviceStatus(deviceId, DeviceStatus.ONLINE);
           await deviceService.updateHeartbeat(deviceId);
+          
+          // 🔥 FIX: Broadcast device status change after auto-registration
+          websocketService.broadcastDeviceStatus(deviceId, 'online', updatedDevice);
         } catch (regError: any) {
           logger.error(`❌ MQTT: Failed to auto-register device ${deviceId}`, { error: regError.message, stack: regError.stack });
         }

@@ -1,6 +1,6 @@
 /**
  * GridFS Service
- * MongoDB GridFS file storage for PDF reports
+ * MongoDB GridFS file storage for PDF reports and backups
  * Provides upload, download, delete, and metadata operations
  */
 
@@ -15,9 +15,11 @@ import logger from '@utils/logger.util';
 interface IFileMetadata {
   filename: string;
   contentType: string;
-  reportId: string;
-  reportType: string;
+  reportId?: string;
+  reportType?: string;
+  backupType?: string;
   uploadedAt: Date;
+  [key: string]: any;
 }
 
 /**
@@ -35,11 +37,12 @@ interface IUploadResult {
  * Singleton pattern for consistent file storage operations
  */
 class GridFSService {
-  private bucket: GridFSBucket | null = null;
+  private reportsBucket: GridFSBucket | null = null;
+  private backupsBucket: GridFSBucket | null = null;
   private db: Db | null = null;
 
   /**
-   * Initialize GridFS bucket
+   * Initialize GridFS buckets
    * Called during app startup
    */
   async initialize(): Promise<void> {
@@ -53,11 +56,17 @@ class GridFSService {
         throw new Error('Database connection is null');
       }
       
-      this.bucket = new GridFSBucket(this.db, {
+      // Create reports bucket
+      this.reportsBucket = new GridFSBucket(this.db, {
         bucketName: 'reports', // Collection name prefix: reports.files, reports.chunks
       });
 
-      logger.info('✅ GridFS Service: Initialized successfully');
+      // Create backups bucket
+      this.backupsBucket = new GridFSBucket(this.db, {
+        bucketName: 'backups', // Collection name prefix: backups.files, backups.chunks
+      });
+
+      logger.info('✅ GridFS Service: Initialized successfully (reports & backups buckets)');
     } catch (error) {
       logger.error('❌ GridFS Service: Initialization failed:', error);
       throw error;
@@ -65,29 +74,35 @@ class GridFSService {
   }
 
   /**
+   * Get the appropriate bucket based on type
+   */
+  private getBucketByType(bucketType: 'reports' | 'backups' = 'reports'): GridFSBucket {
+    const bucket = bucketType === 'backups' ? this.backupsBucket : this.reportsBucket;
+    if (!bucket) {
+      throw new Error(`GridFS ${bucketType} bucket not initialized. Call initialize() first.`);
+    }
+    return bucket;
+  }
+
+  /**
    * Upload file to GridFS
    * @param buffer - File buffer
    * @param filename - File name
    * @param metadata - File metadata
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns Upload result with fileId
    */
   async uploadFile(
     buffer: Buffer,
     filename: string,
-    metadata: IFileMetadata
+    metadata: IFileMetadata,
+    bucketType: 'reports' | 'backups' = 'reports'
   ): Promise<IUploadResult> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
-    }
+    const bucket = this.getBucketByType(bucketType);
 
     return new Promise((resolve, reject) => {
-      const uploadStream = this.bucket!.openUploadStream(filename, {
-        metadata: {
-          contentType: metadata.contentType,
-          reportId: metadata.reportId,
-          reportType: metadata.reportType,
-          uploadedAt: metadata.uploadedAt,
-        },
+      const uploadStream = bucket.openUploadStream(filename, {
+        metadata: metadata,
       });
 
       // Convert buffer to readable stream
@@ -95,7 +110,7 @@ class GridFSService {
 
       uploadStream.on('finish', () => {
         logger.info(
-          `✅ GridFS Service: Uploaded file ${filename} (${uploadStream.id}) - ${(buffer.length / 1024).toFixed(2)} KB`
+          `✅ GridFS Service: Uploaded ${bucketType} file ${filename} (${uploadStream.id}) - ${(buffer.length / 1024).toFixed(2)} KB`
         );
 
         resolve({
@@ -119,27 +134,26 @@ class GridFSService {
   /**
    * Download file from GridFS as stream
    * @param fileId - MongoDB ObjectId of the file
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns Readable stream
    */
-  downloadFile(fileId: ObjectId | string): Readable {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
-    }
-
+  downloadFile(fileId: ObjectId | string, bucketType: 'reports' | 'backups' = 'reports'): Readable {
+    const bucket = this.getBucketByType(bucketType);
     const objectId = typeof fileId === 'string' ? new ObjectId(fileId) : fileId;
 
-    logger.info(`📥 GridFS Service: Downloading file ${objectId}`);
+    logger.info(`📥 GridFS Service: Downloading ${bucketType} file ${objectId}`);
 
-    return this.bucket.openDownloadStream(objectId);
+    return bucket.openDownloadStream(objectId);
   }
 
   /**
    * Download file from GridFS as buffer
    * @param fileId - MongoDB ObjectId of the file
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns Buffer containing file data
    */
-  async downloadFileAsBuffer(fileId: ObjectId | string): Promise<Buffer> {
-    const stream = this.downloadFile(fileId);
+  async downloadFileAsBuffer(fileId: ObjectId | string, bucketType: 'reports' | 'backups' = 'reports'): Promise<Buffer> {
+    const stream = this.downloadFile(fileId, bucketType);
 
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
@@ -150,7 +164,7 @@ class GridFSService {
 
       stream.on('end', () => {
         const buffer = Buffer.concat(chunks);
-        logger.info(`✅ GridFS Service: Downloaded file ${fileId} - ${(buffer.length / 1024).toFixed(2)} KB`);
+        logger.info(`✅ GridFS Service: Downloaded ${bucketType} file ${fileId} - ${(buffer.length / 1024).toFixed(2)} KB`);
         resolve(buffer);
       });
 
@@ -164,17 +178,15 @@ class GridFSService {
   /**
    * Delete file from GridFS
    * @param fileId - MongoDB ObjectId of the file
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    */
-  async deleteFile(fileId: ObjectId | string): Promise<void> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
-    }
-
+  async deleteFile(fileId: ObjectId | string, bucketType: 'reports' | 'backups' = 'reports'): Promise<void> {
+    const bucket = this.getBucketByType(bucketType);
     const objectId = typeof fileId === 'string' ? new ObjectId(fileId) : fileId;
 
     try {
-      await this.bucket.delete(objectId);
-      logger.info(`✅ GridFS Service: Deleted file ${objectId}`);
+      await bucket.delete(objectId);
+      logger.info(`✅ GridFS Service: Deleted ${bucketType} file ${objectId}`);
     } catch (error) {
       logger.error(`❌ GridFS Service: Delete failed for ${objectId}:`, error);
       throw error;
@@ -184,32 +196,30 @@ class GridFSService {
   /**
    * Delete multiple files from GridFS
    * @param fileIds - Array of MongoDB ObjectIds
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    */
-  async deleteFiles(fileIds: Array<ObjectId | string>): Promise<void> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
-    }
-
-    const deletePromises = fileIds.map((fileId) => this.deleteFile(fileId));
+  async deleteFiles(fileIds: Array<ObjectId | string>, bucketType: 'reports' | 'backups' = 'reports'): Promise<void> {
+    const deletePromises = fileIds.map((fileId) => this.deleteFile(fileId, bucketType));
     await Promise.all(deletePromises);
 
-    logger.info(`✅ GridFS Service: Deleted ${fileIds.length} files`);
+    logger.info(`✅ GridFS Service: Deleted ${fileIds.length} ${bucketType} files`);
   }
 
   /**
    * Get file metadata from GridFS
    * @param fileId - MongoDB ObjectId of the file
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns File metadata
    */
-  async getFileMetadata(fileId: ObjectId | string): Promise<any> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
+  async getFileMetadata(fileId: ObjectId | string, bucketType: 'reports' | 'backups' = 'reports'): Promise<any> {
+    if (!this.db) {
+      throw new Error('Database connection is null');
     }
 
     const objectId = typeof fileId === 'string' ? new ObjectId(fileId) : fileId;
 
     try {
-      const filesCollection = this.db!.collection('reports.files');
+      const filesCollection = this.db.collection(`${bucketType}.files`);
       const file = await filesCollection.findOne({ _id: objectId });
 
       if (!file) {
@@ -233,17 +243,18 @@ class GridFSService {
   /**
    * Check if file exists in GridFS
    * @param fileId - MongoDB ObjectId of the file
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns True if file exists, false otherwise
    */
-  async fileExists(fileId: ObjectId | string): Promise<boolean> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
+  async fileExists(fileId: ObjectId | string, bucketType: 'reports' | 'backups' = 'reports'): Promise<boolean> {
+    if (!this.db) {
+      throw new Error('Database connection is null');
     }
 
     const objectId = typeof fileId === 'string' ? new ObjectId(fileId) : fileId;
 
     try {
-      const filesCollection = this.db!.collection('reports.files');
+      const filesCollection = this.db.collection(`${bucketType}.files`);
       const file = await filesCollection.findOne({ _id: objectId });
       return file !== null;
     } catch (error) {
@@ -254,15 +265,16 @@ class GridFSService {
 
   /**
    * Get storage statistics
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns Storage stats (total files, total size)
    */
-  async getStorageStats(): Promise<{ totalFiles: number; totalSize: number }> {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
+  async getStorageStats(bucketType: 'reports' | 'backups' = 'reports'): Promise<{ totalFiles: number; totalSize: number }> {
+    if (!this.db) {
+      throw new Error('Database connection is null');
     }
 
     try {
-      const filesCollection = this.db!.collection('reports.files');
+      const filesCollection = this.db.collection(`${bucketType}.files`);
       const stats = await filesCollection
         .aggregate([
           {
@@ -284,20 +296,18 @@ class GridFSService {
         totalSize: stats[0]?.totalSize || 0,
       };
     } catch (error) {
-      logger.error('❌ GridFS Service: Failed to get storage stats:', error);
+      logger.error(`❌ GridFS Service: Failed to get storage stats for ${bucketType}:`, error);
       throw error;
     }
   }
 
   /**
    * Get bucket instance (for advanced operations)
+   * @param bucketType - Type of bucket ('reports' or 'backups')
    * @returns GridFSBucket instance
    */
-  getBucket(): GridFSBucket {
-    if (!this.bucket) {
-      throw new Error('GridFS bucket not initialized. Call initialize() first.');
-    }
-    return this.bucket;
+  getBucket(bucketType: 'reports' | 'backups' = 'reports'): GridFSBucket {
+    return this.getBucketByType(bucketType);
   }
 }
 

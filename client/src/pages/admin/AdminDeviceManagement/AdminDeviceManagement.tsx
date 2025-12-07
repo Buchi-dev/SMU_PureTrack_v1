@@ -35,10 +35,7 @@ export const AdminDeviceManagement = () => {
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // ✅ GLOBAL HOOK - Real-time device data
-  // Use standard polling (15s) even for unregistered tab - registration approvals don't need sub-15s updates
-  const pollInterval = 15000; // 15 seconds for all tabs - reduced from 5s for unregistered
-  
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
   // Don't pass any filters - get ALL devices and filter client-side
   // This ensures we get both registered and unregistered devices
   const {
@@ -46,8 +43,8 @@ export const AdminDeviceManagement = () => {
     isLoading,
     refetch,
   } = useDevices({ 
-    pollInterval,
     filters: {}, // Explicitly pass empty filters to get all devices
+    // 🔥 NO POLLING - WebSocket provides real-time device updates
   });
 
   // ✅ GLOBAL HOOK - Device write operations

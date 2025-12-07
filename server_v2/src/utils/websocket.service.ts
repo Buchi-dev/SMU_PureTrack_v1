@@ -20,6 +20,9 @@ import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import admin from 'firebase-admin';
 import logger from '@utils/logger.util';
+import userService from '@feature/users/user.service';
+import healthService from '@feature/health/health.service';
+import { getAnalyticsSummary } from '@feature/analytics/analytics.service';
 import type { ISensorReadingDocument } from '@feature/sensorReadings/sensorReading.types';
 import type { IDeviceDocument } from '@feature/devices/device.types';
 import type { IAlertDocument } from '@feature/alerts/alert.types';
@@ -47,6 +50,8 @@ export const WS_EVENTS = {
   ALERT_NEW: 'alert:new',
   ALERT_RESOLVED: 'alert:resolved',
   CONNECTION_STATUS: 'connection:status',
+  SYSTEM_HEALTH: 'system:health',
+  ANALYTICS_UPDATE: 'analytics:update',
   ERROR: 'error',
 } as const;
 
@@ -67,6 +72,8 @@ const ROOMS = {
 class WebSocketService {
   private io: SocketIOServer | null = null;
   private connectedClients = new Map<string, AuthenticatedSocket>();
+  private healthBroadcastInterval: NodeJS.Timeout | null = null;
+  private analyticsBroadcastInterval: NodeJS.Timeout | null = null;
 
   /**
    * Initialize WebSocket server
@@ -77,12 +84,14 @@ class WebSocketService {
         origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
         credentials: true,
       },
-      transports: ['websocket', 'polling'], // WebSocket preferred, polling fallback
+      transports: ['websocket'], // WebSocket preferred, polling fallback
       pingTimeout: 60000, // 60 seconds
       pingInterval: 25000, // 25 seconds
     });
 
     this.setupConnectionHandlers();
+    this.startSystemHealthBroadcast();
+    this.startAnalyticsBroadcast();
     logger.info('✅ WebSocket: Server initialized');
   }
 
@@ -155,10 +164,17 @@ class WebSocketService {
       // Verify Firebase JWT token
       const decodedToken = await admin.auth().verifyIdToken(token);
 
-      // Attach user info to socket
+      // Get user from database to fetch the actual role
+      const user = await userService.getUserByFirebaseUid(decodedToken.uid);
+
+      if (!user) {
+        throw new Error('User not found in database');
+      }
+
+      // Attach user info to socket with the role from database
       socket.userId = decodedToken.uid;
-      socket.userEmail = decodedToken.email;
-      socket.userRole = decodedToken.role || 'staff'; // Default to staff if no role claim
+      socket.userEmail = user.email;
+      socket.userRole = user.role; // Get role from database, not Firebase token
 
       logger.info('✅ WebSocket: Authenticated', {
         userId: socket.userId,
@@ -370,6 +386,112 @@ class WebSocketService {
   }
 
   /**
+   * Start system health broadcasting interval
+   * Broadcasts health metrics every 10 seconds to all staff/admin users
+   */
+  private startSystemHealthBroadcast(): void {
+    // Prevent duplicate intervals - only start if not already running
+    if (this.healthBroadcastInterval) {
+      logger.warn('⚠️ WebSocket: System health broadcast already running, skipping initialization');
+      return;
+    }
+
+    // Broadcast immediately on start for better UX
+    this.broadcastSystemHealth();
+
+    // Set up 10-second interval
+    this.healthBroadcastInterval = setInterval(async () => {
+      this.broadcastSystemHealth();
+    }, 10000); // 10 seconds
+
+    logger.info('📊 WebSocket: System health broadcasting started (10s interval)');
+  }
+
+  /**
+   * Broadcast system health metrics via WebSocket
+   * Called by interval - errors are caught to prevent interval death
+   */
+  private async broadcastSystemHealth(): Promise<void> {
+    if (!this.io) return;
+
+    try {
+      // Fetch fresh health metrics
+      const healthData = await healthService.getSystemHealth();
+
+      const payload = {
+        data: healthData,
+        timestamp: Date.now(),
+      };
+
+      // Broadcast to staff and admin rooms only
+      this.io.to(ROOMS.STAFF).emit(WS_EVENTS.SYSTEM_HEALTH, payload);
+      this.io.to(ROOMS.ADMIN).emit(WS_EVENTS.SYSTEM_HEALTH, payload);
+
+      logger.debug('📊 WebSocket: Broadcasted system health metrics');
+    } catch (error: any) {
+      // Log error but don't kill the interval
+      logger.error('❌ WebSocket: System health broadcast failed', {
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+  }
+
+  /**
+   * Start analytics summary broadcasting
+   * Broadcasts every 45 seconds to all staff and admin users
+   */
+  private startAnalyticsBroadcast(): void {
+    if (!this.io) {
+      logger.warn('⚠️ WebSocket: Cannot start analytics broadcast - io is null');
+      return;
+    }
+
+    // Prevent duplicate intervals - only start if not already running
+    if (this.analyticsBroadcastInterval) {
+      logger.warn('⚠️ WebSocket: Analytics broadcast already running, skipping initialization');
+      return;
+    }
+
+    // Set up 45-second interval (less frequent than health)
+    this.analyticsBroadcastInterval = setInterval(async () => {
+      this.broadcastAnalyticsSummary();
+    }, 45000); // 45 seconds
+
+    logger.info('📈 WebSocket: Analytics broadcasting started (45s interval)');
+  }
+
+  /**
+   * Broadcast analytics summary via WebSocket
+   * Called by interval - errors are caught to prevent interval death
+   */
+  private async broadcastAnalyticsSummary(): Promise<void> {
+    if (!this.io) return;
+
+    try {
+      // Fetch analytics summary (last 24 hours by default)
+      const analyticsData = await getAnalyticsSummary();
+
+      const payload = {
+        data: analyticsData,
+        timestamp: Date.now(),
+      };
+
+      // Broadcast to staff and admin rooms only
+      this.io.to(ROOMS.STAFF).emit(WS_EVENTS.ANALYTICS_UPDATE, payload);
+      this.io.to(ROOMS.ADMIN).emit(WS_EVENTS.ANALYTICS_UPDATE, payload);
+
+      logger.debug('📈 WebSocket: Broadcasted analytics summary');
+    } catch (error: any) {
+      // Log error but don't kill the interval
+      logger.error('❌ WebSocket: Analytics broadcast failed', {
+        error: error.message,
+        stack: error.stack,
+      });
+    }
+  }
+
+  /**
    * Get connection statistics
    */
   getStats(): {
@@ -397,6 +519,20 @@ class WebSocketService {
     if (!this.io) return;
 
     logger.info('🔌 WebSocket: Shutting down...');
+
+    // Stop system health broadcasting
+    if (this.healthBroadcastInterval) {
+      clearInterval(this.healthBroadcastInterval);
+      this.healthBroadcastInterval = null;
+      logger.info('📊 WebSocket: System health broadcasting stopped');
+    }
+
+    // Stop analytics broadcasting
+    if (this.analyticsBroadcastInterval) {
+      clearInterval(this.analyticsBroadcastInterval);
+      this.analyticsBroadcastInterval = null;
+      logger.info('📈 WebSocket: Analytics broadcasting stopped');
+    }
 
     // Notify all clients
     this.io.emit(WS_EVENTS.CONNECTION_STATUS, {

@@ -36,6 +36,7 @@ import {
 import { ERROR_MESSAGES, LOG_MESSAGES } from '@core/configs/messages.config';
 import { Types, Document } from 'mongoose';
 import logger from '@utils/logger.util';
+import websocketService from '@utils/websocket.service';
 
 /**
  * Alert Service Class
@@ -302,6 +303,10 @@ export class AlertService {
 
     const newAlert = await this.crud.create(alertData as any);
 
+    // 🔥 Broadcast new alert via WebSocket for real-time notifications
+    websocketService.broadcastNewAlert(newAlert);
+    logger.info(`📡 WebSocket: Broadcasted new ${severity} alert for ${deviceId}`);
+
     // Trigger email notification asynchronously (don't await to avoid blocking)
     this.triggerEmailNotification(newAlert).catch((error) => {
       logger.error(LOG_MESSAGES.EMAIL.SEND_FAILED(error.message));
@@ -529,6 +534,10 @@ export class AlertService {
     if (!updatedAlert) {
       throw new NotFoundError(ERROR_MESSAGES.RESOURCES.NOT_FOUND('Alert', id));
     }
+
+    // 🔥 Broadcast alert resolution via WebSocket
+    websocketService.broadcastAlertResolved(id, updatedAlert.deviceId);
+    logger.info(`📡 WebSocket: Broadcasted alert resolution for ${updatedAlert.deviceId}`);
 
     return updatedAlert;
   }

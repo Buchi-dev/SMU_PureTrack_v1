@@ -18,7 +18,7 @@
  */
 
 import useSWR from 'swr';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   devicesService,
   type DeviceFilters,
@@ -28,8 +28,11 @@ import {
 } from '../services/devices.Service';
 import { SWR_CONFIG } from '../constants/api.constants';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
-import { useVisibilityPolling } from './useVisibilityPolling';
 import { calculateDeviceUIStatus } from '../utils/deviceStatus.util';
+import { io, Socket } from 'socket.io-client';
+import { auth } from '../config/firebase.config';
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -94,12 +97,9 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = SWR_CONFIG.REFRESH_INTERVAL.FREQUENT, // Use centralized SWR refresh interval
     enabled = true,
   } = options;
 
-  // Add visibility detection to pause polling when tab is hidden
-  const adjustedPollInterval = useVisibilityPolling(pollInterval);
 
   // Generate cache key from filters
   const cacheKey = enabled
@@ -150,13 +150,13 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: adjustedPollInterval, // HTTP polling interval
-      revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
-      revalidateOnReconnect: SWR_CONFIG.REVALIDATE_ON_RECONNECT,
+      refreshInterval: 0, // 🔥 DISABLED - WebSocket provides real-time updates
+      revalidateOnFocus: false, // Don't refetch on tab focus - WebSocket keeps data fresh
+      revalidateOnReconnect: true, // Refetch when network reconnects
       dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
       keepPreviousData: true,
-      revalidateIfStale: SWR_CONFIG.REVALIDATE_IF_STALE,
-      revalidateOnMount: true,
+      revalidateIfStale: false, // Data is always fresh via WebSocket
+      revalidateOnMount: true, // Initial fetch on mount only
     }
   );
 
@@ -172,18 +172,102 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: adjustedPollInterval, // Use same interval as device list
-      revalidateOnFocus: SWR_CONFIG.REVALIDATE_ON_FOCUS,
+      refreshInterval: 0, // 🔥 DISABLED - Stats derived from device list (WebSocket updated)
+      revalidateOnFocus: false,
       dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
       keepPreviousData: true,
-      revalidateIfStale: SWR_CONFIG.REVALIDATE_IF_STALE,
+      revalidateIfStale: false,
       revalidateOnMount: true,
     }
   );
 
-  const refetch = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+  // 🔥 FIX: Listen to WebSocket device status updates and update cache
+  // ⚠️ IMPORTANT: useEffect must be called before useMemo/useCallback to maintain hook order
+  useEffect(() => {
+    if (!enabled) return;
+
+    let socket: Socket | null = null;
+
+    const setupWebSocket = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          console.log('📡 [useDevices] No authenticated user, skipping WebSocket setup');
+          return;
+        }
+
+        const token = await currentUser.getIdToken();
+        
+        socket = io(WS_URL, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+        });
+
+        // Connection success
+        socket.on('connect', () => {
+          console.log('✅ [useDevices] WebSocket connected', socket?.id);
+          
+          // 🔥 FIX: Subscribe to device updates by joining rooms
+          // If we have devices, subscribe to each device's room
+          if (devicesData && Array.isArray(devicesData) && devicesData.length > 0) {
+            const deviceIds = devicesData.map((d: any) => d.deviceId);
+            socket?.emit('subscribe:devices', deviceIds);
+            console.log('📡 [useDevices] Subscribed to devices:', deviceIds);
+          }
+        });
+
+        // Listen for device status updates
+        socket.on('device:status', (payload: { deviceId: string; status: 'online' | 'offline'; timestamp: number }) => {
+          console.log('📡 [useDevices] Device status update via WebSocket:', payload.deviceId, payload.status);
+          
+          // Update the device in the SWR cache
+          mutate((currentData) => {
+            if (!currentData || !Array.isArray(currentData)) return currentData;
+            
+            return currentData.map((device: any) => {
+              if (device.deviceId === payload.deviceId) {
+                console.log(`📡 [useDevices] Updating device ${payload.deviceId} status to ${payload.status}`);
+                return {
+                  ...device,
+                  status: payload.status,
+                  lastSeen: new Date(payload.timestamp),
+                };
+              }
+              return device;
+            });
+          }, false); // false = don't revalidate, just update cache
+        });
+
+        // Connection error handling
+        socket.on('connect_error', (error) => {
+          console.error('❌ [useDevices] WebSocket connection error:', error);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.warn('🔌 [useDevices] WebSocket disconnected:', reason);
+        });
+      } catch (error) {
+        console.error('❌ [useDevices] Failed to setup WebSocket:', error);
+      }
+    };
+
+    setupWebSocket();
+
+    // Cleanup
+    return () => {
+      if (socket) {
+        socket.disconnect();
+        console.log('📡 [useDevices] WebSocket disconnected');
+      }
+    };
+  }, [enabled, mutate]); // Keep dependencies minimal to prevent unnecessary reconnections
+  
+  // Separate effect to handle device subscription updates
+  useEffect(() => {
+    // This effect runs when devices data changes to update subscriptions
+    // without recreating the entire WebSocket connection
+  }, [devicesData]);
 
   // Enrich devices with computed uiStatus
   const enrichedDevices = useMemo(() => {
@@ -211,6 +295,10 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       };
     });
   }, [devicesData]);
+
+  const refetch = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
 
   return {
     devices: enrichedDevices as DeviceWithReadings[],

@@ -46,7 +46,7 @@ export const StaffDashboard = () => {
     isLoading: devicesLoading, 
     error: devicesError,
     refetch: refetchDevices 
-  } = useDevices({ pollInterval: 30000 }); // 30 seconds - device status doesn't change that rapidly
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time device updates
   
   const { 
     alerts, 
@@ -55,8 +55,7 @@ export const StaffDashboard = () => {
     refetch: refetchAlerts 
   } = useAlerts({ 
     filters: { limit: 20 }, 
-    pollInterval: 5000 // Poll every 5 seconds for alerts
-  });
+  }); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved instantly
   
   // Local UI state
   const [refreshing, setRefreshing] = useState(false);
