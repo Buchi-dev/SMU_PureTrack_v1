@@ -77,12 +77,6 @@ export interface UserListResponse {
   };
 }
 
-export interface DeleteUserResponse {
-  success: boolean;
-  message: string;
-  userId: string;
-}
-
 export interface UserPreferences {
   email: {
     alerts: boolean;
@@ -223,18 +217,6 @@ export class UserService {
     } catch (error) {
       const message = getErrorMessage(error);
       console.error('[UserService] Reset preferences error:', message);
-      throw new Error(message);
-    }
-  }
-
-  async deleteUser(userId: string): Promise<DeleteUserResponse> {
-    try {
-      const response = await apiClient.delete<DeleteUserResponse>(USER_ENDPOINTS.DELETE(userId));
-      console.log('[UserService] User deleted:', { userId });
-      return response.data;
-    } catch (error) {
-      const message = getErrorMessage(error);
-      console.error('[UserService] Delete user error:', message);
       throw new Error(message);
     }
   }

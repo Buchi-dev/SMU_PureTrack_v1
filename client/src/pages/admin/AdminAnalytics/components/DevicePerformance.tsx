@@ -11,6 +11,7 @@ import { Card, Table, Tag, Progress, Typography, Space } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { memo } from 'react';
 import { useThemeToken } from '../../../../theme';
+import { useTableScroll } from '../../../../hooks';
 import type { DevicePerformanceMetrics } from '../../../../schemas/analytics.schema';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -26,6 +27,7 @@ export const DevicePerformance = memo<DevicePerformanceProps>(({
   loading = false 
 }) => {
   const token = useThemeToken();
+  const tableScroll = useTableScroll({ offsetHeight: 400 });
 
   const getQualityScoreColor = (score: number): string => {
     if (score >= 90) return token.colorSuccess;
@@ -208,7 +210,7 @@ export const DevicePerformance = memo<DevicePerformanceProps>(({
           showSizeChanger: true,
           showTotal: (total) => `Total ${total} devices`,
         }}
-        scroll={{ x: 1200 }}
+        scroll={tableScroll}
       />
     </Card>
   );

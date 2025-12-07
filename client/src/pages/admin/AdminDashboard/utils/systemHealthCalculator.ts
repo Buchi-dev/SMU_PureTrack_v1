@@ -6,6 +6,7 @@
  */
 
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS, ALERT_SEVERITY } from '../../../../constants';
 
 // ============================================================================
 // TYPES
@@ -113,7 +114,7 @@ export const calculateAlertScore = (alert: WaterQualityAlert): { score: number; 
   }
 
   // Acknowledged alerts are partially healthy
-  if (alert.status === 'Acknowledged') {
+  if (alert.status === ALERT_STATUS.ACKNOWLEDGED) {
     return {
       score: ALERT_SCORES.ACKNOWLEDGED,
       reason: 'Acknowledged',
@@ -121,14 +122,14 @@ export const calculateAlertScore = (alert: WaterQualityAlert): { score: number; 
   }
 
   // Active alerts: score based on severity
-  if (alert.status === 'Active') {
+  if (alert.status === ALERT_STATUS.UNACKNOWLEDGED) {
     switch (alert.severity) {
-      case 'Advisory':
+      case ALERT_SEVERITY.ADVISORY:
         return {
           score: ALERT_SCORES.ACTIVE_NORMAL,
           reason: 'Active + Advisory (Normal)',
         };
-      case 'Warning':
+      case ALERT_SEVERITY.WARNING:
         return {
           score: ALERT_SCORES.ACTIVE_WARNING,
           reason: 'Active + Warning',

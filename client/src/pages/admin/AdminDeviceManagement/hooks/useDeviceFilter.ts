@@ -1,19 +1,25 @@
 import { useMemo } from 'react';
-import type { Device } from '../../../../schemas';
+import type { DeviceWithReadings } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 
 interface UseDeviceFilterProps {
-  devices: Device[];
-  activeTab: 'registered' | 'unregistered';
+  devices: DeviceWithReadings[];
+  activeTab: 'registered' | 'unregistered' | 'deleted';
   searchText: string;
+  deletedDevices?: DeviceWithReadings[];
 }
 
-export const useDeviceFilter = ({ devices, activeTab, searchText }: UseDeviceFilterProps) => {
+export const useDeviceFilter = ({ devices, activeTab, searchText, deletedDevices = [] }: UseDeviceFilterProps) => {
   return useMemo(() => {
     const registered = devices.filter((d) => isDeviceRegistered(d));
     const unregistered = devices.filter((d) => !isDeviceRegistered(d));
     
-    const currentDevices = activeTab === 'registered' ? registered : unregistered;
+    const currentDevices = activeTab === 'registered' 
+      ? registered 
+      : activeTab === 'unregistered'
+      ? unregistered
+      : deletedDevices;
+    
     const searchLower = searchText.toLowerCase();
     const filtered = searchText
       ? currentDevices.filter(
@@ -33,10 +39,10 @@ export const useDeviceFilter = ({ devices, activeTab, searchText }: UseDeviceFil
         total: devices.length,
         online: devices.filter((d) => d.status === 'online').length,
         offline: devices.filter((d) => d.status === 'offline').length,
-        maintenance: devices.filter((d) => d.status === 'maintenance').length,
         registered: registered.length,
         unregistered: unregistered.length,
+        deleted: deletedDevices.length,
       },
     };
-  }, [devices, activeTab, searchText]);
+  }, [devices, activeTab, searchText, deletedDevices]);
 };

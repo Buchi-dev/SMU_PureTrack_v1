@@ -21,7 +21,6 @@ import {
   Tooltip,
   Row,
   Col,
-  Statistic,
   Spin,
   Popconfirm
 } from 'antd';
@@ -29,15 +28,16 @@ import {
   FileTextOutlined,
   DownloadOutlined,
   SearchOutlined,
-  CalendarOutlined,
   FilterOutlined,
-  DatabaseOutlined,
   ReloadOutlined,
   DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { reportsService } from '../../../services/reports.Service';
+import { getReportTypeColor, getReportTypeLabel } from '../../../constants';
+import { CompactReportHistoryStats } from './components';
+import { useResponsive } from '../../../hooks/useResponsive';
 
 // Extend dayjs with relativeTime plugin for fromNow() function
 dayjs.extend(relativeTime);
@@ -49,19 +49,45 @@ const { Option } = Select;
 
 interface ReportHistoryItem {
   id: string;
-  reportId: string;
   type: string;
   title: string;
-  createdAt: string;
-  fileSize: number;
-  downloadCount: number;
-  startDate: string;
-  endDate: string;
-  deviceCount: number;
-  downloadUrl: string;
+  description?: string;
+  status: string;
+  format: string;
+  parameters: {
+    deviceIds?: string[];
+    startDate?: string;
+    endDate?: string;
+    [key: string]: any;
+  };
+  file?: {
+    fileId: string;
+    filename: string;
+    format: string;
+    size: number;
+    mimeType: string;
+  };
+  generatedBy: string | {
+    id: string;
+    displayName: string;
+    email: string;
+  };
+  generatedAt?: {
+    seconds: number;
+    nanoseconds: number;
+  };
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
+  updatedAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 const ReportHistory: React.FC = () => {
+  const { isMobile } = useResponsive();
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [reports, setReports] = useState<ReportHistoryItem[]>([]);
@@ -94,18 +120,71 @@ const ReportHistory: React.FC = () => {
         limit: pageSize,
       });
 
-      setReports(response.data);
+      // Ensure each report has an id field (transform _id to id if needed)
+      const normalizedReports = response.data.map((report: any) => ({
+        ...report,
+        id: report.id || report._id,
+      }));
+
+      setReports(normalizedReports);
       setPagination({
         current: page,
         pageSize,
         total: response.pagination.total,
       });
     } catch (error) {
-      console.error('Failed to load report history:', error);
+      if (import.meta.env.DEV) {
+        console.error('Failed to load report history:', error);
+      }
       message.error('Failed to load report history');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to convert Firebase Timestamp to Date
+  const timestampToDate = (timestamp: any): Date => {
+    if (!timestamp) return new Date();
+    
+    // Handle Firebase Timestamp object
+    if (timestamp.seconds !== undefined) {
+      return new Date(timestamp.seconds * 1000);
+    }
+    
+    // Handle ISO string
+    if (typeof timestamp === 'string') {
+      return new Date(timestamp);
+    }
+    
+    // Handle Date object
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    
+    // Handle timestamp in milliseconds
+    if (typeof timestamp === 'number') {
+      return new Date(timestamp);
+    }
+    
+    // Fallback
+    return new Date();
+  };
+
+  // Helper function to get device count from parameters
+  const getDeviceCount = (report: ReportHistoryItem): number => {
+    return report.parameters?.deviceIds?.length || 0;
+  };
+
+  // Helper function to get file size
+  const getFileSize = (report: ReportHistoryItem): number => {
+    return report.file?.size || 0;
+  };
+
+  // Helper function to get date range
+  const getDateRange = (report: ReportHistoryItem): { start: string; end: string } => {
+    const startDate = report.parameters?.startDate || '';
+    const endDate = report.parameters?.endDate || '';
+    return { start: startDate, end: endDate };
   };
 
   // Initial load
@@ -137,15 +216,16 @@ const ReportHistory: React.FC = () => {
     try {
       message.loading({ content: 'Downloading report...', key: 'download', duration: 0 });
       
-      // Extract fileId from downloadUrl or use it directly
-      const fileId = record.downloadUrl.split('/').pop() || record.id;
+      // Use report ID as the file identifier
+      // The backend will look up the file.fileId from the report document
+      const fileId = record.id;
       const blob = await reportsService.downloadReport(fileId);
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `report_${record.reportId}.pdf`;
+      link.download = record.file?.filename || `report_${record.id}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -153,7 +233,9 @@ const ReportHistory: React.FC = () => {
 
       message.success({ content: 'Download completed successfully', key: 'download' });
     } catch (error) {
-      console.error('Download failed:', error);
+      if (import.meta.env.DEV) {
+        console.error('Download failed:', error);
+      }
       message.error({ 
         content: error instanceof Error ? error.message : 'Download failed', 
         key: 'download' 
@@ -185,22 +267,110 @@ const ReportHistory: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  // Table columns - Compact version with merged columns
+  // Mobile columns (3 columns)
+  const mobileColumns = [
+    {
+      title: 'Report',
+      key: 'report',
+      ellipsis: false,
+      render: (record: ReportHistoryItem) => {
+        const dateRange = getDateRange(record);
+        const date = timestampToDate(record.createdAt);
+        const isValidDate = !isNaN(date.getTime());
+        
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <Space size={4} wrap style={{ width: '100%' }}>
+              <Text strong style={{ fontSize: '12px', wordBreak: 'break-word' }}>
+                {record.title}
+              </Text>
+              <Tag color={getReportTypeColor(record.type)} style={{ margin: 0, fontSize: '9px' }}>
+                {getReportTypeLabel(record.type).toUpperCase()}
+              </Tag>
+            </Space>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {dateRange.start ? dayjs(dateRange.start).format('MMM D') : 'N/A'} - {dateRange.end ? dayjs(dateRange.end).format('MMM D, YYYY') : 'N/A'}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {getDeviceCount(record)} devices • {formatFileSize(getFileSize(record))}
+            </Text>
+            {isValidDate && (
+              <Text type="secondary" style={{ fontSize: '10px' }}>
+                {dayjs(date).format('MMM D, h:mm A')}
+              </Text>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 50,
+      align: 'center' as const,
+      render: () => (
+        <Tooltip title="Ready to download">
+          <FileTextOutlined style={{ fontSize: '24px', color: '#1890ff' }} />
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 80,
+      align: 'center' as const,
+      render: (record: ReportHistoryItem) => (
+        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <Button
+            type="primary"
+            size="small"
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownload(record)}
+            block
+            style={{ fontSize: '11px', height: '32px' }}
+          >
+            Download
+          </Button>
+          {record.file?.fileId && (
+            <Popconfirm
+              title="Delete Report"
+              description="Are you sure you want to delete this report?"
+              onConfirm={() => handleDelete(record)}
+              okText="Delete"
+              cancelText="Cancel"
+            >
+              <Button
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                block
+                style={{ fontSize: '11px', height: '28px' }}
+              >
+                Delete
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  // Table columns - Compact version with fixed widths for consistency
   const columns = [
     {
       title: 'Report',
       key: 'report',
-      width: '35%',
+      width: 300,
       render: (record: ReportHistoryItem) => (
         <Space direction="vertical" size={2}>
           <Space size={8}>
             <Text strong>{record.title}</Text>
-            <Tag color={record.type === 'water-quality' ? 'blue' : 'green'} style={{ margin: 0 }}>
-              {record.type.replace('-', ' ').toUpperCase()}
+            <Tag color={getReportTypeColor(record.type)} style={{ margin: 0 }}>
+              {getReportTypeLabel(record.type).toUpperCase()}
             </Tag>
           </Space>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            ID: {record.reportId}
+            ID: {record.id}
           </Text>
         </Space>
       ),
@@ -208,60 +378,91 @@ const ReportHistory: React.FC = () => {
     {
       title: 'Date Range',
       key: 'dateRange',
-      width: '25%',
-      render: (record: ReportHistoryItem) => (
-        <Space direction="vertical" size={2}>
-          <Text style={{ fontSize: '13px' }}>
-            {dayjs(record.startDate).format('MMM DD, YYYY')}
-          </Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
-            to {dayjs(record.endDate).format('Dec 01, 2025')}
-          </Text>
-        </Space>
-      ),
+      width: 200,
+      render: (record: ReportHistoryItem) => {
+        const dateRange = getDateRange(record);
+        return (
+          <Space direction="vertical" size={2}>
+            <Text style={{ fontSize: '13px' }}>
+              {dateRange.start ? dayjs(dateRange.start).format('MMM DD, YYYY') : 'N/A'}
+            </Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              to {dateRange.end ? dayjs(dateRange.end).format('MMM DD, YYYY') : 'N/A'}
+            </Text>
+          </Space>
+        );
+      },
     },
     {
       title: 'Devices',
-      dataIndex: 'deviceCount',
       key: 'deviceCount',
-      width: '10%',
+      width: 100,
       align: 'center' as const,
-      render: (count: number) => (
-        <Text strong style={{ fontSize: '14px' }}>
-          {count} <Text type="secondary" style={{ fontSize: '12px' }}>devices</Text>
-        </Text>
-      ),
+      render: (record: ReportHistoryItem) => {
+        const count = getDeviceCount(record);
+        return (
+          <Text strong style={{ fontSize: '14px' }}>
+            {count} <Text type="secondary" style={{ fontSize: '12px' }}>devices</Text>
+          </Text>
+        );
+      },
     },
     {
       title: 'Size',
-      dataIndex: 'fileSize',
       key: 'fileSize',
-      width: '10%',
+      width: 100,
       align: 'center' as const,
-      render: (size: number) => <Text style={{ fontSize: '13px' }}>{formatFileSize(size)}</Text>,
+      render: (record: ReportHistoryItem) => {
+        const size = getFileSize(record);
+        return <Text style={{ fontSize: '13px' }}>{formatFileSize(size)}</Text>;
+      },
     },
     {
       title: 'Downloads',
-      dataIndex: 'downloadCount',
       key: 'downloadCount',
-      width: '8%',
+      width: 100,
       align: 'center' as const,
-      render: (count: number) => (
-        <Tag color={count > 0 ? 'green' : 'default'} style={{ margin: 0 }}>
-          {count || 0}
+      render: () => (
+        <Tag color="default" style={{ margin: 0 }}>
+          N/A
         </Tag>
       ),
     },
     {
+      title: 'Generated By',
+      key: 'generatedBy',
+      width: '150px',
+      render: (record: ReportHistoryItem) => {
+        if (typeof record.generatedBy === 'object' && record.generatedBy.displayName) {
+          return (
+            <Tooltip title={record.generatedBy.email}>
+              <Text style={{ fontSize: '13px' }}>{record.generatedBy.displayName}</Text>
+            </Tooltip>
+          );
+        }
+        return <Text type="secondary" style={{ fontSize: '13px' }}>N/A</Text>;
+      },
+    },
+    {
       title: 'Generated',
-      dataIndex: 'createdAt',
       key: 'createdAt',
-      width: '12%',
-      render: (date: string) => (
-        <Tooltip title={dayjs(date).format('YYYY-MM-DD HH:mm:ss')}>
-          <Text style={{ fontSize: '13px' }}>{dayjs(date).fromNow()}</Text>
-        </Tooltip>
-      ),
+      width: '150px',
+      render: (record: ReportHistoryItem) => {
+        const date = timestampToDate(record.createdAt);
+        const isValidDate = !isNaN(date.getTime());
+        
+        if (!isValidDate) {
+          return <Text type="secondary" style={{ fontSize: '13px' }}>N/A</Text>;
+        }
+        
+        return (
+          <Tooltip title={dayjs(date).format('MMMM D, YYYY [at] h:mm:ss A')}>
+            <Text style={{ fontSize: '13px' }}>{dayjs(date).format('MMM D, YYYY')}</Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: '11px' }}>{dayjs(date).format('h:mm A')}</Text>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Actions',
@@ -275,6 +476,7 @@ const ReportHistory: React.FC = () => {
               icon={<DownloadOutlined />}
               onClick={() => handleDownload(record)}
               size="small"
+              disabled={!record.file}
             >
               Download
             </Button>
@@ -328,45 +530,10 @@ const ReportHistory: React.FC = () => {
             </Col>
           </Row>
 
-          {/* Stats */}
-          <Row gutter={16}>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Total Reports"
-                  value={pagination.total}
-                  prefix={<FileTextOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="This Month"
-                  value={reports.filter(r => dayjs(r.createdAt).isAfter(dayjs().startOf('month'))).length}
-                  prefix={<CalendarOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Total Downloads"
-                  value={reports.reduce((sum, r) => sum + (r.downloadCount || 0), 0)}
-                  prefix={<DownloadOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="Storage Used"
-                  value={formatFileSize(reports.reduce((sum, r) => sum + r.fileSize, 0))}
-                  prefix={<DatabaseOutlined />}
-                />
-              </Card>
-            </Col>
-          </Row>
+          {/* Compact Stats */}
+          <div style={{ marginBottom: 16 }}>
+            <CompactReportHistoryStats reports={reports} totalReports={pagination.total} />
+          </div>
 
           {/* Filters */}
           <Card title={<><FilterOutlined /> Filters</>}>
@@ -424,14 +591,18 @@ const ReportHistory: React.FC = () => {
               />
             ) : (
               <Table
-                columns={columns}
+                columns={isMobile ? mobileColumns : columns}
                 dataSource={reports}
                 rowKey="id"
-                size="middle"
+                size={isMobile ? 'small' : 'middle'}
+                bordered={!isMobile}
+                scroll={isMobile ? undefined : { x: 1200 }}
                 pagination={{
                   ...pagination,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
+                  pageSize: isMobile ? 5 : pagination.pageSize,
+                  showSizeChanger: !isMobile,
+                  showQuickJumper: !isMobile,
+                  simple: isMobile,
                   pageSizeOptions: ['10', '20', '50'],
                   showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} reports`,
                   onChange: (page, pageSize) => loadReports(page, pageSize),

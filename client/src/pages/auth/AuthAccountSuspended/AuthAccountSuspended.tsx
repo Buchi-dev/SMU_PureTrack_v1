@@ -32,11 +32,15 @@ export const AuthAccountSuspended = () => {
 
     // Check status and redirect accordingly
     if (!authLoading && user) {
-      console.log("User status:", user.status);
+      if (import.meta.env.DEV) {
+        console.log("User status:", user.status);
+      }
 
       // If status changes to active, redirect to dashboard
       if (user.status === "active") {
-        console.log("User activated! Redirecting to dashboard...");
+        if (import.meta.env.DEV) {
+          console.log("User activated! Redirecting to dashboard...");
+        }
         
         if (user.role === "admin") {
           navigate("/admin/dashboard");
@@ -50,7 +54,9 @@ export const AuthAccountSuspended = () => {
 
       // If status is pending
       if (user.status === "pending") {
-        console.log("Status is pending");
+        if (import.meta.env.DEV) {
+          console.log("Status is pending");
+        }
         // Stay on this page or show different message
       }
     }
@@ -61,7 +67,9 @@ export const AuthAccountSuspended = () => {
     if (!isAuthenticated || !user) return;
 
     const interval = setInterval(async () => {
-      console.log("Checking for status updates...");
+      if (import.meta.env.DEV) {
+        console.log("Checking for status updates...");
+      }
       await refetchUser();
     }, 30000); // 30 seconds
 
@@ -72,7 +80,9 @@ export const AuthAccountSuspended = () => {
     try {
       await authService.logout();
     } catch (error) {
-      console.error("Error signing out:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error signing out:", error);
+      }
     }
   };
 

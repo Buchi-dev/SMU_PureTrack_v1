@@ -19,11 +19,9 @@ import {
   Input,
   Row,
   Col,
-  Tooltip,
 } from 'antd';
 import {
   EditOutlined,
-  DeleteOutlined,
   CheckCircleOutlined,
   StopOutlined,
   SwapOutlined,
@@ -59,7 +57,6 @@ interface UserActionsDrawerProps {
   ) => Promise<void>;
   onQuickStatusChange: (userId: string, status: UserStatus) => Promise<void>;
   onQuickRoleChange: (userId: string, role: UserRole) => Promise<void>;
-  onDelete: (userId: string, userName: string) => Promise<void>;
   loading?: boolean;
 }
 
@@ -114,12 +111,10 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
   onSaveProfile,
   onQuickStatusChange,
   onQuickRoleChange,
-  onDelete,
   loading = false,
 }) => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [form] = Form.useForm<FormValues>();
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [isChangingRole, setIsChangingRole] = useState(false);
   
@@ -140,12 +135,11 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
   useEffect(() => {
     if (!open) {
       setIsEditMode(false);
-      setIsDeleting(false);
       setIsChangingStatus(false);
       setIsChangingRole(false);
       form.resetFields();
     }
-  }, [open]);
+  }, [open, form]);
 
   // Update form when current user changes
   useEffect(() => {
@@ -166,49 +160,6 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
   const userName = [currentUser.firstName, currentUser.middleName, currentUser.lastName]
     .filter(Boolean)
     .join(' ') || 'Unknown User';
-
-  /**
-   * Handle delete user with confirmation
-   */
-  const handleDeleteClick = () => {
-    Modal.confirm({
-      title: 'Delete User Account',
-      icon: <ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />,
-      content: (
-        <div>
-          <p>Are you sure you want to delete this user account?</p>
-          <p><strong>User:</strong> {userName}</p>
-          <p><strong>Email:</strong> {currentUser.email}</p>
-          <p style={{ color: '#ff4d4f', marginTop: 12 }}>
-            ⚠️ <strong>Warning:</strong> This action will:
-          </p>
-          <ul style={{ color: '#666', marginLeft: 20 }}>
-            <li>Delete the user from Firebase Authentication</li>
-            <li>Delete all user data from the database</li>
-            <li>This action cannot be undone</li>
-          </ul>
-        </div>
-      ),
-      okText: 'Delete User',
-      okType: 'danger',
-      cancelText: 'Cancel',
-      onOk: async () => {
-        setIsDeleting(true);
-        try {
-          await onDelete(currentUser.id, userName);
-          // Only close drawer on successful deletion
-          onClose();
-        } catch (error) {
-          const errorMsg = getErrorMessage(error);
-          antMessage.error(errorMsg);
-          console.error('[UserActionsDrawer] Delete failed:', errorMsg);
-          // Keep drawer open on failure
-        } finally {
-          setIsDeleting(false);
-        }
-      },
-    });
-  };
 
   /**
    * Handle edit mode toggle
@@ -842,46 +793,36 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
 
               <Divider style={{ margin: '12px 0' }} />
 
-              {/* Danger Zone - Delete User */}
+              {/* Information Section - Account Safety */}
               <div
                 style={{
                   padding: '20px',
-                  backgroundColor: isOwnProfile ? '#f5f5f5' : '#fff1f0',
+                  backgroundColor: '#e6f7ff',
                   borderRadius: '12px',
-                  border: isOwnProfile ? '1px solid #d9d9d9' : '1px solid #ffccc7',
+                  border: '1px solid #91d5ff',
                 }}
               >
                 <Space direction="vertical" size="middle" style={{ width: '100%' }}>
                   <div>
-                    <Text strong style={{ fontSize: 15, color: isOwnProfile ? '#8c8c8c' : '#cf1322', display: 'block', marginBottom: 4 }}>
-                      <ExclamationCircleOutlined /> Danger Zone
+                    <Text strong style={{ fontSize: 15, color: '#0050b3', display: 'block', marginBottom: 4 }}>
+                      <ExclamationCircleOutlined /> Account Safety Information
                     </Text>
                     <Text type="secondary" style={{ fontSize: 13 }}>
-                      {isOwnProfile 
-                        ? 'You cannot delete your own account for security reasons'
-                        : 'Permanently delete this user account and all associated data'}
+                      User accounts are preserved for security and compliance
                     </Text>
                   </div>
-                  <Tooltip 
-                    title={isOwnProfile ? "You cannot delete your own account. Please contact another administrator." : ""}
-                    placement="top"
-                  >
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      size="large"
-                      block
-                      onClick={handleDeleteClick}
-                      disabled={isOwnProfile || isDeleting || loading}
-                      loading={isDeleting}
-                      style={{
-                        fontWeight: 600,
-                        height: 44,
-                      }}
-                    >
-                      Delete User Account
-                    </Button>
-                  </Tooltip>
+                  <div style={{ fontSize: 13, lineHeight: '1.6' }}>
+                    <p style={{ marginBottom: 8 }}>
+                      Instead of permanently deleting user accounts, you can:
+                    </p>
+                    <ul style={{ marginLeft: 20, marginBottom: 0 }}>
+                      <li><strong>Suspend</strong> - Temporarily disable account access while preserving all user data</li>
+                      <li><strong>Reactivate</strong> - Restore suspended accounts when needed</li>
+                    </ul>
+                    <p style={{ marginTop: 12, marginBottom: 0, color: '#595959' }}>
+                      💡 This approach ensures data integrity and allows for account recovery if needed.
+                    </p>
+                  </div>
                 </Space>
               </div>
             </Space>
@@ -891,3 +832,5 @@ export const UserActionsDrawer: React.FC<UserActionsDrawerProps> = ({
     </Drawer>
   );
 };
+
+export default UserActionsDrawer;

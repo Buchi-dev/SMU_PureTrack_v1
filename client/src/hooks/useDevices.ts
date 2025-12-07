@@ -18,7 +18,7 @@
  */
 
 import useSWR from 'swr';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   devicesService,
   type DeviceFilters,
@@ -26,8 +26,13 @@ import {
   type DeviceStats,
   type UpdateDevicePayload,
 } from '../services/devices.Service';
+import { SWR_CONFIG } from '../constants/api.constants';
 import type { DeviceWithReadings, SensorReading } from '../schemas';
-import { useVisibilityPolling } from './useVisibilityPolling';
+import { calculateDeviceUIStatus } from '../utils/deviceStatus.util';
+import { io, Socket } from 'socket.io-client';
+import { auth } from '../config/firebase.config';
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -70,6 +75,7 @@ export interface UseDeviceReadingsReturn {
 export interface UseDeviceMutationsReturn {
   updateDevice: (deviceId: string, payload: UpdateDevicePayload) => Promise<void>;
   deleteDevice: (deviceId: string) => Promise<void>;
+  recoverDevice: (deviceId: string) => Promise<void>;
   registerDevice: (deviceId: string, building: string, floor: string, notes?: string) => Promise<void>;
   isLoading: boolean;
   error: Error | null;
@@ -91,19 +97,16 @@ export interface UseDeviceMutationsReturn {
 export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
   const {
     filters = {},
-    pollInterval = 30000, // 30 seconds - faster updates for device registration/status changes
     enabled = true,
   } = options;
 
-  // Add visibility detection to pause polling when tab is hidden
-  const adjustedPollInterval = useVisibilityPolling(pollInterval);
 
   // Generate cache key from filters
   const cacheKey = enabled
     ? ['devices', 'list', JSON.stringify(filters)]
     : null;
 
-  // Fetch devices with SWR - NO CACHING for fresh data
+  // Fetch devices with SWR
   const {
     data: devicesData,
     error: devicesError,
@@ -147,13 +150,13 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: adjustedPollInterval, // HTTP polling interval
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
-      keepPreviousData: false, // DISABLED: Don't show stale data
-      revalidateIfStale: true, // Always revalidate stale data
-      revalidateOnMount: true, // Always fetch on mount
+      refreshInterval: 0, // 🔥 DISABLED - WebSocket provides real-time updates
+      revalidateOnFocus: false, // Don't refetch on tab focus - WebSocket keeps data fresh
+      revalidateOnReconnect: true, // Refetch when network reconnects
+      dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
+      keepPreviousData: true,
+      revalidateIfStale: false, // Data is always fresh via WebSocket
+      revalidateOnMount: true, // Initial fetch on mount only
     }
   );
 
@@ -169,21 +172,136 @@ export function useDevices(options: UseDevicesOptions = {}): UseDevicesReturn {
       return response.data;
     },
     {
-      refreshInterval: adjustedPollInterval, // Use same interval as device list
+      refreshInterval: 0, // 🔥 DISABLED - Stats derived from device list (WebSocket updated)
       revalidateOnFocus: false,
-      dedupingInterval: 0, // DISABLED: No deduplication - always fetch fresh data
-      keepPreviousData: false, // DISABLED: Don't show stale data
-      revalidateIfStale: true, // Always revalidate stale data
-      revalidateOnMount: true, // Always fetch on mount
+      dedupingInterval: SWR_CONFIG.DEDUPE_INTERVAL,
+      keepPreviousData: true,
+      revalidateIfStale: false,
+      revalidateOnMount: true,
     }
   );
+
+  // 🔥 FIX: Listen to WebSocket device status updates and update cache
+  // ⚠️ IMPORTANT: useEffect must be called before useMemo/useCallback to maintain hook order
+  useEffect(() => {
+    if (!enabled) return;
+
+    let socket: Socket | null = null;
+
+    const setupWebSocket = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          console.log('📡 [useDevices] No authenticated user, skipping WebSocket setup');
+          return;
+        }
+
+        const token = await currentUser.getIdToken();
+        
+        socket = io(WS_URL, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+        });
+
+        // Connection success
+        socket.on('connect', () => {
+          console.log('✅ [useDevices] WebSocket connected', socket?.id);
+          
+          // 🔥 FIX: Subscribe to device updates by joining rooms
+          // If we have devices, subscribe to each device's room
+          if (devicesData && Array.isArray(devicesData) && devicesData.length > 0) {
+            const deviceIds = devicesData.map((d: any) => d.deviceId);
+            socket?.emit('subscribe:devices', deviceIds);
+            console.log('📡 [useDevices] Subscribed to devices:', deviceIds);
+          }
+        });
+
+        // Listen for device status updates
+        socket.on('device:status', (payload: { deviceId: string; status: 'online' | 'offline'; timestamp: number }) => {
+          console.log('📡 [useDevices] Device status update via WebSocket:', payload.deviceId, payload.status);
+          
+          // Update the device in the SWR cache
+          mutate((currentData) => {
+            if (!currentData || !Array.isArray(currentData)) return currentData;
+            
+            return currentData.map((device: any) => {
+              if (device.deviceId === payload.deviceId) {
+                console.log(`📡 [useDevices] Updating device ${payload.deviceId} status to ${payload.status}`);
+                return {
+                  ...device,
+                  status: payload.status,
+                  lastSeen: new Date(payload.timestamp),
+                };
+              }
+              return device;
+            });
+          }, false); // false = don't revalidate, just update cache
+        });
+
+        // Connection error handling
+        socket.on('connect_error', (error) => {
+          console.error('❌ [useDevices] WebSocket connection error:', error);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.warn('🔌 [useDevices] WebSocket disconnected:', reason);
+        });
+      } catch (error) {
+        console.error('❌ [useDevices] Failed to setup WebSocket:', error);
+      }
+    };
+
+    setupWebSocket();
+
+    // Cleanup
+    return () => {
+      if (socket) {
+        socket.disconnect();
+        console.log('📡 [useDevices] WebSocket disconnected');
+      }
+    };
+  }, [enabled, mutate]); // Keep dependencies minimal to prevent unnecessary reconnections
+  
+  // Separate effect to handle device subscription updates
+  useEffect(() => {
+    // This effect runs when devices data changes to update subscriptions
+    // without recreating the entire WebSocket connection
+  }, [devicesData]);
+
+  // Enrich devices with computed uiStatus
+  const enrichedDevices = useMemo(() => {
+    if (!devicesData || !Array.isArray(devicesData)) return [];
+    
+    return devicesData.map((device) => {
+      // Cast to DeviceWithReadings since API might include latestReading
+      const deviceWithReading = device as DeviceWithReadings;
+      
+      // Calculate UI status using centralized helper
+      const statusResult = calculateDeviceUIStatus({
+        status: device.status,
+        lastSeen: device.lastSeen,
+        deviceId: device.deviceId,
+        latestReading: deviceWithReading.latestReading || null,
+      });
+      
+      return {
+        ...deviceWithReading,
+        uiStatus: statusResult.uiStatus,
+        statusReason: statusResult.statusReason,
+        hasRecentData: statusResult.hasRecentData,
+        hasQualityWarnings: statusResult.hasQualityWarnings,
+        lastSeenMs: statusResult.lastSeenMs,
+      };
+    });
+  }, [devicesData]);
 
   const refetch = useCallback(async () => {
     await mutate();
   }, [mutate]);
 
   return {
-    devices: (devicesData || []) as DeviceWithReadings[],
+    devices: enrichedDevices as DeviceWithReadings[],
     stats: statsData || null,
     isLoading: devicesLoading || statsLoading,
     error: devicesError || statsError || null,
@@ -336,11 +454,99 @@ export function useDeviceMutations(): UseDeviceMutationsReturn {
     []
   );
 
+  const recoverDevice = useCallback(
+    async (deviceId: string) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        await devicesService.recoverDevice(deviceId);
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error('Failed to recover device');
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
   return {
     updateDevice,
     deleteDevice,
     registerDevice,
+    recoverDevice,
     isLoading,
     error,
+  };
+}
+
+/**
+ * useDeletedDevices - Hook for Deleted Devices
+ * 
+ * Fetches soft-deleted devices that can be recovered
+ * 
+ * @param options - Configuration options
+ * @returns Deleted devices list and utilities
+ * 
+ * @example
+ * const { deletedDevices, isLoading, refetch } = useDeletedDevices();
+ */
+export function useDeletedDevices(options: { enabled?: boolean } = {}) {
+  const { enabled = true } = options;
+
+  const {
+    data,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(
+    enabled ? 'deleted-devices' : null,
+    () => devicesService.getDeletedDevices(),
+    {
+      ...SWR_CONFIG,
+      revalidateOnFocus: true,
+      refreshInterval: 0, // Don't auto-refresh deleted devices
+    }
+  );
+
+  const deletedDevices = useMemo(() => {
+    if (!data?.data || !Array.isArray(data.data)) return [];
+    
+    // Map to DeviceWithReadings format with computed uiStatus
+    return data.data.map((device) => {
+      // Cast to DeviceWithReadings
+      const deviceWithReading = device as DeviceWithReadings;
+      
+      // Calculate UI status using centralized helper
+      const statusResult = calculateDeviceUIStatus({
+        status: device.status,
+        lastSeen: device.lastSeen,
+        deviceId: device.deviceId,
+        latestReading: deviceWithReading.latestReading || null,
+      });
+      
+      return {
+        ...deviceWithReading,
+        uiStatus: statusResult.uiStatus,
+        statusReason: statusResult.statusReason,
+        hasRecentData: statusResult.hasRecentData,
+        hasQualityWarnings: statusResult.hasQualityWarnings,
+        lastSeenMs: statusResult.lastSeenMs,
+        sensorReadings: [] as SensorReading[], // No sensor readings for deleted devices
+      };
+    }) as DeviceWithReadings[];
+  }, [data]);
+
+  const refetch = useCallback(async () => {
+    await mutate();
+  }, [mutate]);
+
+  return {
+    deletedDevices,
+    isLoading,
+    error,
+    refetch,
+    mutate,
   };
 }

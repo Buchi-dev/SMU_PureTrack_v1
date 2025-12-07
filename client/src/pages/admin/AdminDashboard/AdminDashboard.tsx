@@ -7,9 +7,10 @@ import { memo, useState } from 'react';
 import { AdminLayout } from "../../../components/layouts";
 import { PageHeader } from "../../../components/PageHeader";
 import { 
-  useSystemHealth,
+  useHealth,
   useDevices, 
-  useAlerts 
+  useAlerts,
+  useResponsive
 } from '../../../hooks';
 import { useDashboardStats } from './hooks';
 import {
@@ -35,21 +36,20 @@ const { Content } = Layout;
 export const AdminDashboard = memo(() => {
   const [activeTab, setActiveTab] = useState('overview');
   const [refreshing, setRefreshing] = useState(false);
+  const { isMobile } = useResponsive();
   
   // ✅ GLOBAL HOOKS - Real-time data from service layer
   const {
     health: systemHealth,
     isLoading: healthLoading,
-    error: healthError,
-    refetch: healthRefetch,
-  } = useSystemHealth({ pollInterval: 10000 });
+  } = useHealth(); // 🔥 NO POLLING - WebSocket broadcasts every 10s
 
   const {
     devices,
     isLoading: devicesLoading,
     error: devicesError,
     refetch: devicesRefetch,
-  } = useDevices({ pollInterval: 15000 });
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   const {
     alerts,
@@ -58,8 +58,7 @@ export const AdminDashboard = memo(() => {
     refetch: alertsRefetch,
   } = useAlerts({ 
     filters: { limit: 50 },
-    pollInterval: 10000 
-  });
+  }); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved
 
   // ✅ LOCAL HOOK - UI-specific statistics calculation
   const { deviceStats, alertStats } = useDashboardStats(devices, alerts);
@@ -71,7 +70,6 @@ export const AdminDashboard = memo(() => {
     setRefreshing(true);
     try {
       await Promise.all([
-        healthRefetch(),
         devicesRefetch(),
         alertsRefetch()
       ]);
@@ -97,15 +95,6 @@ export const AdminDashboard = memo(() => {
       children: (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Error Alerts */}
-          {healthError && (
-            <Alert
-              message="System Health Connection Error"
-              description={healthError.message}
-              type="error"
-              showIcon
-              closable
-            />
-          )}
           {devicesError && (
             <Alert
               message="Device Monitoring Error"
@@ -125,14 +114,22 @@ export const AdminDashboard = memo(() => {
             />
           )}
 
-          {/* PRIORITY 1: Overall System Health + Key Metrics (TOP) */}
-          <OverallHealthCard
-            deviceStats={deviceStats}
-            alertStats={alertStats}
-            alerts={alerts}
-            systemHealth={systemHealth}
-            loading={isLoading}
-          />
+          {/* PRIORITY 1: Overall System Health + Recent Alerts (TOP ROW) */}
+          <Space direction="vertical" size={isMobile ? 'small' : 'middle'} style={{ width: '100%' }}>
+            <OverallHealthCard
+              deviceStats={deviceStats}
+              alertStats={alertStats}
+              alerts={alerts}
+              systemHealth={systemHealth}
+              loading={isLoading}
+            />
+            
+            <RecentAlertsList
+              alerts={alerts}
+              loading={alertsLoading}
+              maxItems={isMobile ? 5 : 10}
+            />
+          </Space>
 
           {/* PRIORITY 2: Quick Stats - Devices & Alerts */}
           <QuickStatsCard
@@ -145,13 +142,6 @@ export const AdminDashboard = memo(() => {
             systemHealth={systemHealth}
             loading={healthLoading}
           />
-
-          {/* PRIORITY 4: Recent Alerts List */}
-          <RecentAlertsList
-            alerts={alerts}
-            loading={alertsLoading}
-            maxItems={10}
-          />
         </Space>
       ),
     },
@@ -159,18 +149,18 @@ export const AdminDashboard = memo(() => {
 
   return (
     <AdminLayout>
-      <Content style={{ padding: '24px' }}>
+      <Content style={{ padding: isMobile ? '12px' : '24px' }}>
         <PageHeader
           title="Dashboard"
           icon={<DashboardOutlined />}
-          description="Monitor system health, device status, and water quality metrics in real-time"
+          description={isMobile ? "" : "Monitor system health, device status, and water quality metrics in real-time"}
           breadcrumbItems={[
             { title: 'Dashboard', icon: <DashboardOutlined /> }
           ]}
           actions={[
             {
               key: 'refresh',
-              label: 'Refresh',
+              label: isMobile ? "" : 'Refresh',
               icon: <ReloadOutlined spin={refreshing} />,
               onClick: handleRefreshAll,
               disabled: refreshing,
@@ -184,8 +174,8 @@ export const AdminDashboard = memo(() => {
           activeKey={activeTab}
           onChange={setActiveTab}
           items={tabItems}
-          size="large"
-          style={{ marginTop: 24 }}
+          size={isMobile ? 'small' : 'large'}
+          style={{ marginTop: isMobile ? 12 : 24 }}
         />
       </Content>
     </AdminLayout>

@@ -28,19 +28,16 @@ const { Text } = Typography;
 import {
   UserOutlined,
   ReloadOutlined,
-  PlusOutlined,
-  BugOutlined,
 } from "@ant-design/icons";
 import { useUsers, useUserMutations } from "../../../hooks";
 import { UsersTable } from "./components/UsersTable";
 import { UserActionsDrawer } from "./components/UserActionsDrawer";
-import { UsersStatistics } from "./components/UsersStatistics";
+import { CompactUsersStatistics } from "./components/CompactUsersStatistics";
 import type { UserListData, UserRole, UserStatus } from "../../../schemas";
 
 import { AdminLayout } from "../../../components/layouts/AdminLayout";
 import { PageHeader } from "../../../components/PageHeader";
 import { useAuth } from "../../../contexts";
-import { diagnoseAndPrint } from "../../../utils/authDiagnostics";
 import { getErrorMessage } from "../../../utils/errorHelpers";
 
 const { Content } = Layout;
@@ -55,7 +52,7 @@ export const AdminUserManagement: React.FC = () => {
     error: realtimeError,
     refetch 
   } = useUsers({ 
-    pollInterval: 15000,
+    pollInterval: 15000, // ⚠️ User data still polls (not critical real-time data)
     enabled: !authLoading && !!userProfile, // Only fetch when auth is ready
   });
 
@@ -64,7 +61,6 @@ export const AdminUserManagement: React.FC = () => {
     updateUserRole,
     updateUserStatus,
     updateUserProfile,
-    deleteUser,
     isLoading: refreshing,
     error: writeError,
   } = useUserMutations();
@@ -169,32 +165,6 @@ export const AdminUserManagement: React.FC = () => {
     }
   };
 
-  // Handle delete user
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    try {
-      await deleteUser(userId);
-      message.success(`User "${userName}" deleted successfully`);
-      await refetch(); // Refetch to update the list
-    } catch (error) {
-      const errorMsg = getErrorMessage(error);
-      message.error(errorMsg);
-      console.error('[AdminUserManagement] Delete user error:', errorMsg);
-      throw error; // Re-throw for drawer to handle
-    }
-  };
-
-  // Handle diagnostic check
-  const handleRunDiagnostics = async () => {
-    message.info('Running authentication diagnostics... Check browser console for results.');
-    const result = await diagnoseAndPrint();
-    
-    if (result.success) {
-      message.success('Authentication is working correctly!');
-    } else {
-      message.error(`Authentication issues found: ${result.diagnostics.summary.issues} issue(s)`);
-    }
-  };
-
   // Handle refresh with loading state
   const handleRefresh = async () => {
     if (isRefreshing) return; // Prevent spam clicks
@@ -238,12 +208,6 @@ export const AdminUserManagement: React.FC = () => {
             { title: 'User Management', icon: <UserOutlined /> }
           ]}
           actions={[
-            ...(import.meta.env.DEV ? [{
-              key: 'debug',
-              label: 'Debug Auth',
-              icon: <BugOutlined />,
-              onClick: () => void handleRunDiagnostics(),
-            }] : []),
             {
               key: 'refresh',
               label: 'Refresh',
@@ -252,14 +216,6 @@ export const AdminUserManagement: React.FC = () => {
               disabled: loading || isRefreshing,
               loading: isRefreshing,
             },
-            {
-              key: 'add',
-              label: 'Add User',
-              icon: <PlusOutlined />,
-              type: 'primary',
-              disabled: true,
-              onClick: () => message.info('Users are created through registration'),
-            }
           ]}
         />
 
@@ -305,15 +261,6 @@ export const AdminUserManagement: React.FC = () => {
                         >
                           Reload Page
                         </Button>
-                        {import.meta.env.DEV && (
-                          <Button 
-                            size="small"
-                            icon={<BugOutlined />}
-                            onClick={handleRunDiagnostics}
-                          >
-                            Debug
-                          </Button>
-                        )}
                       </Space>
                     </>
                   )}
@@ -326,7 +273,7 @@ export const AdminUserManagement: React.FC = () => {
           )}
 
           {/* Statistics Cards */}
-          <UsersStatistics users={users} loading={loading} />
+          <CompactUsersStatistics users={users} loading={loading} />
 
           {/* Users Table */}
           <Card
@@ -357,6 +304,7 @@ export const AdminUserManagement: React.FC = () => {
         </Space>
 
         {/* User Actions Drawer */}
+        {/* User management drawer for viewing and editing user details */}
         <UserActionsDrawer
           open={drawerVisible}
           user={selectedUser}
@@ -365,7 +313,6 @@ export const AdminUserManagement: React.FC = () => {
           onSaveProfile={handleSaveUser}
           onQuickStatusChange={handleQuickStatusChange}
           onQuickRoleChange={handleQuickRoleChange}
-          onDelete={handleDeleteUser}
           loading={refreshing}
         />
       </Content>

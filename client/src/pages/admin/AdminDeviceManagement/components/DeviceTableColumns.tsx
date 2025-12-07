@@ -6,32 +6,39 @@ import {
   EyeOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  WarningOutlined,
-  ToolOutlined,
   WifiOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
+  WarningOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons';
-import type { Device, DeviceStatus } from '../../../../schemas';
+import type { DeviceWithReadings, DeviceStatus, DeviceUIStatus } from '../../../../schemas';
 import { isDeviceRegistered } from '../../../../schemas';
 import type { ReactNode } from 'react';
+import { useResponsive } from '../../../../hooks';
 
 const { Text } = Typography;
 
-// Status color mapping
-const statusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
+// ✅ UI Status color mapping (uses centralized deviceStatus.util uiStatus)
+const uiStatusConfig: Record<DeviceUIStatus, { color: string; icon: ReactNode }> = {
   online: { color: 'success', icon: <CheckCircleOutlined /> },
   offline: { color: 'default', icon: <CloseCircleOutlined /> },
-  error: { color: 'error', icon: <WarningOutlined /> },
-  maintenance: { color: 'warning', icon: <ToolOutlined /> },
+  warning: { color: 'warning', icon: <WarningOutlined /> },
+};
+
+// Legacy status config for devices without uiStatus (fallback only)
+const legacyStatusConfig: Record<DeviceStatus, { color: string; icon: ReactNode }> = {
+  online: { color: 'success', icon: <CheckCircleOutlined /> },
+  offline: { color: 'default', icon: <CloseCircleOutlined /> },
 };
 
 interface UseDeviceColumnsProps {
   activeTab: 'registered' | 'unregistered';
   token: GlobalToken;
-  onView: (device: Device) => void;
-  onDelete: (device: Device) => void;
-  onRegister: (device: Device) => void;
+  onView: (device: DeviceWithReadings) => void;
+  onDelete?: (device: DeviceWithReadings) => void;
+  onRegister: (device: DeviceWithReadings) => void;
+  onRecover?: (device: DeviceWithReadings) => void;
 }
 
 export const useDeviceColumns = ({
@@ -40,9 +47,142 @@ export const useDeviceColumns = ({
   onView,
   onDelete,
   onRegister,
+  onRecover,
 }: UseDeviceColumnsProps) => {
+  const { isMobile } = useResponsive();
+
+  // Mobile-optimized columns (3 columns: Device ID, Status, Actions)
+  const mobileColumns: ColumnsType<DeviceWithReadings> = [
+    {
+      title: 'Device ID',
+      dataIndex: 'deviceId',
+      key: 'deviceId',
+      ellipsis: false,
+      render: (text, record) => (
+        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+          <Text 
+            strong 
+            code 
+            style={{ 
+              fontSize: '13px', 
+              display: 'block',
+              wordBreak: 'break-all',
+              lineHeight: 1.3,
+            }}
+          >
+            {text}
+          </Text>
+          <Text 
+            type="secondary" 
+            style={{ 
+              fontSize: '12px',
+              display: 'block',
+              lineHeight: 1.2,
+            }}
+          >
+            {record.name}
+          </Text>
+        </Space>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'uiStatus',
+      key: 'uiStatus',
+      width: 60,
+      align: 'center',
+      render: (_: unknown, record: DeviceWithReadings) => {
+        const status = record.uiStatus || record.status;
+        const config = record.uiStatus 
+          ? uiStatusConfig[record.uiStatus] 
+          : legacyStatusConfig[record.status];
+        
+        return (
+          <Tooltip title={status.toUpperCase()}>
+            <div
+              style={{
+                fontSize: '24px',
+                color: config.color === 'success' 
+                  ? '#52c41a' 
+                  : config.color === 'warning' 
+                  ? '#faad14' 
+                  : '#d9d9d9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {config.icon}
+            </div>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, record) => {
+        const isUnregistered = !isDeviceRegistered(record);
+
+        return (
+          <Space size={4} direction="vertical">
+            {activeTab === 'unregistered' && isUnregistered ? (
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={() => onRegister(record)}
+                size="small"
+                style={{ width: '100%' }}
+              >
+                Register
+              </Button>
+            ) : onRecover ? (
+              <>
+                <Button
+                  type="default"
+                  icon={<EyeOutlined />}
+                  onClick={() => onView(record)}
+                  size="small"
+                  block
+                />
+                <Button
+                  type="primary"
+                  icon={<RollbackOutlined />}
+                  onClick={() => onRecover(record)}
+                  size="small"
+                  block
+                />
+              </>
+            ) : (
+              <>
+                <Button
+                  type="default"
+                  icon={<EyeOutlined />}
+                  onClick={() => onView(record)}
+                  size="small"
+                  block
+                />
+                {onDelete && (
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => onDelete(record)}
+                    size="small"
+                    block
+                  />
+                )}
+              </>
+            )}
+          </Space>
+        );
+      },
+    },
+  ];
+
   // Table columns for registered devices
-  const registeredColumns: ColumnsType<Device> = [
+  const registeredColumns: ColumnsType<DeviceWithReadings> = [
     {
       title: 'Device ID',
       dataIndex: 'deviceId',
@@ -78,25 +218,35 @@ export const useDeviceColumns = ({
     },
     {
       title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: 'uiStatus',
+      key: 'uiStatus',
       width: 120,
       align: 'center',
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
-        { text: 'Maintenance', value: 'maintenance' },
+        { text: 'Warning', value: 'warning' },
       ],
-      onFilter: (value, record) => record.status === value,
-      render: (status: DeviceStatus) => (
-        <Tag
-          icon={statusConfig[status].icon}
-          color={statusConfig[status].color}
-          style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
-        >
-          {status.toUpperCase()}
-        </Tag>
-      ),
+      onFilter: (value, record) => (record.uiStatus || record.status) === value,
+      render: (_: unknown, record: DeviceWithReadings) => {
+        // Use centralized uiStatus from deviceStatus.util (computed in useDevices)
+        const status = record.uiStatus || record.status; // Fallback to backend status
+        const config = record.uiStatus 
+          ? uiStatusConfig[record.uiStatus] 
+          : legacyStatusConfig[record.status];
+        
+        return (
+          <Tooltip title={record.statusReason || `Device is ${status}`}>
+            <Tag
+              icon={config.icon}
+              color={config.color}
+              style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
+            >
+              {status.toUpperCase()}
+            </Tag>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Registration',
@@ -209,7 +359,8 @@ export const useDeviceColumns = ({
                   Register
                 </Button>
               </Tooltip>
-            ) : (
+            ) : onRecover ? (
+              // Deleted devices - show recover button
               <>
                 <Tooltip title="View Details">
                   <Button
@@ -219,15 +370,40 @@ export const useDeviceColumns = ({
                     size="small"
                   />
                 </Tooltip>
-                <Tooltip title="Delete Device">
+                <Tooltip title="Recover Device">
+                  <Button
+                    type="primary"
+                    icon={<RollbackOutlined />}
+                    onClick={() => onRecover(record)}
+                    size="small"
+                    style={{ fontWeight: 500 }}
+                  >
+                    Recover
+                  </Button>
+                </Tooltip>
+              </>
+            ) : (
+              // Registered devices - show view and delete
+              <>
+                <Tooltip title="View Details">
                   <Button
                     type="default"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => onDelete(record)}
+                    icon={<EyeOutlined />}
+                    onClick={() => onView(record)}
                     size="small"
                   />
                 </Tooltip>
+                {onDelete && (
+                  <Tooltip title="Delete Device">
+                    <Button
+                      type="default"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => onDelete(record)}
+                      size="small"
+                    />
+                  </Tooltip>
+                )}
               </>
             )}
           </Space>
@@ -237,7 +413,7 @@ export const useDeviceColumns = ({
   ];
 
   // Simplified columns for unregistered devices
-  const unregisteredColumns: ColumnsType<Device> = [
+  const unregisteredColumns: ColumnsType<DeviceWithReadings> = [
     {
       title: 'Device ID',
       dataIndex: 'deviceId',
@@ -248,7 +424,7 @@ export const useDeviceColumns = ({
       render: (text) => (
         <Tooltip title={text}>
           <Space size="small">
-            <WarningOutlined style={{ color: token.colorWarning as string, fontSize: '14px' }} />
+            <InfoCircleOutlined style={{ color: token.colorInfo as string, fontSize: '14px' }} />
             <Text strong code style={{ fontSize: '12px' }}>
               {text}
             </Text>
@@ -289,18 +465,20 @@ export const useDeviceColumns = ({
       filters: [
         { text: 'Online', value: 'online' },
         { text: 'Offline', value: 'offline' },
-        { text: 'Maintenance', value: 'maintenance' },
       ],
       onFilter: (value, record) => record.status === value,
-      render: (status: DeviceStatus) => (
-        <Tag
-          icon={statusConfig[status].icon}
-          color={statusConfig[status].color}
-          style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
-        >
-          {status.toUpperCase()}
-        </Tag>
-      ),
+      render: (status: DeviceStatus) => {
+        const config = legacyStatusConfig[status]; // Use legacy config for unregistered devices
+        return (
+          <Tag
+            icon={config.icon}
+            color={config.color}
+            style={{ fontSize: '11px', fontWeight: 500, padding: '4px 8px' }}
+          >
+            {status.toUpperCase()}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Sensors Detected',
@@ -377,6 +555,11 @@ export const useDeviceColumns = ({
       ),
     },
   ];
+
+  // Return mobile columns if on mobile device, otherwise return full columns
+  if (isMobile) {
+    return mobileColumns;
+  }
 
   return activeTab === 'registered' ? registeredColumns : unregisteredColumns;
 };

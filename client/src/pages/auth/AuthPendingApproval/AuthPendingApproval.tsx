@@ -17,6 +17,7 @@ import {
 } from "@ant-design/icons";
 import { useAuth } from "../../../contexts";
 import { authService } from "../../../services/auth.Service";
+import { isValidSMUEmail } from "../../../utils/validation.util";
 
 const { Title, Text } = Typography;
 
@@ -37,18 +38,23 @@ export const AuthPendingApproval = () => {
     // Check status and redirect accordingly
     if (!authLoading && user) {
       // CRITICAL: Domain validation - block personal accounts
-      if (!user.email || !user.email.endsWith('@smu.edu.ph')) {
-        console.error('[PendingApproval] Unauthorized access attempt - personal account detected:', user.email);
+      if (!user.email || !isValidSMUEmail(user.email)) {
+        if (import.meta.env.DEV) {
+          console.error('[PendingApproval] Unauthorized access attempt - personal account detected:', user.email);
+        }
         navigate("/auth/login");
         return;
       }
       
-      console.log("User status:", user.status);
+      if (import.meta.env.DEV) {
+        console.log("User status:", user.status);
+      }
 
       // If status changes to active, redirect to dashboard
       if (user.status === "active") {
-        console.log("User approved! Redirecting to dashboard...");
-        
+        if (import.meta.env.DEV) {
+          console.log("User approved! Redirecting to dashboard...");
+        }
         if (user.role === "admin") {
           navigate("/admin/dashboard");
         } else if (user.role === "staff") {
@@ -61,7 +67,9 @@ export const AuthPendingApproval = () => {
 
       // If status changes to suspended
       if (user.status === "suspended") {
-        console.log("User suspended! Redirecting...");
+        if (import.meta.env.DEV) {
+          console.log("User suspended! Redirecting...");
+        }
         navigate("/auth/account-suspended");
         return;
       }
@@ -86,24 +94,11 @@ export const AuthPendingApproval = () => {
     const currentInterval = intervals[pollCount] || intervals[intervals.length - 1];
     
     const interval = setInterval(async () => {
-      if (isChecking) return; // Prevent concurrent checks
-      
-      setIsChecking(true);
-      console.log(`[PendingApproval] Auto-checking status (attempt ${pollCount + 1}/${maxPolls})...`);
-      
-      try {
-        await refetchUser();
-        setPollCount(prev => prev + 1);
-      } catch (error) {
-        console.error('[PendingApproval] Failed to check status:', error);
-        // Stop polling on error
-        setPollCount(maxPolls);
-      } finally {
-        setIsChecking(false);
+      if (import.meta.env.DEV) {
+        console.log("Checking for status updates...");
       }
-    }, currentInterval);
-
-    console.log(`[PendingApproval] Next auto-check in ${currentInterval / 1000} seconds`);
+      await refetchUser();
+    }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
   }, [isAuthenticated, user, refetchUser, pollCount, isChecking]);
@@ -112,7 +107,9 @@ export const AuthPendingApproval = () => {
     try {
       await authService.logout();
     } catch (error) {
-      console.error("Error signing out:", error);
+      if (import.meta.env.DEV) {
+        console.error("Error signing out:", error);
+      }
     }
   };
 

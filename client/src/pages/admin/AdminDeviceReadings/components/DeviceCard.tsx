@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { memo } from 'react';
 import type { DeviceWithReadings } from '../../../../schemas';
+import { SensorHealthIndicator } from '../../../../components';
 
 const { Text, Title } = Typography;
 
@@ -153,7 +154,7 @@ export const DeviceCard = memo(({ device }: DeviceCardProps) => {
           )}
 
           {/* Readings */}
-          {latestReading && typeof latestReading.ph === 'number' && typeof latestReading.tds === 'number' && typeof latestReading.turbidity === 'number' ? (
+          {latestReading ? (
             <>
               <Row gutter={[8, 12]}>
                 {/* pH Level */}
@@ -173,22 +174,41 @@ export const DeviceCard = memo(({ device }: DeviceCardProps) => {
                       </Text>
                       <Space>
                         <Text strong style={{ fontSize: '16px' }}>
-                          {latestReading.ph.toFixed(2)}
+                          {typeof (latestReading.pH ?? latestReading.ph) === 'number' 
+                            ? (latestReading.pH ?? latestReading.ph)!.toFixed(2) 
+                            : '-'}
                         </Text>
-                        <Tag color={getQualityStatus('ph', latestReading.ph).status}>
-                          {getQualityStatus('ph', latestReading.ph).text}
-                        </Tag>
+                        {typeof (latestReading.pH ?? latestReading.ph) === 'number' && latestReading.pH_valid !== false ? (
+                          <Tag color={getQualityStatus('ph', latestReading.pH ?? latestReading.ph!)!.status}>
+                            {getQualityStatus('ph', latestReading.pH ?? latestReading.ph!)!.text}
+                          </Tag>
+                        ) : (
+                          <SensorHealthIndicator 
+                            sensor="pH" 
+                            value={latestReading.pH ?? latestReading.ph} 
+                            valid={latestReading.pH_valid}
+                            mode="tag"
+                          />
+                        )}
                       </Space>
                     </div>
-                    <Progress
-                      percent={getProgressPercent('ph', latestReading.ph)}
-                      strokeColor={getProgressColor('ph', latestReading.ph)}
-                      showInfo={false}
-                      size="small"
-                    />
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                      Optimal: 6.5 - 8.5
-                    </Text>
+                    {typeof (latestReading.pH ?? latestReading.ph) === 'number' && latestReading.pH_valid !== false ? (
+                      <>
+                        <Progress
+                          percent={getProgressPercent('ph', latestReading.pH ?? latestReading.ph!)}
+                          strokeColor={getProgressColor('ph', latestReading.pH ?? latestReading.ph!)}
+                          showInfo={false}
+                          size="small"
+                        />
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          Optimal: 6.5 - 8.5
+                        </Text>
+                      </>
+                    ) : (
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        Sensor needs attention
+                      </Text>
+                    )}
                   </div>
                 </Col>
 
@@ -209,22 +229,39 @@ export const DeviceCard = memo(({ device }: DeviceCardProps) => {
                       </Text>
                       <Space>
                         <Text strong style={{ fontSize: '16px' }}>
-                          {latestReading.tds.toFixed(0)} ppm
+                          {typeof latestReading.tds === 'number' ? `${latestReading.tds.toFixed(0)} ppm` : '-'}
                         </Text>
-                        <Tag color={getQualityStatus('tds', latestReading.tds).status}>
-                          {getQualityStatus('tds', latestReading.tds).text}
-                        </Tag>
+                        {typeof latestReading.tds === 'number' && latestReading.tds_valid !== false ? (
+                          <Tag color={getQualityStatus('tds', latestReading.tds).status}>
+                            {getQualityStatus('tds', latestReading.tds).text}
+                          </Tag>
+                        ) : (
+                          <SensorHealthIndicator 
+                            sensor="tds" 
+                            value={latestReading.tds} 
+                            valid={latestReading.tds_valid}
+                            mode="tag"
+                          />
+                        )}
                       </Space>
                     </div>
-                    <Progress
-                      percent={getProgressPercent('tds', latestReading.tds)}
-                      strokeColor={getProgressColor('tds', latestReading.tds)}
-                      showInfo={false}
-                      size="small"
-                    />
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                      Optimal: {'<'} 300 ppm
-                    </Text>
+                    {typeof latestReading.tds === 'number' && latestReading.tds_valid !== false ? (
+                      <>
+                        <Progress
+                          percent={getProgressPercent('tds', latestReading.tds)}
+                          strokeColor={getProgressColor('tds', latestReading.tds)}
+                          showInfo={false}
+                          size="small"
+                        />
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          Optimal: {'<'} 300 ppm
+                        </Text>
+                      </>
+                    ) : (
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        Sensor needs attention
+                      </Text>
+                    )}
                   </div>
                 </Col>
 
@@ -245,22 +282,39 @@ export const DeviceCard = memo(({ device }: DeviceCardProps) => {
                       </Text>
                       <Space>
                         <Text strong style={{ fontSize: '16px' }}>
-                          {latestReading.turbidity.toFixed(2)} NTU
+                          {typeof latestReading.turbidity === 'number' ? `${latestReading.turbidity.toFixed(2)} NTU` : '-'}
                         </Text>
-                        <Tag color={getQualityStatus('turbidity', latestReading.turbidity).status}>
-                          {getQualityStatus('turbidity', latestReading.turbidity).text}
-                        </Tag>
+                        {typeof latestReading.turbidity === 'number' && latestReading.turbidity_valid !== false ? (
+                          <Tag color={getQualityStatus('turbidity', latestReading.turbidity).status}>
+                            {getQualityStatus('turbidity', latestReading.turbidity).text}
+                          </Tag>
+                        ) : (
+                          <SensorHealthIndicator 
+                            sensor="turbidity" 
+                            value={latestReading.turbidity} 
+                            valid={latestReading.turbidity_valid}
+                            mode="tag"
+                          />
+                        )}
                       </Space>
                     </div>
-                    <Progress
-                      percent={getProgressPercent('turbidity', latestReading.turbidity)}
-                      strokeColor={getProgressColor('turbidity', latestReading.turbidity)}
-                      showInfo={false}
-                      size="small"
-                    />
-                    <Text type="secondary" style={{ fontSize: '11px' }}>
-                      Optimal: {'<'} 1 NTU
-                    </Text>
+                    {typeof latestReading.turbidity === 'number' && latestReading.turbidity_valid !== false ? (
+                      <>
+                        <Progress
+                          percent={getProgressPercent('turbidity', latestReading.turbidity)}
+                          strokeColor={getProgressColor('turbidity', latestReading.turbidity)}
+                          showInfo={false}
+                          size="small"
+                        />
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          Optimal: {'<'} 1 NTU
+                        </Text>
+                      </>
+                    ) : (
+                      <Text type="secondary" style={{ fontSize: '11px' }}>
+                        Sensor needs attention
+                      </Text>
+                    )}
                   </div>
                 </Col>
               </Row>

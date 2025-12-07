@@ -7,6 +7,10 @@
 
 import { z } from 'zod';
 
+// Note: Analytics uses lowercase parameter names ('ph', 'tds', 'turbidity') for aggregation
+// This differs from alert schemas which use capitalized names ('pH', 'TDS', 'Turbidity')
+// The difference is intentional - analytics aggregates raw sensor data
+
 // ============================================================================
 // ENUMS
 // ============================================================================

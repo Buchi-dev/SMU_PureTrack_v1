@@ -21,7 +21,7 @@ const { Title, Text } = Typography;
 export default function AuthLogin() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isAuthenticated, loading, user, refetchUser } = useAuth();
+  const { isAuthenticated, loading, user, refetchUser, requiresAccountCompletion } = useAuth();
   const { token } = theme.useToken();
   const [error, setError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -33,18 +33,55 @@ export default function AuthLogin() {
       setError('Authentication failed. Please try again.');
     }
 
-    // Redirect if already authenticated - use centralized navigation logic
-    if (!loading && isAuthenticated && user) {
-      console.log('[AuthLogin] User authenticated, redirecting...', user.email);
+    // Add 500ms delay before redirect to prevent jarring instant-redirects
+    const redirectTimer = setTimeout(() => {
+      // If Firebase authenticated but no database record, go to account completion
+      if (!loading && requiresAccountCompletion && !user) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] Account completion required, redirecting...');
+        }
+        navigate('/auth/account-completion');
+        setIsLoggingIn(false);
+        return;
+      }
       
-      // Use centralized navigation helper - single source of truth!
-      const destination = getUserDestination(user);
-      navigate(destination);
-      
-      // Stop loading state after navigation
-      setIsLoggingIn(false);
-    }
-  }, [isAuthenticated, loading, user, navigate, searchParams]);
+      // Redirect if already authenticated
+      if (!loading && isAuthenticated && user) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] User authenticated, redirecting...', user);
+        }
+        
+        // Route based on user role and status
+        if (user.status === 'suspended') {
+          navigate('/auth/account-suspended');
+        } else if (user.status === 'pending') {
+          // Check if profile is complete (has department and phone)
+          if (!user.department || !user.phoneNumber) {
+            // New user without complete profile - go to account completion
+            navigate('/auth/account-completion');
+          } else {
+            // Profile complete - go to pending approval
+            navigate('/auth/pending-approval');
+          }
+        } else if (user.status === 'active') {
+          // Active user - redirect to appropriate dashboard
+          if (user.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (user.role === 'staff') {
+            navigate('/staff/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
+        }
+        
+        // Stop loading state after navigation
+        setIsLoggingIn(false);
+      }
+    }, 500);
+
+    // Cleanup timer on unmount or when dependencies change
+    return () => clearTimeout(redirectTimer);
+  }, [isAuthenticated, loading, user, navigate, searchParams, requiresAccountCompletion]);
 
   /**
    * Handle Google OAuth login
@@ -60,17 +97,83 @@ export default function AuthLogin() {
       
       console.log('[AuthLogin] Login successful:', response.user.email);
       
-      // Simply refetch user and let useEffect handle navigation
-      // This eliminates race conditions and duplicate navigation logic
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] Login successful, user:', response.user);
+      }
+      
+      // Wait for Firebase auth state to be fully established
+      // This ensures subsequent API calls will have auth.currentUser available
+      await new Promise<void>((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+            if (import.meta.env.DEV) {
+              console.log('[AuthLogin] Firebase auth state confirmed for:', firebaseUser.email);
+            }
+            unsubscribe();
+            resolve();
+          }
+        });
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 5000);
+      });
+      
+      // Add a small delay to ensure Firebase is fully ready
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Now refetch the user through AuthContext
+      // At this point, auth.currentUser is ready, so the API interceptor will work
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] Refetching user through AuthContext...');
+      }
       await refetchUser();
       
-      console.log('[AuthLogin] User refetched successfully');
+      if (import.meta.env.DEV) {
+        console.log('[AuthLogin] User refetched successfully');
+      }
       
-      // useEffect will automatically navigate based on user status
-      // No manual navigation needed - single source of truth!
+      // Check if account completion is required
+      if (response.requiresAccountCompletion) {
+        if (import.meta.env.DEV) {
+          console.log('[AuthLogin] Account completion required, redirecting...');
+        }
+        navigate('/auth/account-completion');
+        setIsLoggingIn(false);
+        return;
+      }
+      
+      // User exists in database, navigate based on status
+      if (!isAuthenticated && response.user) {
+        if (import.meta.env.DEV) {
+          console.warn('[AuthLogin] AuthContext not updated, navigating manually');
+        }
+        const loggedInUser = response.user;
+        
+        if (loggedInUser.status === 'suspended') {
+          navigate('/auth/account-suspended');
+        } else if (loggedInUser.status === 'pending') {
+          // Profile complete but awaiting approval
+          navigate('/auth/pending-approval');
+        } else if (loggedInUser.status === 'active') {
+          if (loggedInUser.role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (loggedInUser.role === 'staff') {
+            navigate('/staff/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
+        }
+        setIsLoggingIn(false);
+      }
+      // Otherwise, useEffect will handle navigation and stop loading
       
     } catch (err) {
-      console.error('[AuthLogin] Login failed:', err);
+      if (import.meta.env.DEV) {
+        console.error('[AuthLogin] Login failed:', err);
+      }
       const errorMessage = (err as Error).message || 'Failed to sign in. Please try again.';
       
       // Show user-friendly error for domain validation

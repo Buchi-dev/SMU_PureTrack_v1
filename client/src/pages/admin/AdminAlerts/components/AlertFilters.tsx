@@ -9,6 +9,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import type { AlertFiltersExtended } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -42,13 +43,13 @@ const AlertFilters: React.FC<AlertFiltersProps> = ({
   const applyQuickFilter = (preset: string) => {
     switch (preset) {
       case 'critical-active':
-        onFiltersChange({ severity: ['Critical'], status: ['Active'] });
+        onFiltersChange({ severity: ['Critical'], status: [ALERT_STATUS.UNACKNOWLEDGED] });
         break;
       case 'needs-attention':
-        onFiltersChange({ status: ['Active', 'Acknowledged'] });
+        onFiltersChange({ status: [ALERT_STATUS.UNACKNOWLEDGED, ALERT_STATUS.ACKNOWLEDGED] });
         break;
       case 'today-resolved':
-        onFiltersChange({ status: ['Resolved'] });
+        onFiltersChange({ status: [ALERT_STATUS.RESOLVED] });
         break;
       default:
         break;

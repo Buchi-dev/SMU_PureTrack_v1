@@ -9,6 +9,8 @@ import {
   Typography,
   Space,
   Breadcrumb,
+  Button,
+  Drawer,
 } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -19,10 +21,14 @@ import {
   HomeOutlined,
   SettingOutlined,
   BellOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { ROUTES } from '../../router/routes';
 import UserMenu from '../UserMenu';
 import AlertNotificationCenter from '../AlertNotificationCenter';
+import { useResponsive } from '../../hooks/useResponsive';
+import { MobileUserProfile, MobileLogoutButton } from '../index';
 
 const { Header, Content, Footer } = Layout;
 const { Text } = Typography;
@@ -32,12 +38,31 @@ interface StaffLayoutProps {
 }
 
 export const StaffLayout = ({ children }: StaffLayoutProps) => {
+  const { isMobile } = useResponsive();
   const [selectedKeys, setSelectedKeys] = useState<string[]>(['dashboard']);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const {
     token: { colorBgContainer, colorPrimary },
   } = theme.useToken();
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobile && mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobile, mobileMenuOpen]);
 
   // Update selected menu item based on current route
   useEffect(() => {
@@ -105,6 +130,10 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
     const route = routeMap[e.key];
     if (route) {
       navigate(route);
+      // Close mobile menu after navigation
+      if (isMobile) {
+        setMobileMenuOpen(false);
+      }
     }
   };
 
@@ -141,10 +170,87 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+      {/* Mobile Drawer Menu */}
+      {isMobile && (
+        <Drawer
+          placement="left"
+          open={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          closeIcon={<CloseOutlined style={{ fontSize: '18px' }} />}
+          styles={{
+            header: {
+              borderBottom: '1px solid #f0f0f0',
+              padding: '16px 24px',
+            },
+            body: {
+              padding: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            },
+          }}
+          width={280}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {/* Logo at Top */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: '1px solid #f0f0f0',
+                  background: colorBgContainer,
+                }}
+              >
+                <Space size="middle">
+                  <img 
+                    src="/system_logo.svg" 
+                    alt="PureTrack Logo" 
+                    style={{ width: 40, height: 40 }} 
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                    <Text 
+                      strong 
+                      style={{ 
+                        fontSize: '18px',
+                        color: colorPrimary,
+                        fontWeight: 600,
+                      }}
+                    >
+                      PureTrack
+                    </Text>
+                    <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                      Staff Portal
+                    </Text>
+                  </div>
+                </Space>
+              </div>
+
+              {/* User Profile below Logo */}
+              <MobileUserProfile />
+
+              {/* Mobile Menu Items */}
+              <Menu
+                mode="inline"
+                selectedKeys={selectedKeys}
+                items={menuItems}
+                onClick={handleMenuClick}
+                style={{
+                  border: 'none',
+                  fontSize: '15px',
+                  padding: '8px 0',
+                }}
+              />
+            </div>
+
+            {/* Logout Button at Bottom */}
+            <MobileLogoutButton onLogout={() => setMobileMenuOpen(false)} />
+          </div>
+        </Drawer>
+      )}
+
       {/* Main Header with Navigation */}
       <Header
         style={{
-          padding: '0 32px',
+          padding: isMobile ? '0 16px' : '0 32px',
           background: colorBgContainer,
           display: 'flex',
           alignItems: 'center',
@@ -154,99 +260,132 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
           zIndex: 1000,
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           borderBottom: `1px solid ${colorPrimary}15`,
+          height: '64px',
         }}
       >
-        {/* Left side - Logo and Navigation */}
-        <Space size="large" style={{ flex: 1 }}>
-          {/* Logo and Branding */}
-          <div
-            onClick={() => navigate(ROUTES.STAFF.DASHBOARD)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              cursor: 'pointer',
-              paddingRight: '24px',
-              borderRight: '1px solid #f0f0f0',
-            }}
-          >
-            <img 
-              src="/system_logo.svg" 
-              alt="PureTrack Logo" 
-              style={{ 
-                width: 36,
-                height: 36,
-              }} 
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
-              <Text 
-                strong 
-                style={{ 
-                  fontSize: '18px',
-                  color: colorPrimary,
-                  fontWeight: 600,
+        {/* Left side - Mobile Hamburger or Desktop Logo + Nav */}
+        <Space size={isMobile ? 'small' : 'large'} style={{ flex: 1 }}>
+          {isMobile ? (
+            <>
+              {/* Mobile Hamburger */}
+              <Button
+                type="text"
+                icon={<MenuOutlined />}
+                onClick={() => setMobileMenuOpen(true)}
+                style={{
+                  fontSize: '20px',
+                  width: 48,
+                  height: 48,
+                }}
+                aria-label="Open navigation menu"
+              />
+              {/* Mobile Logo */}
+              <div
+                onClick={() => navigate(ROUTES.STAFF.DASHBOARD)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
                 }}
               >
-                PureTrack
-              </Text>
-              <Text 
-                style={{ 
-                  fontSize: '12px',
-                  color: '#8c8c8c',
+                <img 
+                  src="/system_logo.svg" 
+                  alt="PureTrack" 
+                  style={{ width: 28, height: 28 }} 
+                />
+                <Text strong style={{ fontSize: '16px', color: colorPrimary }}>
+                  PureTrack
+                </Text>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Desktop Logo and Navigation */}
+              <div
+                onClick={() => navigate(ROUTES.STAFF.DASHBOARD)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  cursor: 'pointer',
+                  paddingRight: '24px',
+                  borderRight: '1px solid #f0f0f0',
                 }}
               >
-                Staff Portal
-              </Text>
-            </div>
-          </div>
+                <img 
+                  src="/system_logo.svg" 
+                  alt="PureTrack Logo" 
+                  style={{ width: 36, height: 36 }} 
+                />
+                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+                  <Text 
+                    strong 
+                    style={{ 
+                      fontSize: '18px',
+                      color: colorPrimary,
+                      fontWeight: 600,
+                    }}
+                  >
+                    PureTrack
+                  </Text>
+                  <Text style={{ fontSize: '12px', color: '#8c8c8c' }}>
+                    Staff Portal
+                  </Text>
+                </div>
+              </div>
 
-          {/* Main Navigation Menu */}
-          <Menu
-            mode="horizontal"
-            selectedKeys={selectedKeys}
-            items={menuItems}
-            onClick={handleMenuClick}
-            style={{
-              flex: 1,
-              border: 'none',
-              background: 'transparent',
-              fontSize: '14px',
-              fontWeight: 500,
-            }}
-          />
+              {/* Desktop Navigation Menu */}
+              <Menu
+                mode="horizontal"
+                selectedKeys={selectedKeys}
+                items={menuItems}
+                onClick={handleMenuClick}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              />
+            </>
+          )}
         </Space>
 
         {/* Right side - Actions and User Menu */}
-        <Space size="middle">
+        <Space size={isMobile ? 'small' : 'middle'}>
           {/* Alert Notifications */}
           <AlertNotificationCenter />
 
-          {/* User Profile Menu */}
-          <UserMenu />
+          {/* User Profile Menu - Hidden on mobile, shown in drawer instead */}
+          {!isMobile && <UserMenu />}
         </Space>
       </Header>
 
-      {/* Breadcrumb Navigation */}
-      <div
-        style={{
-          background: colorBgContainer,
-          padding: '12px 32px',
-          borderBottom: '1px solid #f0f0f0',
-        }}
-      >
-        <Breadcrumb items={getBreadcrumbItems()} />
-      </div>
+      {/* Breadcrumb Navigation - Hidden on Mobile */}
+      {!isMobile && (
+        <div
+          style={{
+            background: colorBgContainer,
+            padding: '12px 32px',
+            borderBottom: '1px solid #f0f0f0',
+          }}
+        >
+          <Breadcrumb items={getBreadcrumbItems()} />
+        </div>
+      )}
 
       {/* Main Content Area */}
       <Content
         style={{
-          margin: '24px 32px',
+          margin: isMobile ? '16px 8px' : '24px 32px',
           minHeight: 'calc(100vh - 240px)',
         }}
       >
         <div
           style={{
-            padding: '32px',
+            padding: isMobile ? '16px' : '32px',
             background: colorBgContainer,
             borderRadius: '8px',
             boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
@@ -263,14 +402,14 @@ export const StaffLayout = ({ children }: StaffLayoutProps) => {
           textAlign: 'center',
           background: colorBgContainer,
           borderTop: '1px solid #f0f0f0',
-          padding: '20px 32px',
+          padding: isMobile ? '16px 8px' : '20px 32px',
         }}
       >
         <Space direction="vertical" size={4}>
-          <Text strong style={{ fontSize: '13px' }}>
+          <Text strong style={{ fontSize: isMobile ? '12px' : '13px' }}>
             PureTrack Staff Portal
           </Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>
+          <Text type="secondary" style={{ fontSize: isMobile ? '11px' : '12px' }}>
             Water Quality Monitoring System © {new Date().getFullYear()}
           </Text>
         </Space>

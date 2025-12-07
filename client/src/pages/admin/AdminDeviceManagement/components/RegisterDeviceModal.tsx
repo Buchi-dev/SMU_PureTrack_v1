@@ -1,6 +1,6 @@
 import { Modal, Form, Input, Select, Space, Typography, Divider, Alert } from 'antd';
 import { useEffect, useState } from 'react';
-import type { Device } from '../../../../schemas';
+import type { DeviceWithReadings } from '../../../../schemas';
 import { EnvironmentOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useThemeToken } from '../../../../theme';
 
@@ -10,7 +10,7 @@ const { Text } = Typography;
 
 interface RegisterDeviceModalProps {
   visible: boolean;
-  device: Device | null;
+  device: DeviceWithReadings | null;
   onRegister: (deviceId: string, locationData: { building: string; floor: string; notes?: string }) => void;
   onCancel: () => void;
 }

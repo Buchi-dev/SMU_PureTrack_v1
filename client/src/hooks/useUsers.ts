@@ -87,7 +87,6 @@ export interface UseUserMutationsReturn {
   updateUserStatus: (userId: string, payload: UpdateUserStatusRequest) => Promise<void>;
   updateUserProfile: (userId: string, payload: UpdateUserProfileRequest) => Promise<void>;
   completeUserProfile: (userId: string, payload: CompleteUserProfileRequest) => Promise<void>;
-  deleteUser: (userId: string) => Promise<void>;
   updateUserPreferences: (userId: string, preferences: Partial<UserPreferences>) => Promise<void>;
   resetUserPreferences: (userId: string) => Promise<void>;
   isLoading: boolean;
@@ -271,11 +270,10 @@ export function useUserPreferences(
  * Perform write operations on users
  * 
  * @example
- * const { updateUserRole, updateUserStatus, deleteUser, isLoading } = useUserMutations();
+ * const { updateUserRole, updateUserStatus, isLoading } = useUserMutations();
  * 
  * await updateUserRole('user-123', { role: 'admin' });
  * await updateUserStatus('user-456', { status: 'active' });
- * await deleteUser('user-789');
  */
 export function useUserMutations(): UseUserMutationsReturn {
   const [isLoading, setIsLoading] = useState(false);
@@ -349,20 +347,6 @@ export function useUserMutations(): UseUserMutationsReturn {
     []
   );
 
-  const deleteUser = useCallback(async (userId: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await userService.deleteUser(userId);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error('Failed to delete user');
-      setError(error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   const updateUserPreferences = useCallback(
     async (userId: string, preferences: Partial<UserPreferences>) => {
       setIsLoading(true);
@@ -399,7 +383,6 @@ export function useUserMutations(): UseUserMutationsReturn {
     updateUserStatus,
     updateUserProfile,
     completeUserProfile,
-    deleteUser,
     updateUserPreferences,
     resetUserPreferences,
     isLoading,

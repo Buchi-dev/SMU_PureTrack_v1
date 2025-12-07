@@ -17,7 +17,6 @@ import {
   Typography,
   Row,
   Col,
-  Statistic,
   Alert,
   Skeleton,
 } from 'antd';
@@ -32,7 +31,8 @@ import {
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { useDevices } from '../../../hooks';
+import { useDevices, useResponsive } from '../../../hooks';
+import CompactReadingStats from './components/CompactReadingStats';
 import { calculateReadingStatus } from '../../../utils/waterQualityUtils';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -56,15 +56,14 @@ interface Reading {
  */
 export const StaffReadings = () => {
   const token = useThemeToken();
+  const { isMobile } = useResponsive();
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 10000 // Poll every 10 seconds for readings
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   // Handle refresh with loading state
   const handleRefresh = async () => {
@@ -100,7 +99,7 @@ export const StaffReadings = () => {
         location: device.metadata?.location 
           ? `${device.metadata.location.building}, ${device.metadata.location.floor}`
           : 'Unknown',
-        ph: reading.ph || 0,
+        ph: reading.pH ?? reading.ph ?? 0,
         tds: reading.tds || 0,
         turbidity: reading.turbidity || 0,
         status,
@@ -148,6 +147,81 @@ export const StaffReadings = () => {
     if (value < range.min + 0.5 || value > range.max - 50) return token.colorWarning;
     return token.colorSuccess;
   };
+
+  const mobileColumns: ColumnsType<Reading> = useMemo(() => [
+    {
+      title: 'Reading',
+      key: 'reading',
+      ellipsis: false,
+      render: (_, record: Reading) => {
+        const statusConfig = {
+          normal: { color: 'success', icon: <CheckCircleOutlined />, text: 'Normal' },
+          warning: { color: 'warning', icon: <WarningOutlined />, text: 'Warning' },
+          critical: { color: 'error', icon: <ExclamationCircleOutlined />, text: 'Critical' },
+        };
+        const config = statusConfig[record.status as keyof typeof statusConfig];
+        
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <Space size={4} wrap>
+              <Text strong style={{ fontSize: '12px', wordBreak: 'break-word' }}>
+                {record.device}
+              </Text>
+              <Tag icon={config.icon} color={config.color} style={{ fontSize: '9px', margin: 0 }}>
+                {config.text}
+              </Tag>
+            </Space>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              📍 {record.location}
+            </Text>
+            <Space size={4} wrap>
+              <Tag 
+                color={getParamColor(record.ph, 'ph') === token.colorSuccess ? 'success' : 'error'}
+                style={{ fontSize: '10px', margin: 0 }}
+              >
+                pH: {record.ph.toFixed(2)}
+              </Tag>
+              <Tag 
+                color={getParamColor(record.tds, 'tds') === token.colorSuccess ? 'success' : 'warning'}
+                style={{ fontSize: '10px', margin: 0 }}
+              >
+                TDS: {record.tds.toFixed(1)}
+              </Tag>
+              <Tag 
+                color={getParamColor(record.turbidity, 'turbidity') === token.colorSuccess ? 'success' : 'warning'}
+                style={{ fontSize: '10px', margin: 0 }}
+              >
+                Turb: {record.turbidity.toFixed(2)}
+              </Tag>
+            </Space>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {record.timestamp}
+            </Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 50,
+      align: 'center' as const,
+      render: (_, record: Reading) => {
+        const statusConfig = {
+          normal: { color: token.colorSuccess, icon: <CheckCircleOutlined /> },
+          warning: { color: token.colorWarning, icon: <WarningOutlined /> },
+          critical: { color: token.colorError, icon: <ExclamationCircleOutlined /> },
+        };
+        const config = statusConfig[record.status as keyof typeof statusConfig];
+        
+        return (
+          <div style={{ fontSize: '24px', color: config.color }}>
+            {config.icon}
+          </div>
+        );
+      },
+    },
+  ], [token]);
 
   const columns: ColumnsType<Reading> = [
     {
@@ -297,48 +371,7 @@ export const StaffReadings = () => {
         )}
 
         {/* Statistics */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Total Readings"
-                value={stats.total}
-                prefix={<LineChartOutlined />}
-                valueStyle={{ color: token.colorInfo }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Normal"
-                value={stats.normal}
-                prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: token.colorSuccess }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Warnings"
-                value={stats.warning}
-                prefix={<WarningOutlined />}
-                valueStyle={{ color: token.colorWarning }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Critical"
-                value={stats.critical}
-                prefix={<ExclamationCircleOutlined />}
-                valueStyle={{ color: token.colorError }}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <CompactReadingStats stats={stats} />
 
         {/* Filters */}
         <Card>
@@ -417,9 +450,15 @@ export const StaffReadings = () => {
         {/* Readings Table */}
         <Card>
           <Table
-            columns={columns}
+            columns={isMobile ? mobileColumns : columns}
             dataSource={filteredReadings}
-            pagination={{
+            size={isMobile ? 'small' : 'middle'}
+            bordered={!isMobile}
+            scroll={isMobile ? undefined : { x: 1000 }}
+            pagination={isMobile ? {
+              pageSize: 5,
+              simple: true,
+            } : {
               pageSize: 20,
               showTotal: (total) => `Total ${total} readings`,
             }}

@@ -13,7 +13,8 @@ import {
   AdminAlerts,
   AdminAnalytics,
   AdminUserManagement,
-  AdminSettings
+  AdminSettings,
+  AdminSystemHealth
 } from '../pages/admin';
 import ReportHistory from '../pages/admin/AdminReports/ReportHistory';
 
@@ -37,6 +38,9 @@ import {
 
 // 404 Page
 import { NotFoundPage } from '../pages/NotFoundPage';
+
+// Test Page (Development)
+import ComponentTestPage from '../pages/ComponentTestPage';
 
 /**
  * Application Routes Configuration
@@ -183,6 +187,14 @@ const router = createBrowserRouter([
       </AdminRoute>
     ),
   },
+  {
+    path: '/admin/health',
+    element: (
+      <AdminRoute>
+        <AdminSystemHealth />
+      </AdminRoute>
+    ),
+  },
 
   // ==================== STAFF DASHBOARD ====================
   // Staff routes - for approved staff members (both Admin and Staff roles can access)
@@ -253,6 +265,12 @@ const router = createBrowserRouter([
         <StaffDashboard />
       </ApprovedRoute>
     ),
+  },
+
+  // ==================== TEST PAGE (DEVELOPMENT) ====================
+  {
+    path: '/test/components',
+    element: <ComponentTestPage />,
   },
 
   // ==================== 404 NOT FOUND ====================

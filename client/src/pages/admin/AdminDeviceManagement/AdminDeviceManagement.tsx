@@ -4,14 +4,14 @@ import { ApiOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import { AdminLayout } from '../../../components/layouts';
 import { PageHeader } from '../../../components/PageHeader';
 import {
-  DeviceStats,
+  CompactDeviceMetrics,
   DeviceTable,
   ViewDeviceModal,
   RegisterDeviceModal,
 } from './components';
 import { useDeviceFilter } from './hooks';
-import { useDevices, useDeviceMutations } from '../../../hooks';
-import type { Device } from '../../../schemas';
+import { useDevices, useDeviceMutations, useDeletedDevices } from '../../../hooks';
+import type { DeviceWithReadings } from '../../../schemas';
 import './DeviceManagement.css';
 
 const { Content } = Layout;
@@ -29,16 +29,13 @@ const { Search } = Input;
  */
 export const AdminDeviceManagement = () => {
   const [searchText, setSearchText] = useState('');
-  const [activeTab, setActiveTab] = useState<'registered' | 'unregistered'>('registered');
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [activeTab, setActiveTab] = useState<'registered' | 'unregistered' | 'deleted'>('registered');
+  const [selectedDevice, setSelectedDevice] = useState<DeviceWithReadings | null>(null);
   const [isViewModalVisible, setIsViewModalVisible] = useState(false);
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // ✅ GLOBAL HOOK - Real-time device data
-  // Use more aggressive polling (5s) when on unregistered tab to catch new devices quickly
-  const pollInterval = activeTab === 'unregistered' ? 5000 : 15000;
-  
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
   // Don't pass any filters - get ALL devices and filter client-side
   // This ensures we get both registered and unregistered devices
   const {
@@ -46,26 +43,38 @@ export const AdminDeviceManagement = () => {
     isLoading,
     refetch,
   } = useDevices({ 
-    pollInterval,
     filters: {}, // Explicitly pass empty filters to get all devices
+    // 🔥 NO POLLING - WebSocket provides real-time device updates
   });
 
   // ✅ GLOBAL HOOK - Device write operations
   const {
     deleteDevice,
     registerDevice,
+    recoverDevice,
   } = useDeviceMutations();
 
-  // Extract Device objects - devices already have metadata
+  // ✅ GLOBAL HOOK - Deleted devices
+  const {
+    deletedDevices,
+    isLoading: isLoadingDeleted,
+    refetch: refetchDeleted,
+  } = useDeletedDevices({ enabled: activeTab === 'deleted' });
+
+  // Extract devices - useDevices now returns enriched DeviceWithReadings with uiStatus
   const devices = useMemo(() => {
-    return devicesWithSensorData as Device[];
-  }, [devicesWithSensorData]);
+    if (activeTab === 'deleted') {
+      return deletedDevices;
+    }
+    return devicesWithSensorData; // Already DeviceWithReadings[] with computed uiStatus
+  }, [devicesWithSensorData, deletedDevices, activeTab]);
 
   // ✅ LOCAL HOOK - UI-specific filtering logic
   const { filteredDevices, stats } = useDeviceFilter({
     devices,
     activeTab,
     searchText,
+    deletedDevices,
   });
 
   // Auto-refetch when switching to unregistered tab to see latest pending devices
@@ -82,12 +91,12 @@ export const AdminDeviceManagement = () => {
   }, [activeTab, refetch, stats.unregistered]);
 
   // Device action handlers
-  const handleView = (device: Device) => {
+  const handleView = (device: DeviceWithReadings) => {
     setSelectedDevice(device);
     setIsViewModalVisible(true);
   };
 
-  const handleDelete = (device: Device) => {
+  const handleDelete = (device: DeviceWithReadings) => {
     Modal.confirm({
       title: 'Delete Device',
       content: (
@@ -124,7 +133,7 @@ export const AdminDeviceManagement = () => {
     });
   };
 
-  const handleRegister = (device: Device) => {
+  const handleRegister = (device: DeviceWithReadings) => {
     setSelectedDevice(device);
     setIsRegisterModalVisible(true);
   };
@@ -157,13 +166,45 @@ export const AdminDeviceManagement = () => {
     }
   };
 
+  const handleRecover = (device: DeviceWithReadings) => {
+    Modal.confirm({
+      title: 'Recover Device',
+      content: (
+        <div>
+          <p>Are you sure you want to recover "<strong>{device.name || device.deviceId}</strong>"?</p>
+          <p style={{ marginTop: '8px' }}>
+            This will restore the device and all its associated data.
+          </p>
+        </div>
+      ),
+      okText: 'Recover',
+      okType: 'primary',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await recoverDevice(device.deviceId);
+          message.success('Device recovered successfully');
+          refetchDeleted();
+          refetch();
+        } catch (error) {
+          message.error('Failed to recover device');
+          console.error('Error recovering device:', error);
+        }
+      },
+    });
+  };
+
   // Handle refresh with loading state
   const handleRefresh = async () => {
     if (isRefreshing) return; // Prevent spam clicks
     
     setIsRefreshing(true);
     try {
-      await refetch();
+      if (activeTab === 'deleted') {
+        await refetchDeleted();
+      } else {
+        await refetch();
+      }
       setTimeout(() => setIsRefreshing(false), 500);
     } catch (error) {
       console.error('Refresh error:', error);
@@ -204,17 +245,18 @@ export const AdminDeviceManagement = () => {
         </PageHeader>
 
         <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
-          <DeviceStats stats={stats} />
+          <CompactDeviceMetrics stats={stats} />
 
           <DeviceTable
             activeTab={activeTab}
             onTabChange={setActiveTab}
             filteredDevices={filteredDevices}
-            loading={isLoading}
+            loading={activeTab === 'deleted' ? isLoadingDeleted : isLoading}
             stats={stats}
             onView={handleView}
             onDelete={handleDelete}
             onRegister={handleRegister}
+            onRecover={handleRecover}
           />
         </Space>
 

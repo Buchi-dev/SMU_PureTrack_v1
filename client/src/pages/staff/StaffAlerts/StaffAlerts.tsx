@@ -30,11 +30,16 @@ import {
   ExclamationCircleOutlined,
   FilterOutlined,
   EyeOutlined,
+  AlertOutlined,
+  WarningOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
+import { ALERT_STATUS } from '../../../constants';
 import { useThemeToken } from '../../../theme';
-import { useAlerts, useAlertMutations } from '../../../hooks';
-import { PageHeader, StatsCard } from '../../../components/staff';
+import { useAlerts, useAlertMutations, useTableScroll, useResponsive } from '../../../hooks';
+import { PageHeader } from '../../../components/staff';
+import CompactAlertStats from './components/CompactAlertStats';
 import { getSeverityColor } from '../../../schemas';
 import type { WaterQualityAlert } from '../../../schemas';
 import type { ColumnsType } from 'antd/es/table';
@@ -47,6 +52,8 @@ const { TextArea } = Input;
  */
 export const StaffAlerts = () => {
   const token = useThemeToken();
+  const { isMobile } = useResponsive();
+  const tableScroll = useTableScroll({ offsetHeight: 450 });
   
   // State for filters and modals
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -55,21 +62,30 @@ export const StaffAlerts = () => {
   const [selectedAlert, setSelectedAlert] = useState<WaterQualityAlert | null>(null);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
   const [resolveModalVisible, setResolveModalVisible] = useState(false);
+  const [resolveAllModalVisible, setResolveAllModalVisible] = useState(false);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOKS - Real-time alert data with SWR polling
+  // ✅ GLOBAL HOOKS - Real-time alert data via WebSocket
+  // Pass filters to backend for server-side filtering
   const { 
-    alerts: allAlerts, 
+    alerts: filteredAlerts,
+    stats,
     isLoading, 
     refetch 
   } = useAlerts({ 
-    pollInterval: 10000 // Poll every 10 seconds
+    filters: {
+      status: statusFilter !== 'all' ? statusFilter as any : undefined,
+      severity: severityFilter !== 'all' ? severityFilter as any : undefined,
+      parameter: parameterFilter !== 'all' ? parameterFilter as any : undefined,
+    },
+    // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved instantly
   });
   
   const { 
     acknowledgeAlert, 
     resolveAlert, 
+    resolveAllAlerts,
     isLoading: mutationLoading 
   } = useAlertMutations();
 
@@ -87,35 +103,42 @@ export const StaffAlerts = () => {
     }
   };
 
-  // Filter alerts based on selected filters
-  const filteredAlerts = useMemo(() => {
-    return allAlerts.filter((alert) => {
-      if (statusFilter !== 'all' && alert.status !== statusFilter) return false;
-      if (severityFilter !== 'all' && alert.severity !== severityFilter) return false;
-      if (parameterFilter !== 'all' && alert.parameter !== parameterFilter) return false;
-      return true;
-    });
-  }, [allAlerts, statusFilter, severityFilter, parameterFilter]);
-
-  // Calculate filtered stats
+  // ✅ Use backend-provided stats instead of client-side calculation
+  // Backend returns aggregated statistics with the filtered data
   const filteredStats = useMemo(() => {
-    const active = filteredAlerts.filter(a => a.status === 'Active').length;
-    const acknowledged = filteredAlerts.filter(a => a.status === 'Acknowledged').length;
-    const resolved = filteredAlerts.filter(a => a.status === 'Resolved').length;
-    const critical = filteredAlerts.filter(a => a.severity === 'Critical').length;
-    const warning = filteredAlerts.filter(a => a.severity === 'Warning').length;
-    const advisory = filteredAlerts.filter(a => a.severity === 'Advisory').length;
+    if (!stats) {
+      return {
+        total: filteredAlerts.length,
+        active: 0,
+        acknowledged: 0,
+        resolved: 0,
+        critical: 0,
+        warning: 0,
+        advisory: 0,
+      };
+    }
+
+    // Map backend stats to UI display format
+    const byStatus = stats.byStatus.reduce((acc, item) => {
+      acc[item._id.toLowerCase()] = item.count;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const bySeverity = stats.bySeverity.reduce((acc, item) => {
+      acc[item._id.toLowerCase()] = item.count;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
       total: filteredAlerts.length,
-      active,
-      acknowledged,
-      resolved,
-      critical,
-      warning,
-      advisory,
+      active: byStatus['unacknowledged'] || 0,
+      acknowledged: byStatus['acknowledged'] || 0,
+      resolved: byStatus['resolved'] || 0,
+      critical: bySeverity['critical'] || 0,
+      warning: bySeverity['warning'] || 0,
+      advisory: bySeverity['advisory'] || 0,
     };
-  }, [filteredAlerts]);
+  }, [filteredAlerts.length, stats]);
 
   // Handle alert acknowledgment
   const handleAcknowledge = async (alertId: string) => {
@@ -143,6 +166,29 @@ export const StaffAlerts = () => {
     } catch (error) {
       message.error('Failed to resolve alert');
       console.error('Resolve error:', error);
+    }
+  };
+
+  // Handle resolve all alerts
+  const handleResolveAll = async () => {
+    try {
+      // Build filters based on current filter state
+      const filters: { severity?: string; parameter?: string } = {};
+      if (severityFilter !== 'all') {
+        filters.severity = severityFilter;
+      }
+      if (parameterFilter !== 'all') {
+        filters.parameter = parameterFilter;
+      }
+
+      const result = await resolveAllAlerts(resolutionNotes, filters);
+      message.success(`Successfully resolved ${result.resolvedCount} alert(s)`);
+      setResolveAllModalVisible(false);
+      setResolutionNotes('');
+      await refetch();
+    } catch (error) {
+      message.error('Failed to resolve all alerts');
+      console.error('Resolve all error:', error);
     }
   };
 
@@ -227,6 +273,91 @@ export const StaffAlerts = () => {
   };
 
   // Table columns definition
+  const mobileColumns: ColumnsType<WaterQualityAlert> = useMemo(() => [
+    {
+      title: 'Alert',
+      key: 'alert',
+      ellipsis: false,
+      render: (_, record) => {
+        const statusConfig = getStatusConfig(record.status);
+        
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <Space size={4} wrap>
+              <Text strong style={{ fontSize: '12px', wordBreak: 'break-word' }}>
+                {record.deviceName || record.deviceId}
+              </Text>
+              <Tag 
+                icon={statusConfig.icon} 
+                color={statusConfig.color}
+                style={{ fontSize: '9px', margin: 0 }}
+              >
+                {record.status}
+              </Tag>
+            </Space>
+            <Space size={4} wrap>
+              <Tag color="blue" style={{ fontSize: '10px', margin: 0 }}>
+                {record.parameter.toUpperCase()}
+              </Tag>
+              <Text strong style={{ fontSize: '11px', color: getSeverityColor(record.severity) }}>
+                {(record.currentValue ?? record.value) !== undefined 
+                  ? (record.currentValue ?? record.value).toFixed(2) 
+                  : 'N/A'}
+              </Text>
+            </Space>
+            {(record.deviceBuilding || record.deviceFloor) && (
+              <Text type="secondary" style={{ fontSize: '10px' }}>
+                📍 {[record.deviceBuilding, record.deviceFloor].filter(Boolean).join(', ')}
+              </Text>
+            )}
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {getTimeSince(record.createdAt)}
+            </Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Severity',
+      key: 'severity',
+      width: 50,
+      align: 'center' as const,
+      render: (_, record) => {
+        const severityConfig = {
+          Critical: { color: token.colorError, icon: <AlertOutlined /> },
+          Warning: { color: token.colorWarning, icon: <WarningOutlined /> },
+          Advisory: { color: token.colorInfo, icon: <InfoCircleOutlined /> },
+        };
+        const config = severityConfig[record.severity as keyof typeof severityConfig];
+        
+        return (
+          <div style={{ fontSize: '24px', color: config.color }}>
+            {config.icon}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 90,
+      align: 'center' as const,
+      render: (_, record) => (
+        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDetails(record)}
+            block
+            style={{ height: '32px' }}
+          >
+            View
+          </Button>
+        </Space>
+      ),
+    },
+  ], [token, isMobile]);
+
   const columns: ColumnsType<WaterQualityAlert> = [
     {
       title: 'Status',
@@ -350,7 +481,7 @@ export const StaffAlerts = () => {
           >
             Details
           </Button>
-          {record.status === 'Active' && (
+          {record.status === ALERT_STATUS.UNACKNOWLEDGED && (
             <Button
               size="small"
               type="primary"
@@ -361,7 +492,7 @@ export const StaffAlerts = () => {
               Acknowledge
             </Button>
           )}
-          {(record.status === 'Active' || record.status === 'Acknowledged') && (
+          {(record.status === ALERT_STATUS.UNACKNOWLEDGED || record.status === ALERT_STATUS.ACKNOWLEDGED) && (
             <Button
               size="small"
               type="default"
@@ -392,72 +523,7 @@ export const StaffAlerts = () => {
         />
 
         {/* Statistics Cards */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <StatsCard
-              title="Total Alerts"
-              value={filteredStats.total}
-              icon={<BellOutlined />}
-              color={token.colorInfo}
-              description="All alerts in system"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <StatsCard
-              title="Active Alerts"
-              value={filteredStats.active}
-              icon={<ExclamationCircleOutlined />}
-              color={token.colorError}
-              description="Require attention"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <StatsCard
-              title="Acknowledged"
-              value={filteredStats.acknowledged}
-              icon={<CheckCircleOutlined />}
-              color={token.colorWarning}
-              description="Being investigated"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <StatsCard
-              title="Resolved"
-              value={filteredStats.resolved}
-              icon={<CloseCircleOutlined />}
-              color={token.colorSuccess}
-              description="Successfully resolved"
-            />
-          </Col>
-        </Row>
-
-        {/* Severity Breakdown */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={8}>
-            <StatsCard
-              title="Critical"
-              value={filteredStats.critical}
-              color="#cf1322"
-              size="small"
-            />
-          </Col>
-          <Col xs={24} sm={8}>
-            <StatsCard
-              title="Warning"
-              value={filteredStats.warning}
-              color="#d46b08"
-              size="small"
-            />
-          </Col>
-          <Col xs={24} sm={8}>
-            <StatsCard
-              title="Advisory"
-              value={filteredStats.advisory}
-              color="#096dd9"
-              size="small"
-            />
-          </Col>
-        </Row>
+        <CompactAlertStats stats={filteredStats} />
 
         {/* Filters */}
         <Card>
@@ -522,14 +588,34 @@ export const StaffAlerts = () => {
               <Text strong>Alerts ({filteredAlerts.length})</Text>
             </Space>
           }
+          extra={
+            <Space>
+              {(statusFilter !== 'Resolved' && filteredAlerts.length > 0) && (
+                <Button
+                  type="primary"
+                  danger
+                  icon={<CloseCircleOutlined />}
+                  onClick={() => setResolveAllModalVisible(true)}
+                  disabled={mutationLoading}
+                >
+                  Resolve All Alerts
+                </Button>
+              )}
+            </Space>
+          }
         >
           <Table
-            columns={columns}
+            columns={isMobile ? mobileColumns : columns}
             dataSource={filteredAlerts}
             rowKey="alertId"
             loading={isLoading}
-            scroll={{ x: 1200 }}
-            pagination={{
+            scroll={isMobile ? undefined : tableScroll}
+            size={isMobile ? 'small' : 'middle'}
+            bordered={!isMobile}
+            pagination={isMobile ? {
+              pageSize: 5,
+              simple: true,
+            } : {
               pageSize: 10,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} alerts`,
@@ -562,7 +648,7 @@ export const StaffAlerts = () => {
             <Button key="close" onClick={() => setDetailsModalVisible(false)}>
               Close
             </Button>,
-            selectedAlert?.status === 'Active' && (
+            selectedAlert?.status === ALERT_STATUS.UNACKNOWLEDGED && (
               <Button
                 key="acknowledge"
                 type="primary"
@@ -576,7 +662,7 @@ export const StaffAlerts = () => {
                 Acknowledge
               </Button>
             ),
-            (selectedAlert?.status === 'Active' || selectedAlert?.status === 'Acknowledged') && (
+            (selectedAlert?.status === ALERT_STATUS.UNACKNOWLEDGED || selectedAlert?.status === ALERT_STATUS.ACKNOWLEDGED) && (
               <Button
                 key="resolve"
                 type="primary"
@@ -786,6 +872,70 @@ export const StaffAlerts = () => {
                 value={resolutionNotes}
                 onChange={(e) => setResolutionNotes(e.target.value)}
                 placeholder="Enter resolution notes..."
+                style={{ marginTop: 8 }}
+              />
+            </div>
+          </Space>
+        </Modal>
+
+        {/* Resolve All Alerts Modal */}
+        <Modal
+          title={
+            <Space>
+              <CloseCircleOutlined />
+              <span>Resolve All Alerts</span>
+            </Space>
+          }
+          open={resolveAllModalVisible}
+          onOk={handleResolveAll}
+          onCancel={() => {
+            setResolveAllModalVisible(false);
+            setResolutionNotes('');
+          }}
+          okText="Resolve All"
+          okButtonProps={{ 
+            icon: <CloseCircleOutlined />,
+            loading: mutationLoading,
+            danger: true,
+          }}
+        >
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Text strong style={{ color: token.colorWarning }}>
+              ⚠️ Are you sure you want to resolve all alerts?
+            </Text>
+            <Text>
+              This action will resolve <Text strong>{filteredAlerts.filter(a => a.status !== ALERT_STATUS.RESOLVED).length}</Text> unresolved alert(s).
+            </Text>
+            {(severityFilter !== 'all' || parameterFilter !== 'all') && (
+              <div style={{ 
+                padding: 12, 
+                background: token.colorInfoBg, 
+                borderRadius: 6,
+                border: `1px solid ${token.colorInfoBorder}`
+              }}>
+                <Text strong>Active Filters:</Text>
+                <div style={{ marginTop: 8 }}>
+                  {severityFilter !== 'all' && (
+                    <Tag color={getSeverityColor(severityFilter as any)}>
+                      {severityFilter}
+                    </Tag>
+                  )}
+                  {parameterFilter !== 'all' && (
+                    <Tag color="blue">{parameterFilter.toUpperCase()}</Tag>
+                  )}
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Only alerts matching these filters will be resolved.
+                </Text>
+              </div>
+            )}
+            <div>
+              <Text strong>Resolution Notes (Optional)</Text>
+              <TextArea
+                rows={4}
+                value={resolutionNotes}
+                onChange={(e) => setResolutionNotes(e.target.value)}
+                placeholder="Enter resolution notes for all alerts..."
                 style={{ marginTop: 8 }}
               />
             </div>

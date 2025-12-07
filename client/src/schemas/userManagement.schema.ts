@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { USER_ROLES, USER_STATUS } from '../constants/roles.constants';
 
 // ============================================================================
 // ENUMS (aligned with MongoDB model)
@@ -14,16 +15,25 @@ import { z } from 'zod';
 
 /**
  * User Status Schema (MongoDB enum values)
- * - active: User can access the system
- * - pending: User account is pending admin approval (new registrations)
- * - suspended: User account is suspended by admin
+ * - Active: User can access the system
+ * - Pending: User account is pending admin approval (new registrations)
+ * - Suspended: User account is suspended by admin
+ * ✅ Uses constants from roles.constants.ts (lowercase to match V2 backend)
  */
-export const UserStatusSchema = z.enum(['active', 'pending', 'suspended']);
+export const UserStatusSchema = z.enum([
+  USER_STATUS.ACTIVE.toLowerCase() as 'active',
+  USER_STATUS.PENDING.toLowerCase() as 'pending', 
+  USER_STATUS.SUSPENDED.toLowerCase() as 'suspended'
+]);
 
 /**
  * User Role Schema (MongoDB enum values)
+ * ✅ Uses constants from roles.constants.ts (lowercase to match V2 backend)
  */
-export const UserRoleSchema = z.enum(['admin', 'staff']);
+export const UserRoleSchema = z.enum([
+  USER_ROLES.ADMIN.toLowerCase() as 'admin',
+  USER_ROLES.STAFF.toLowerCase() as 'staff'
+]);
 
 /**
  * Auth Provider Schema

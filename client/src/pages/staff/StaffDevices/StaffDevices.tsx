@@ -17,7 +17,6 @@ import {
   Typography,
   Row,
   Col,
-  Statistic,
   Skeleton,
 } from 'antd';
 import {
@@ -33,8 +32,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
-import { useDevices } from '../../../hooks';
-import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
+import { useDevices, useTableScroll, useResponsiveGutter, useResponsive } from '../../../hooks';
+import CompactDeviceStats from './components/CompactDeviceStats';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -57,14 +56,16 @@ interface Device {
 export const StaffDevices = () => {
   const navigate = useNavigate();
   const token = useThemeToken();
+  const { isMobile } = useResponsive();
+  const tableScroll = useTableScroll({ offsetHeight: 500 });
+  const gutter = useResponsiveGutter();
+  
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 15000 // Poll every 15 seconds
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   // Handle refresh with loading state
   const handleRefresh = async () => {
@@ -80,11 +81,12 @@ export const StaffDevices = () => {
     }
   };
 
-  // Transform devices for display using utility function
+  // Transform devices for display using centralized uiStatus
   const devices: Device[] = useMemo(() => {
     return realtimeDevices.map((device) => {
       const reading = device.latestReading;
-      const status = calculateDeviceStatus(device.status, reading);
+      // Use centralized uiStatus computed by useDevices hook
+      const status = device.uiStatus || 'offline';
       
       const uptime = status === 'online' ? '99.5%' : status === 'warning' ? '95.0%' : '0%';
       
@@ -131,6 +133,85 @@ export const StaffDevices = () => {
     offline: devices.filter(d => d.status === 'offline').length,
     warning: devices.filter(d => d.status === 'warning').length,
   }), [devices]);
+
+  const mobileColumns: ColumnsType<Device> = useMemo(() => [
+    {
+      title: 'Device',
+      key: 'device',
+      ellipsis: false,
+      render: (_, record: Device) => {
+        const config = {
+          online: { color: 'success', icon: <CheckCircleOutlined />, text: 'Online' },
+          offline: { color: 'default', icon: <ClockCircleOutlined />, text: 'Offline' },
+          warning: { color: 'warning', icon: <WarningOutlined />, text: 'Warning' },
+        };
+        const statusConfig = config[record.status as keyof typeof config];
+        
+        return (
+          <Space direction="vertical" size={2} style={{ width: '100%' }}>
+            <Space size={4} wrap>
+              <Text strong style={{ fontSize: '13px', wordBreak: 'break-word' }}>
+                {record.name}
+              </Text>
+              <Tag icon={statusConfig.icon} color={statusConfig.color} style={{ fontSize: '10px', margin: 0 }}>
+                {statusConfig.text}
+              </Tag>
+            </Space>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              📍 {record.location}
+            </Text>
+            <Space size={4} wrap>
+              {record.sensors.map(sensor => (
+                <Tag key={sensor} color="blue" style={{ fontSize: '9px', margin: 0 }}>
+                  {sensor}
+                </Tag>
+              ))}
+            </Space>
+            <Text type="secondary" style={{ fontSize: '10px' }}>
+              {record.lastUpdate}
+            </Text>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 50,
+      align: 'center' as const,
+      render: (_, record: Device) => {
+        const config = {
+          online: { color: token.colorSuccess, icon: <CheckCircleOutlined /> },
+          offline: { color: '#8c8c8c', icon: <ClockCircleOutlined /> },
+          warning: { color: token.colorWarning, icon: <WarningOutlined /> },
+        };
+        const statusConfig = config[record.status as keyof typeof config];
+        
+        return (
+          <div style={{ fontSize: '24px', color: statusConfig.color }}>
+            {statusConfig.icon}
+          </div>
+        );
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 90,
+      align: 'center' as const,
+      render: (_, record: Device) => (
+        <Button
+          size="small"
+          icon={<EyeOutlined />}
+          onClick={() => navigate(`/staff/devices/${record.id}/readings`)}
+          block
+          style={{ height: '32px' }}
+        >
+          View
+        </Button>
+      ),
+    },
+  ], [token, navigate]);
 
   const columns: ColumnsType<Device> = [
     {
@@ -277,52 +358,11 @@ export const StaffDevices = () => {
         ) : (
           <>
         {/* Statistics */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Total Devices"
-                value={stats.total}
-                prefix={<ApiOutlined />}
-                valueStyle={{ color: token.colorInfo }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Online"
-                value={stats.online}
-                prefix={<CheckCircleOutlined />}
-                valueStyle={{ color: token.colorSuccess }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Warnings"
-                value={stats.warning}
-                prefix={<WarningOutlined />}
-                valueStyle={{ color: token.colorWarning }}
-              />
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6} xl={6}>
-            <Card>
-              <Statistic
-                title="Offline"
-                value={stats.offline}
-                prefix={<ClockCircleOutlined />}
-                valueStyle={{ color: '#8c8c8c' }}
-              />
-            </Card>
-          </Col>
-        </Row>
+        <CompactDeviceStats stats={stats} />
 
         {/* Filters and Search */}
         <Card>
-          <Row gutter={[16, 16]} align="middle">
+          <Row gutter={gutter} align="middle">
             <Col xs={24} md={12}>
               <Search
                 placeholder="Search devices by name or location..."
@@ -355,9 +395,15 @@ export const StaffDevices = () => {
         {/* Devices Table */}
         <Card>
           <Table
-            columns={columns}
+            columns={isMobile ? mobileColumns : columns}
             dataSource={filteredDevices}
-            pagination={{
+            scroll={isMobile ? undefined : tableScroll}
+            size={isMobile ? 'small' : 'middle'}
+            bordered={!isMobile}
+            pagination={isMobile ? {
+              pageSize: 5,
+              simple: true,
+            } : {
               pageSize: 10,
               showTotal: (total) => `Total ${total} devices`,
             }}

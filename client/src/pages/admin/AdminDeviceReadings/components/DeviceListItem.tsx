@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons';
 import { memo } from 'react';
 import type { DeviceWithReadings } from '../../../../schemas';
+import { SensorHealthIndicator } from '../../../../components';
 
 const { Text } = Typography;
 
@@ -119,54 +120,96 @@ export const DeviceListItem = memo(({ device }: DeviceListItemProps) => {
               )}
             </Space>
 
-            {latestReading && typeof latestReading.ph === 'number' && typeof latestReading.tds === 'number' && typeof latestReading.turbidity === 'number' ? (
+            {latestReading ? (
               <Row gutter={24} style={{ marginTop: 8 }}>
                 <Col xs={8} sm={8} md={6} lg={4}>
                   <Statistic
-                    title="pH"
-                    value={latestReading.ph.toFixed(2)}
+                    title={
+                      <Space size={4}>
+                        <span>pH</span>
+                        {(typeof (latestReading.pH ?? latestReading.ph) !== 'number' || latestReading.pH_valid === false) && (
+                          <SensorHealthIndicator 
+                            sensor="pH" 
+                            value={latestReading.pH ?? latestReading.ph} 
+                            valid={latestReading.pH_valid}
+                            mode="icon-only"
+                            size="small"
+                          />
+                        )}
+                      </Space>
+                    }
+                    value={typeof (latestReading.pH ?? latestReading.ph) === 'number' ? (latestReading.pH ?? latestReading.ph)!.toFixed(2) : '-'}
                     prefix={<ExperimentOutlined style={{ fontSize: '14px' }} />}
                     valueStyle={{
                       fontSize: '18px',
-                      color:
-                        getQualityColor('ph', latestReading.ph) === 'success'
-                          ? '#52c41a'
-                          : getQualityColor('ph', latestReading.ph) === 'warning'
-                          ? '#faad14'
-                          : '#ff4d4f',
+                      color: typeof (latestReading.pH ?? latestReading.ph) !== 'number' || latestReading.pH_valid === false
+                        ? '#8c8c8c'
+                        : getQualityColor('ph', latestReading.pH ?? latestReading.ph!) === 'success'
+                        ? '#52c41a'
+                        : getQualityColor('ph', latestReading.pH ?? latestReading.ph!) === 'warning'
+                        ? '#faad14'
+                        : '#ff4d4f',
                     }}
                   />
                 </Col>
                 <Col xs={8} sm={8} md={6} lg={4}>
                   <Statistic
-                    title="TDS"
-                    value={latestReading.tds.toFixed(0)}
+                    title={
+                      <Space size={4}>
+                        <span>TDS</span>
+                        {(typeof latestReading.tds !== 'number' || latestReading.tds_valid === false) && (
+                          <SensorHealthIndicator 
+                            sensor="tds" 
+                            value={latestReading.tds} 
+                            valid={latestReading.tds_valid}
+                            mode="icon-only"
+                            size="small"
+                          />
+                        )}
+                      </Space>
+                    }
+                    value={typeof latestReading.tds === 'number' ? latestReading.tds.toFixed(0) : '-'}
                     suffix="ppm"
                     prefix={<ExperimentOutlined style={{ fontSize: '14px' }} />}
                     valueStyle={{
                       fontSize: '18px',
-                      color:
-                        getQualityColor('tds', latestReading.tds) === 'success'
-                          ? '#52c41a'
-                          : getQualityColor('tds', latestReading.tds) === 'warning'
-                          ? '#faad14'
-                          : '#ff4d4f',
+                      color: typeof latestReading.tds !== 'number' || latestReading.tds_valid === false
+                        ? '#8c8c8c'
+                        : getQualityColor('tds', latestReading.tds) === 'success'
+                        ? '#52c41a'
+                        : getQualityColor('tds', latestReading.tds) === 'warning'
+                        ? '#faad14'
+                        : '#ff4d4f',
                     }}
                   />
                 </Col>
                 <Col xs={8} sm={8} md={6} lg={4}>
                   <Statistic
-                    title="Turbidity"
-                    value={latestReading.turbidity.toFixed(2)}
+                    title={
+                      <Space size={4}>
+                        <span>Turbidity</span>
+                        {(typeof latestReading.turbidity !== 'number' || latestReading.turbidity_valid === false) && (
+                          <SensorHealthIndicator 
+                            sensor="turbidity" 
+                            value={latestReading.turbidity} 
+                            valid={latestReading.turbidity_valid}
+                            mode="icon-only"
+                            size="small"
+                          />
+                        )}
+                      </Space>
+                    }
+                    value={typeof latestReading.turbidity === 'number' ? latestReading.turbidity.toFixed(2) : '-'}
                     suffix="NTU"
                     prefix={<ExperimentOutlined style={{ fontSize: '14px' }} />}
                     valueStyle={{
                       fontSize: '18px',
-                      color:
-                        getQualityColor('turbidity', latestReading.turbidity) === 'success'
-                          ? '#52c41a'
-                          : getQualityColor('turbidity', latestReading.turbidity) === 'warning'
-                          ? '#faad14'
+                      color: typeof latestReading.turbidity !== 'number' || latestReading.turbidity_valid === false
+                        ? '#8c8c8c'
+                        : getQualityColor('turbidity', latestReading.turbidity) === 'success'
+                        ? '#52c41a'
+                        : getQualityColor('turbidity', latestReading.turbidity) === 'warning'
+                        ? '#faad14'
                           : '#ff4d4f',
                     }}
                   />

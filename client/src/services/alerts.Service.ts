@@ -31,6 +31,7 @@ import type {
 export interface AlertFilters {
   status?: 'Unacknowledged' | 'Acknowledged' | 'Resolved';
   severity?: 'Critical' | 'Warning' | 'Advisory';
+  parameter?: 'pH' | 'Turbidity' | 'TDS';
   deviceId?: string;
   startDate?: string;
   endDate?: string;
@@ -96,20 +97,8 @@ export class AlertsService {
         ALERT_ENDPOINTS.ACKNOWLEDGE(alertId)
       );
       
-      // Map server field names to client schema
-      const alert = response.data.data;
-      const mappedAlert = {
-        ...alert,
-        currentValue: alert.value ?? alert.currentValue,
-        thresholdValue: alert.threshold ?? alert.thresholdValue,
-        parameter: alert.parameter?.toLowerCase(),
-        status: alert.status === 'Unacknowledged' ? 'Active' : alert.status,
-      } as WaterQualityAlert;
-      
-      return {
-        ...response.data,
-        data: mappedAlert,
-      };
+      // ✅ V2 backend returns data in standard format: { success, data, message }
+      return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
       console.error('[AlertsService] Acknowledge error:', message);
@@ -134,23 +123,51 @@ export class AlertsService {
         { notes }
       );
       
-      // Map server field names to client schema
-      const alert = response.data.data;
-      const mappedAlert = {
-        ...alert,
-        currentValue: alert.value ?? alert.currentValue,
-        thresholdValue: alert.threshold ?? alert.thresholdValue,
-        parameter: alert.parameter?.toLowerCase(),
-        status: alert.status === 'Unacknowledged' ? 'Active' : alert.status,
-      } as WaterQualityAlert;
-      
-      return {
-        ...response.data,
-        data: mappedAlert,
-      };
+      // ✅ V2 backend returns data in standard format: { success, data, message }
+      return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
       console.error('[AlertsService] Resolve error:', message);
+      throw new Error(message);
+    }
+  }
+
+  /**
+   * Resolve all unresolved alerts with optional filters
+   * Marks all matching alerts as resolved
+   * 
+   * @param notes - Optional resolution notes for all alerts
+   * @param filters - Optional filters to limit which alerts to resolve
+   * @throws {Error} If bulk resolution fails
+   * @example
+   * await alertsService.resolveAllAlerts('All issues addressed', { severity: 'Warning' });
+   */
+  async resolveAllAlerts(
+    notes?: string,
+    filters?: { severity?: string; parameter?: string; deviceId?: string }
+  ): Promise<{ success: boolean; data: { resolvedCount: number; alerts: WaterQualityAlert[] }; message: string }> {
+    try {
+      // Build request body, only including fields that have values
+      const body: { resolutionNotes?: string; filters?: typeof filters } = {};
+      
+      if (notes && notes.trim().length > 0) {
+        body.resolutionNotes = notes;
+      }
+      
+      if (filters && Object.keys(filters).length > 0) {
+        body.filters = filters;
+      }
+      
+      const response = await apiClient.patch<any>(
+        ALERT_ENDPOINTS.RESOLVE_ALL,
+        body
+      );
+      
+      // ✅ V2 backend returns data in standard format: { success, data, message }
+      return response.data;
+    } catch (error) {
+      const message = getErrorMessage(error);
+      console.error('[AlertsService] Resolve all error:', message);
       throw new Error(message);
     }
   }
@@ -194,19 +211,8 @@ export class AlertsService {
       const url = buildAlertsUrl(filters);
       const response = await apiClient.get<any>(url);
       
-      // Map server field names to client schema
-      const mappedData = response.data.data.map((alert: any) => ({
-        ...alert,
-        currentValue: alert.value ?? alert.currentValue, // Map 'value' to 'currentValue'
-        thresholdValue: alert.threshold ?? alert.thresholdValue, // Map 'threshold' to 'thresholdValue'
-        parameter: alert.parameter?.toLowerCase(), // Normalize parameter to lowercase
-        status: alert.status === 'Unacknowledged' ? 'Active' : alert.status, // Map 'Unacknowledged' to 'Active'
-      })) as WaterQualityAlert[];
-      
-      return {
-        ...response.data,
-        data: mappedData,
-      };
+      // ✅ V2 backend returns data in standard format: { success, data, pagination }
+      return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
       console.error('[AlertsService] Get alerts error:', message);
@@ -228,20 +234,8 @@ export class AlertsService {
         ALERT_ENDPOINTS.BY_ID(alertId)
       );
       
-      // Map server field names to client schema
-      const alert = response.data.data;
-      const mappedAlert = {
-        ...alert,
-        currentValue: alert.value ?? alert.currentValue,
-        thresholdValue: alert.threshold ?? alert.thresholdValue,
-        parameter: alert.parameter?.toLowerCase(),
-        status: alert.status === 'Unacknowledged' ? 'Active' : alert.status,
-      } as WaterQualityAlert;
-      
-      return {
-        ...response.data,
-        data: mappedAlert,
-      };
+      // ✅ V2 backend returns data in standard format: { success, data }
+      return response.data;
     } catch (error) {
       const message = getErrorMessage(error);
       console.error('[AlertsService] Get alert error:', message);

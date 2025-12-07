@@ -4,6 +4,7 @@
  */
 import axios, { type AxiosInstance } from 'axios';
 import { auth } from './firebase.config';
+import { REQUEST_TIMEOUT } from '../constants/api.constants';
 
 // API Base URL - use environment variable for both development and production
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -29,7 +30,7 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 seconds default - auth should fail fast
+  timeout: REQUEST_TIMEOUT.SHORT, // use centralized timeout (10 seconds) for quick checks
 });
 
 /**

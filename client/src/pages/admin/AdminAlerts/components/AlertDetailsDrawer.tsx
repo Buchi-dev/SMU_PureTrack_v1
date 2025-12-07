@@ -33,6 +33,7 @@ import {
 } from '../../../../schemas';
 import type { WaterQualityAlert } from '../../../../schemas';
 import { getColorValue } from './utils';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -132,7 +133,7 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
       }}
       extra={
         <Space>
-          {alert.status === 'Active' && (
+          {alert.status === ALERT_STATUS.UNACKNOWLEDGED && (
             <Button
               type="primary"
               icon={<CheckCircleOutlined />}
@@ -143,7 +144,7 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
               Acknowledge
             </Button>
           )}
-          {alert.status !== 'Resolved' && (
+          {alert.status !== ALERT_STATUS.RESOLVED && (
             <Button
               type="primary"
               danger
@@ -169,8 +170,8 @@ const AlertDetailsDrawer: React.FC<AlertDetailsDrawerProps> = ({
             <Tag 
               color={getStatusColor(alert.status)}
               icon={
-                alert.status === 'Active' ? <ExclamationCircleOutlined /> :
-                alert.status === 'Acknowledged' ? <CheckCircleOutlined /> :
+                alert.status === ALERT_STATUS.UNACKNOWLEDGED ? <ExclamationCircleOutlined /> :
+                alert.status === ALERT_STATUS.ACKNOWLEDGED ? <CheckCircleOutlined /> :
                 <CloseCircleOutlined />
               }
               style={{ fontSize: 14, padding: '4px 12px' }}

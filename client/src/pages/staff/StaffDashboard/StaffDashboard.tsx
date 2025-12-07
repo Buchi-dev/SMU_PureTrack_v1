@@ -15,14 +15,15 @@ import { Row, Col, Space, Alert, Button, Skeleton } from 'antd';
 import { EyeOutlined, AlertOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
-import { useAuth, useDevices, useAlerts } from '../../../hooks';
+import { useAuth, useDevices, useAlerts, useResponsiveGutter } from '../../../hooks';
 import { useThemeToken } from '../../../theme';
 import type { WaterQualityAlert } from '../../../schemas';
 import { RealtimeAlertMonitor } from '../../../components/RealtimeAlertMonitor';
 import { calculateDeviceStatus } from '../../../utils/waterQualityUtils';
+import { ALERT_STATUS } from '../../../constants';
 import {
   DashboardHeader,
-  DeviceStatsCards,
+  CompactDeviceStats,
   DeviceStatusTable,
   RecentAlertsTable,
   QuickActionsSidebar,
@@ -38,6 +39,7 @@ export const StaffDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const token = useThemeToken();
+  const gutter = useResponsiveGutter();
   
   // ✅ GLOBAL HOOKS - Real-time data from service layer
   const { 
@@ -45,7 +47,7 @@ export const StaffDashboard = () => {
     isLoading: devicesLoading, 
     error: devicesError,
     refetch: refetchDevices 
-  } = useDevices({ pollInterval: 10000 }); // Poll every 10 seconds
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time device updates
   
   const { 
     alerts, 
@@ -54,8 +56,7 @@ export const StaffDashboard = () => {
     refetch: refetchAlerts 
   } = useAlerts({ 
     filters: { limit: 20 }, 
-    pollInterval: 5000 // Poll every 5 seconds for alerts
-  });
+  }); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved instantly
   
   // Local UI state
   const [refreshing, setRefreshing] = useState(false);
@@ -142,7 +143,7 @@ export const StaffDashboard = () => {
   const recentAlertsData: RecentAlert[] = useMemo(() => {
     return alerts
       .filter((alert: WaterQualityAlert) => 
-        alert.status === 'Active' || alert.status === 'Acknowledged'
+        alert.status === ALERT_STATUS.UNACKNOWLEDGED || alert.status === ALERT_STATUS.ACKNOWLEDGED
       )
       .slice(0, 5)
       .map((alert: WaterQualityAlert) => ({
@@ -223,8 +224,8 @@ export const StaffDashboard = () => {
             refreshing={refreshing}
           />
 
-          {/* Device Statistics Cards */}
-          <DeviceStatsCards stats={deviceStats} />
+          {/* Device Statistics Cards - Compact for Mobile */}
+          <CompactDeviceStats stats={deviceStats} />
 
           {/* Warning Alert for High Severity Issues */}
           {deviceStats.warnings > 0 && (
@@ -258,7 +259,7 @@ export const StaffDashboard = () => {
           <RealtimeAlertMonitor />
 
           {/* Main Content Grid */}
-          <Row gutter={[16, 16]}>
+          <Row gutter={gutter}>
             {/* Left Column - Alerts & Device Status */}
             <Col xs={24} xl={16}>
               <Space direction="vertical" size="middle" style={{ width: '100%' }}>

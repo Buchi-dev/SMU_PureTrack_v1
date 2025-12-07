@@ -16,6 +16,7 @@ import React from 'react';
 import { Breadcrumb, Card, Space, Typography, Button } from 'antd';
 import { HomeOutlined } from '@ant-design/icons';
 import type { BreadcrumbItemType } from 'antd/es/breadcrumb/Breadcrumb';
+import { useResponsive } from '../hooks';
 
 const { Title, Text } = Typography;
 
@@ -77,6 +78,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   actions = [],
   children,
 }) => {
+  const { isMobile } = useResponsive();
+
   // Build breadcrumb items with Home as first item
   const breadcrumbs: BreadcrumbItemType[] = [
     {
@@ -103,8 +106,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      {/* Breadcrumb */}
-      <Breadcrumb items={breadcrumbs} />
+      {/* Breadcrumb - Hidden on Mobile */}
+      {!isMobile && <Breadcrumb items={breadcrumbs} />}
 
       {/* Page Header Card */}
       <Card variant="borderless">

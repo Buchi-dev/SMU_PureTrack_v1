@@ -24,6 +24,8 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import type { UserListData, UserRole, UserStatus } from '../../../../schemas';
+import { useTableScroll } from '../../../../hooks';
+import { useResponsive } from '../../../../hooks/useResponsive';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -39,6 +41,9 @@ export const UsersTable: React.FC<UsersTableProps> = ({
   loading,
   onViewUser,
 }) => {
+  const tableScroll = useTableScroll({ offsetHeight: 450 });
+  const { isMobile } = useResponsive();
+  
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | 'All'>('All');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'All'>('All');
@@ -104,6 +109,114 @@ export const UsersTable: React.FC<UsersTableProps> = ({
   const getInitials = (firstname: string, lastname: string) => {
     return `${firstname.charAt(0)}${lastname.charAt(0)}`.toUpperCase();
   };
+
+  // Mobile-optimized columns (3 columns)
+  const mobileColumns: ColumnsType<UserListData> = [
+    {
+      title: 'User',
+      key: 'user',
+      ellipsis: false,
+      render: (_, record) => {
+        const fullName = [record.firstName, record.middleName, record.lastName]
+          .filter(Boolean)
+          .join(' ') || 'Unknown User';
+        
+        return (
+          <Space size={8} style={{ width: '100%' }}>
+            <Avatar
+              style={{
+                backgroundColor: record.role === 'admin' ? '#ff4d4f' : '#1890ff',
+                flexShrink: 0,
+              }}
+              size={40}
+            >
+              {getInitials(record.firstName || '', record.lastName || '')}
+            </Avatar>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Text 
+                strong 
+                style={{ 
+                  fontSize: '13px', 
+                  display: 'block', 
+                  wordBreak: 'break-word',
+                  lineHeight: 1.3,
+                }}
+              >
+                {fullName}
+              </Text>
+              <Text 
+                type="secondary" 
+                style={{ 
+                  fontSize: '11px', 
+                  display: 'block',
+                  wordBreak: 'break-all',
+                  lineHeight: 1.2,
+                }}
+              >
+                {record.email}
+              </Text>
+              {record.department && (
+                <Text 
+                  type="secondary" 
+                  style={{ 
+                    fontSize: '10px', 
+                    display: 'block',
+                    marginTop: 2,
+                  }}
+                >
+                  {record.department}
+                </Text>
+              )}
+            </div>
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      width: 50,
+      align: 'center',
+      render: (_, record) => (
+        <Tooltip title={`${record.status === 'active' ? 'Active' : record.status === 'pending' ? 'Pending' : 'Suspended'} • ${record.role === 'admin' ? 'Admin' : 'Staff'}`}>
+          <Space direction="vertical" size={2} align="center">
+            <div style={{ fontSize: '24px', color: getStatusColor(record.status) === 'success' ? '#52c41a' : getStatusColor(record.status) === 'warning' ? '#faad14' : '#ff4d4f' }}>
+              {getStatusIcon(record.status)}
+            </div>
+            <Tag 
+              color={getRoleColor(record.role)}
+              style={{ 
+                fontSize: '9px',
+                padding: '0 4px',
+                margin: 0,
+                lineHeight: '16px',
+              }}
+            >
+              {record.role === 'admin' ? 'ADM' : 'STF'}
+            </Tag>
+          </Space>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 70,
+      align: 'center',
+      render: (_, record) => (
+        <Button
+          type="primary"
+          icon={<EyeOutlined />}
+          onClick={() => onViewUser(record)}
+          size="small"
+          block
+          style={{ fontSize: '11px', height: '32px' }}
+        >
+          View
+        </Button>
+      ),
+    },
+  ];
 
   const columns: ColumnsType<UserListData> = [
     {
@@ -251,20 +364,20 @@ export const UsersTable: React.FC<UsersTableProps> = ({
       {/* Filters Section */}
       <Space size="middle" style={{ marginBottom: 16, width: '100%', flexWrap: 'wrap' }}>
         <Input
-          placeholder="Search by name, email, or department..."
+          placeholder={isMobile ? "Search users..." : "Search by name, email, or department..."}
           prefix={<SearchOutlined />}
           allowClear
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ width: 300 }}
-          size="large"
+          style={{ width: isMobile ? '100%' : 300 }}
+          size={isMobile ? 'middle' : 'large'}
         />
         <Select
-          placeholder="Filter by Status"
+          placeholder="Status"
           value={statusFilter}
           onChange={setStatusFilter}
-          style={{ width: 150 }}
-          size="large"
+          style={{ width: isMobile ? 'calc(50% - 6px)' : 150 }}
+          size={isMobile ? 'middle' : 'large'}
         >
           <Select.Option value="All">All Statuses</Select.Option>
           <Select.Option value="active">Active</Select.Option>
@@ -272,11 +385,11 @@ export const UsersTable: React.FC<UsersTableProps> = ({
           <Select.Option value="suspended">Suspended</Select.Option>
         </Select>
         <Select
-          placeholder="Filter by Role"
+          placeholder="Role"
           value={roleFilter}
           onChange={setRoleFilter}
-          style={{ width: 150 }}
-          size="large"
+          style={{ width: isMobile ? 'calc(50% - 6px)' : 150 }}
+          size={isMobile ? 'middle' : 'large'}
         >
           <Select.Option value="All">All Roles</Select.Option>
           <Select.Option value="admin">Admin</Select.Option>
@@ -286,14 +399,20 @@ export const UsersTable: React.FC<UsersTableProps> = ({
 
       {/* Table */}
       <Table
-        columns={columns}
+        columns={isMobile ? mobileColumns : columns}
         dataSource={filteredUsers}
         loading={loading}
-        pagination={pagination}
+        pagination={{
+          ...pagination,
+          pageSize: isMobile ? 5 : pagination.pageSize,
+          simple: isMobile,
+          showSizeChanger: !isMobile,
+        }}
         onChange={handleTableChange}
         rowKey="id"
-        scroll={{ x: 1300 }}
-        bordered
+        scroll={isMobile ? undefined : tableScroll}
+        bordered={!isMobile}
+        size={isMobile ? 'small' : 'middle'}
       />
     </div>
   );

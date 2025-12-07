@@ -248,27 +248,37 @@ export const RealtimeAlertMonitor = () => {
 
             <Divider style={{ margin: '8px 0' }} />
 
-            {/* Show affected parameters */}
+            {/* Show affected parameters - UNIQUE ONLY */}
             <div style={{ marginBottom: '8px' }}>
               <Text type="secondary" style={{ fontSize: '11px' }}>
                 Affected Parameters:
               </Text>
               <div style={{ marginTop: '4px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                {device.alerts.map((alert, idx) => (
-                  <Tag
-                    key={idx}
-                    color={
-                      alert.severity === 'Critical'
-                        ? 'red'
-                        : alert.severity === 'Warning'
-                        ? 'orange'
-                        : 'blue'
-                    }
-                    style={{ fontSize: '10px' }}
-                  >
-                    {alert.parameter}
-                  </Tag>
-                ))}
+                {/* Get unique parameters only */}
+                {Array.from(new Set(device.alerts.map(alert => alert.parameter))).map((parameter) => {
+                  // Find the most severe alert for this parameter
+                  const alertsForParam = device.alerts.filter(a => a.parameter === parameter);
+                  const mostSevere = alertsForParam.reduce((prev, current) => {
+                    const severityOrder = { 'Critical': 3, 'Warning': 2, 'Advisory': 1 };
+                    return (severityOrder[current.severity] > severityOrder[prev.severity]) ? current : prev;
+                  });
+                  
+                  return (
+                    <Tag
+                      key={parameter}
+                      color={
+                        mostSevere.severity === 'Critical'
+                          ? 'red'
+                          : mostSevere.severity === 'Warning'
+                          ? 'orange'
+                          : 'blue'
+                      }
+                      style={{ fontSize: '10px' }}
+                    >
+                      {parameter}
+                    </Tag>
+                  );
+                })}
               </div>
             </div>
 

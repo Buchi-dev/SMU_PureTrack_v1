@@ -7,6 +7,7 @@ import { Alert, Space, Tag, Typography } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { memo } from 'react';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
 
 const { Text } = Typography;
 
@@ -29,7 +30,7 @@ const getSeverityColor = (severity: string): 'error' | 'warning' | 'default' | '
 
 export const ActiveAlerts = memo<ActiveAlertsProps>(({ alerts }) => {
   // Only show active alerts
-  const activeAlerts = alerts.filter(alert => alert.status === 'Active');
+  const activeAlerts = alerts.filter(alert => alert.status === ALERT_STATUS.UNACKNOWLEDGED);
 
   if (activeAlerts.length === 0) {
     return null;

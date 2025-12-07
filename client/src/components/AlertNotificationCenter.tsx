@@ -25,6 +25,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAlerts } from '../hooks';
 import { getSeverityColor } from '../schemas';
 import { ROUTES } from '../router/routes';
+import { ALERT_STATUS } from '../constants';
 
 const { Text } = Typography;
 
@@ -42,12 +43,12 @@ export default function AlertNotificationCenter() {
   // Filter for active/acknowledged alerts and limit to 10
   const alerts = useMemo(() => {
     return allAlerts
-      .filter((a) => a.status === 'Active' || a.status === 'Acknowledged')
+      .filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED || a.status === ALERT_STATUS.ACKNOWLEDGED)
       .slice(0, 10);
   }, [allAlerts]);
 
   const unreadCount = useMemo(() => {
-    return alerts.filter((a) => a.status === 'Active').length;
+    return alerts.filter((a) => a.status === ALERT_STATUS.UNACKNOWLEDGED).length;
   }, [alerts]);
 
   const viewAllAlerts = () => {
@@ -136,7 +137,7 @@ export default function AlertNotificationCenter() {
                 style={{
                   padding: '12px 16px',
                   cursor: 'pointer',
-                  background: alert.status === 'Active' ? '#fff1f0' : 'transparent',
+                  background: alert.status === ALERT_STATUS.UNACKNOWLEDGED ? '#fff1f0' : 'transparent',
                   transition: 'background 0.3s',
                 }}
                 onMouseEnter={(e) => {
@@ -144,7 +145,7 @@ export default function AlertNotificationCenter() {
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background =
-                    alert.status === 'Active' ? '#fff1f0' : 'transparent';
+                    alert.status === ALERT_STATUS.UNACKNOWLEDGED ? '#fff1f0' : 'transparent';
                 }}
                 onClick={() => {
                   setDropdownOpen(false);
@@ -179,7 +180,7 @@ export default function AlertNotificationCenter() {
                       <Text strong style={{ fontSize: 13 }}>
                         {alert.parameter.toUpperCase()}
                       </Text>
-                      {alert.status === 'Active' && (
+                      {alert.status === ALERT_STATUS.UNACKNOWLEDGED && (
                         <WarningOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />
                       )}
                     </Space>

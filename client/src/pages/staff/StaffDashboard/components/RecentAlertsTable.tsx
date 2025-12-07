@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useThemeToken } from '../../../../theme';
+import { useResponsive } from '../../../../hooks/useResponsive';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Text } = Typography;
@@ -42,6 +43,67 @@ interface RecentAlertsTableProps {
 export default function RecentAlertsTable({ alerts }: RecentAlertsTableProps) {
   const navigate = useNavigate();
   const token = useThemeToken();
+  const { isMobile } = useResponsive();
+
+  const mobileColumns = useMemo((): ColumnsType<RecentAlert> => {
+    if (!token) return [];
+
+    return [
+      {
+        title: 'Alert',
+        key: 'alert',
+        ellipsis: false,
+        render: (record: RecentAlert) => {
+          const severityConfig = {
+            high: { color: token.colorError, icon: <AlertOutlined />, text: 'High' },
+            medium: { color: token.colorWarning, icon: <WarningOutlined />, text: 'Medium' },
+            low: { color: token.colorInfo, icon: <InfoCircleOutlined />, text: 'Low' },
+          };
+          const config = severityConfig[record.severity as keyof typeof severityConfig];
+          
+          return (
+            <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Space size={4} wrap>
+                <Text strong style={{ fontSize: '12px', wordBreak: 'break-word' }}>
+                  {record.device}
+                </Text>
+                <Tag icon={config.icon} color={record.severity === 'high' ? 'error' : record.severity === 'medium' ? 'warning' : 'default'} style={{ fontSize: '9px', margin: 0 }}>
+                  {config.text}
+                </Tag>
+              </Space>
+              <Text strong style={{ fontSize: '11px' }}>
+                {record.parameter}: <Text style={{ color: token.colorError }}>{record.value != null ? record.value.toFixed(2) : 'N/A'}</Text>
+                <Text type="secondary"> / {record.threshold != null ? record.threshold.toFixed(2) : 'N/A'}</Text>
+              </Text>
+              <Text type="secondary" style={{ fontSize: '10px' }}>
+                {record.time}
+              </Text>
+            </Space>
+          );
+        },
+      },
+      {
+        title: 'Severity',
+        key: 'severity',
+        width: 50,
+        align: 'center' as const,
+        render: (record: RecentAlert) => {
+          const severityConfig = {
+            high: { color: token.colorError, icon: <AlertOutlined /> },
+            medium: { color: token.colorWarning, icon: <WarningOutlined /> },
+            low: { color: token.colorInfo, icon: <InfoCircleOutlined /> },
+          };
+          const config = severityConfig[record.severity as keyof typeof severityConfig];
+          
+          return (
+            <div style={{ fontSize: '24px', color: config.color }}>
+              {config.icon}
+            </div>
+          );
+        },
+      },
+    ];
+  }, [token, isMobile]);
 
   const alertColumns = useMemo((): ColumnsType<RecentAlert> => {
     if (!token) return [];
@@ -177,10 +239,12 @@ export default function RecentAlertsTable({ alerts }: RecentAlertsTableProps) {
         />
       ) : (
         <Table
-          columns={alertColumns}
+          columns={isMobile ? mobileColumns : alertColumns}
           dataSource={alerts}
-          pagination={false}
-          size="middle"
+          pagination={isMobile ? { pageSize: 5, simple: true } : false}
+          size={isMobile ? 'small' : 'middle'}
+          bordered={!isMobile}
+          scroll={isMobile ? undefined : { x: 800 }}
         />
       )}
     </Card>

@@ -15,7 +15,7 @@
  * - Analytics: useAnalyticsSummary, useAnalyticsTrends, useParameterAnalytics
  * - Users: useUsers, useUser, useUserPreferences, useUserMutations
  * - Reports: useReports, useReport, useReportMutations
- * - Health: useSystemHealth, useLiveness, useReadiness
+ * - Health: useHealth, useHealthStatusBadge, formatBytes
  * 
  * @module hooks/index
  */
@@ -55,12 +55,18 @@ export {
   useDevices,
   useDeviceReadings,
   useDeviceMutations,
+  useDeletedDevices,
   type UseDevicesOptions,
   type UseDevicesReturn,
   type UseDeviceReadingsOptions,
   type UseDeviceReadingsReturn,
   type UseDeviceMutationsReturn,
 } from './useDevices';
+
+export {
+  useRealtimeSensorData,
+  useDeviceSensorData,
+} from './useRealtimeSensorData';
 
 // ============================================================================
 // ANALYTICS HOOKS
@@ -116,13 +122,20 @@ export {
 // ============================================================================
 
 export {
-  useSystemHealth,
-  useLiveness,
-  useReadiness,
-  type UseSystemHealthOptions,
-  type UseSystemHealthReturn,
-  type UseLivenessOptions,
-  type UseLivenessReturn,
-  type UseReadinessOptions,
-  type UseReadinessReturn,
+  useHealth,
+  useHealthStatusBadge,
+  formatBytes,
 } from './useHealth';
+
+// ============================================================================
+// RESPONSIVE HOOKS
+// ============================================================================
+
+export {
+  useResponsive,
+  useResponsiveColumns,
+  useTableScroll,
+  useResponsiveGutter,
+  type ResponsiveInfo,
+  type DeviceType,
+} from './useResponsive';

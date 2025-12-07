@@ -9,15 +9,14 @@ import { useMemo } from 'react';
 import { Row, Col, Space, Divider } from 'antd';
 import {
   BarChartOutlined,
-  RiseOutlined,
-  FallOutlined,
   LineChartOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { StaffLayout } from '../../../components/layouts/StaffLayout';
 import { useThemeToken } from '../../../theme';
 import { useDevices } from '../../../hooks';
-import { PageHeader, StatsCard, PageContainer, DataCard } from '../../../components/staff';
+import { PageHeader, PageContainer, DataCard } from '../../../components/staff';
+import CompactAnalyticsStats from './components/CompactAnalyticsStats';
 import { Typography } from 'antd';
 import {
   BarChart,
@@ -38,10 +37,8 @@ const { Text } = Typography;
 export const StaffAnalytics = () => {
   const token = useThemeToken();
   
-  // ✅ GLOBAL HOOK - Real-time device data with SWR polling
-  const { devices: realtimeDevices, isLoading, refetch } = useDevices({ 
-    pollInterval: 30000 // Poll every 30 seconds for analytics
-  });
+  // ✅ GLOBAL HOOK - Real-time device data via WebSocket
+  const { devices: realtimeDevices, isLoading, refetch } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time updates
 
   const handleRefresh = async () => {
     await refetch();
@@ -75,16 +72,20 @@ export const StaffAnalytics = () => {
       const reading = device.latestReading;
       if (!reading) return;
 
+      const phValue = reading.pH ?? reading.ph ?? 0;
+      const turbidityValue = reading.turbidity ?? 0;
+      const tdsValue = reading.tds ?? 0;
+
       deviceStats.push({
         device: device.name || device.deviceId,
-        ph: reading.ph ? Number(reading.ph.toFixed(2)) : 0,
-        turbidity: reading.turbidity ? Number(reading.turbidity.toFixed(2)) : 0,
-        tds: reading.tds ? Number(reading.tds.toFixed(2)) : 0,
+        ph: phValue ? Number(phValue.toFixed(2)) : 0,
+        turbidity: turbidityValue ? Number(turbidityValue.toFixed(2)) : 0,
+        tds: tdsValue ? Number(tdsValue.toFixed(2)) : 0,
       });
 
-      if (reading.ph) totalPh += reading.ph;
-      if (reading.turbidity) totalTurbidity += reading.turbidity;
-      if (reading.tds) totalTds += reading.tds;
+      if (phValue) totalPh += phValue;
+      if (turbidityValue) totalTurbidity += turbidityValue;
+      if (tdsValue) totalTds += tdsValue;
       count++;
     });
 
@@ -123,40 +124,7 @@ export const StaffAnalytics = () => {
         />
 
         {/* Statistics Cards */}
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
-            <StatsCard
-              title="Average pH"
-              value={stats.avgPh}
-              icon={<RiseOutlined />}
-              color={token.colorSuccess}
-              suffix="units"
-              description="Last 24 hours"
-              trend="neutral"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
-            <StatsCard
-              title="Avg TDS"
-              value={stats.avgTds}
-              color={token.colorInfo}
-              suffix="ppm"
-              description="Last 24 hours"
-              trend="neutral"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={8} xl={8}>
-            <StatsCard
-              title="Avg Turbidity"
-              value={stats.avgTurbidity}
-              icon={<FallOutlined />}
-              color={token.colorWarning}
-              suffix="NTU"
-              description="Last 24 hours"
-              trend="neutral"
-            />
-          </Col>
-        </Row>
+        <CompactAnalyticsStats stats={stats} />
 
         {/* Charts */}
         <Row gutter={[16, 16]}>

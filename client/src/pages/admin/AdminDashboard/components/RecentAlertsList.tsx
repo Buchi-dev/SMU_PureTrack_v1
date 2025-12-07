@@ -4,7 +4,7 @@
  * Displays a list of the most recent water quality alerts with
  * severity badges, timestamps, and device information.
  */
-import { Card, List, Badge, Typography, Space, Tag, Empty } from 'antd';
+import { List, Badge, Typography, Space, Tag, Empty } from 'antd';
 import { 
   WarningOutlined, 
   ExclamationCircleOutlined,
@@ -13,6 +13,9 @@ import {
 } from '@ant-design/icons';
 import { memo, useMemo } from 'react';
 import type { WaterQualityAlert } from '../../../../schemas';
+import { ALERT_STATUS } from '../../../../constants';
+import { ResponsiveCard } from '../../../../components';
+import { useResponsive } from '../../../../hooks';
 
 const { Text } = Typography;
 
@@ -33,6 +36,7 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
   loading = false,
   maxItems = 5
 }) => {
+  const { isMobile } = useResponsive();
   // Get recent alerts sorted by createdAt
   const recentAlerts = useMemo(() => {
     return [...alerts]
@@ -110,9 +114,10 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
   };
 
   return (
-    <Card
+    <ResponsiveCard
       size="small"
       loading={loading}
+      compactMobile
       style={{ 
         backgroundColor: '#fafafa',
         borderLeft: '4px solid #1890ff',
@@ -121,7 +126,7 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
       }}
       styles={{
         body: {
-          padding: '12px',
+          padding: isMobile ? '8px' : '12px',
           height: '100%',
           display: 'flex',
           flexDirection: 'column'
@@ -131,9 +136,9 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
       <Space direction="vertical" size="small" style={{ width: '100%', flex: 1 }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space align="center" size={8}>
-            <ClockCircleOutlined style={{ fontSize: '16px', color: '#1890ff' }} />
-            <Text strong style={{ fontSize: '13px' }}>Recent Alerts</Text>
+          <Space align="center" size={isMobile ? 4 : 8}>
+            <ClockCircleOutlined style={{ fontSize: isMobile ? '14px' : '16px', color: '#1890ff' }} />
+            <Text strong style={{ fontSize: isMobile ? '12px' : '13px' }}>Recent Alerts</Text>
           </Space>
           <Badge 
             count={alerts.length} 
@@ -143,12 +148,12 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
         </div>
 
         {/* Alerts List */}
-        <div style={{ flex: 1, overflow: 'auto', maxHeight: '400px' }}>
+        <div style={{ flex: 1, overflow: 'auto', maxHeight: isMobile ? '300px' : '400px' }}>
           {recentAlerts.length === 0 ? (
             <Empty 
               image={Empty.PRESENTED_IMAGE_SIMPLE} 
               description="No recent alerts"
-              style={{ marginTop: '20px' }}
+              style={{ marginTop: isMobile ? '10px' : '20px' }}
             />
           ) : (
             <List
@@ -159,23 +164,24 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
                 return (
                   <List.Item
                     style={{
-                      padding: '8px 0',
+                      padding: isMobile ? '6px 0' : '8px 0',
                       borderBottom: '1px solid #f0f0f0',
                     }}
                   >
                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
                       {/* Alert Header */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <Space size={6} align="start">
-                          <span style={{ color: severityConfig.color, fontSize: '14px', lineHeight: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <Space size={isMobile ? 4 : 6} align="start" style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ color: severityConfig.color, fontSize: isMobile ? '12px' : '14px', lineHeight: '20px' }}>
                             {severityConfig.icon}
                           </span>
                           <Text 
                             strong 
                             style={{ 
-                              fontSize: '12px',
+                              fontSize: isMobile ? '11px' : '12px',
                               lineHeight: '20px',
-                              flex: 1
+                              flex: 1,
+                              wordBreak: 'break-word'
                             }}
                           >
                             {alert.message || 'Alert'}
@@ -184,10 +190,11 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
                         <Tag 
                           color={severityConfig.tagColor} 
                           style={{ 
-                            fontSize: '10px', 
+                            fontSize: isMobile ? '9px' : '10px', 
                             padding: '0 4px',
                             margin: 0,
-                            lineHeight: '18px'
+                            lineHeight: '18px',
+                            flexShrink: 0
                           }}
                         >
                           {alert.severity}
@@ -195,21 +202,25 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
                       </div>
 
                       {/* Alert Details */}
-                      <div style={{ paddingLeft: '20px' }}>
-                        <Space size={12} split={<span style={{ color: '#d9d9d9' }}>•</span>}>
-                          <Text type="secondary" style={{ fontSize: '11px' }}>
+                      <div style={{ paddingLeft: isMobile ? '16px' : '20px' }}>
+                        <Space 
+                          size={isMobile ? 8 : 12} 
+                          split={<span style={{ color: '#d9d9d9' }}>•</span>}
+                          wrap={isMobile}
+                        >
+                          <Text type="secondary" style={{ fontSize: isMobile ? '10px' : '11px' }}>
                             {alert.deviceName || alert.deviceId || 'Unknown device'}
                           </Text>
-                          <Text type="secondary" style={{ fontSize: '11px' }}>
+                          <Text type="secondary" style={{ fontSize: isMobile ? '10px' : '11px' }}>
                             {formatTimestamp(alert.createdAt)}
                           </Text>
                           {alert.status && (
                             <Text 
                               type="secondary" 
                               style={{ 
-                                fontSize: '11px',
-                                color: alert.status === 'Active' ? '#ff4d4f' : 
-                                       alert.status === 'Acknowledged' ? '#faad14' : '#52c41a'
+                                fontSize: isMobile ? '10px' : '11px',
+                                color: alert.status === ALERT_STATUS.UNACKNOWLEDGED ? '#ff4d4f' : 
+                                       alert.status === ALERT_STATUS.ACKNOWLEDGED ? '#faad14' : '#52c41a'
                               }}
                             >
                               {alert.status}
@@ -228,13 +239,13 @@ export const RecentAlertsList = memo<RecentAlertsListProps>(({
         {/* Footer */}
         {alerts.length > maxItems && (
           <div style={{ textAlign: 'center', paddingTop: '8px', borderTop: '1px solid #f0f0f0' }}>
-            <Text type="secondary" style={{ fontSize: '11px' }}>
+            <Text type="secondary" style={{ fontSize: isMobile ? '10px' : '11px' }}>
               Showing {maxItems} of {alerts.length} alerts
             </Text>
           </div>
         )}
       </Space>
-    </Card>
+    </ResponsiveCard>
   );
 });
 

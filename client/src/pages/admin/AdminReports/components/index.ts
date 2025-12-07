@@ -12,3 +12,5 @@ export * from './ReportConfigForm';
 export * from './ReportHistorySidebar';
 export * from './QuickStatsPanel';
 export * from './ReportPreviewPanel';
+export { default as CompactReportStats } from './CompactReportStats';
+export { default as CompactReportHistoryStats } from './CompactReportHistoryStats';

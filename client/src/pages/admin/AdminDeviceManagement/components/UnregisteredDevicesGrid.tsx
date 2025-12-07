@@ -1,15 +1,15 @@
 import { Row, Col, Typography, Spin } from 'antd';
 import { CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import type { Device } from '../../../../schemas';
+import type { DeviceWithReadings } from '../../../../schemas';
 import { useThemeToken } from '../../../../theme';
 import { UnregisteredDeviceCard } from './UnregisteredDeviceCard';
 
 const { Text, Title } = Typography;
 
 interface UnregisteredDevicesGridProps {
-  devices: Device[];
+  devices: DeviceWithReadings[];
   loading: boolean;
-  onRegister: (device: Device) => void;
+  onRegister: (device: DeviceWithReadings) => void;
 }
 
 export const UnregisteredDevicesGrid = ({

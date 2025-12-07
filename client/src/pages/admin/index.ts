@@ -5,6 +5,7 @@ export { AdminDeviceManagement } from './AdminDeviceManagement/AdminDeviceManage
 export { AdminDeviceReadings } from './AdminDeviceReadings/AdminDeviceReadings';
 export { AdminReports } from './AdminReports/AdminReports';
 export { AdminSettings } from './AdminSettings/AdminSettings';
+export { AdminSystemHealth } from './AdminSystemHealth';
 export { AdminUserManagement } from './AdminUserManagement/AdminUserManagement';
 
 

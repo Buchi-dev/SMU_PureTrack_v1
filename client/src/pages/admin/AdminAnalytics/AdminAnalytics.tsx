@@ -28,15 +28,15 @@ import type { DeviceWithReadings } from '../../../schemas';
 import { 
   useDevices,
   useAlerts,
-  useSystemHealth,
+  useHealth,
   useAnalyticsSummary
 } from '../../../hooks';
 import { useAnalyticsProcessing, useAnalyticsStats } from './hooks';
+import { ALERT_STATUS } from '../../../constants';
 import {
   KeyMetrics,
   WaterQualityStandards,
   ActiveAlerts,
-  DeviceStatusOverview,
   WaterQualityMetrics,
   TimeSeriesCharts,
   WaterQualityAssessment,
@@ -48,30 +48,29 @@ import {
 const { Content } = Layout;
 
 export const AdminAnalytics = memo(() => {
-  // ✅ GLOBAL READ HOOKS - Real-time data from service layer
+  // ✅ GLOBAL READ HOOKS - Real-time data via WebSocket
   const {
     devices,
     isLoading: devicesLoading,
     refetch: refetchDevices,
-  } = useDevices({ pollInterval: 15000 });
+  } = useDevices(); // 🔥 NO POLLING - WebSocket provides real-time device updates
 
   const {
     alerts,
     isLoading: alertsLoading,
     refetch: refetchAlerts,
-  } = useAlerts({ pollInterval: 5000 });
+  } = useAlerts(); // 🔥 NO POLLING - WebSocket broadcasts alert:new/resolved
 
   const {
     health: systemHealthData,
     isLoading: healthLoading,
-    refetch: refetchHealth,
-  } = useSystemHealth({ pollInterval: 30000 });
+  } = useHealth(); // 🔥 NO POLLING - WebSocket broadcasts system:health every 10s
 
   const {
     summary: analyticsSummary,
     isLoading: summaryLoading,
     refetch: refetchSummary,
-  } = useAnalyticsSummary({ pollInterval: 60000 });
+  } = useAnalyticsSummary(); // 🔥 NO POLLING - WebSocket broadcasts analytics:update every 45s
 
   // Enrich devices with required properties for analytics
   const enrichedDevices = useMemo<DeviceWithReadings[]>(() => {
@@ -79,7 +78,7 @@ export const AdminAnalytics = memo(() => {
       // Extract latestReading from device (populated by server aggregation)
       // Server returns devices with latestReading via MongoDB lookup
       const latestReading = (device as any).latestReading || null;
-      const activeDeviceAlerts = alerts.filter(a => a.deviceId === device.deviceId && a.status === 'Active');
+      const activeDeviceAlerts = alerts.filter(a => a.deviceId === device.deviceId && a.status === ALERT_STATUS.UNACKNOWLEDGED);
       
       // Calculate severity based on alerts and reading values
       let severityScore = 0;
@@ -143,7 +142,7 @@ export const AdminAnalytics = memo(() => {
     
     setIsRefreshing(true);
     try {
-      await Promise.all([refetchDevices(), refetchAlerts(), refetchHealth(), refetchSummary()]);
+      await Promise.all([refetchDevices(), refetchAlerts(), refetchSummary()]);
       setTimeout(() => setIsRefreshing(false), 500);
     } catch (error) {
       console.error('Refresh error:', error);
@@ -184,11 +183,6 @@ export const AdminAnalytics = memo(() => {
           <WaterQualityStandards />
 
           <ActiveAlerts alerts={alerts} />
-
-          <DeviceStatusOverview 
-            devices={devices}
-            deviceStats={deviceStats}
-          />
 
           <WaterQualityMetrics 
             metrics={waterQualityMetricsWithTotal}

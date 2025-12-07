@@ -7,12 +7,13 @@
  * - Parameter-specific analytics
  * 
  * Uses SWR for efficient data fetching and caching.
+ * Now enhanced with WebSocket for real-time analytics updates.
  * 
  * @module hooks/useAnalytics
  */
 
 import useSWR from 'swr';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   analyticsService,
   type AnalyticsSummary,
@@ -21,14 +22,16 @@ import {
   type TrendsQueryParams,
   type ParameterQueryParams,
 } from '../services/analytics.Service';
-import { useVisibilityPolling } from './useVisibilityPolling';
+import { io, Socket } from 'socket.io-client';
+import { auth } from '../config/firebase.config';
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000';
 
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
 
 export interface UseAnalyticsSummaryOptions {
-  pollInterval?: number;
   enabled?: boolean;
 }
 
@@ -37,6 +40,7 @@ export interface UseAnalyticsSummaryReturn {
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
+  isStale?: boolean; // Indicates if WebSocket data is outdated
 }
 
 export interface UseAnalyticsTrendsOptions {
@@ -70,24 +74,20 @@ export interface UseParameterAnalyticsReturn {
 /**
  * Fetch dashboard analytics summary
  * Includes device counts, alert counts, and latest water quality metrics
+ * Now uses WebSocket for real-time updates every 45 seconds
  * 
  * @example
  * const { summary, isLoading, refetch } = useAnalyticsSummary({
- *   pollInterval: 30000 // Update every 30 seconds
+ *   enabled: true
  * });
  */
 export function useAnalyticsSummary(
   options: UseAnalyticsSummaryOptions = {}
 ): UseAnalyticsSummaryReturn {
-  const {
-    pollInterval = 60000, // Changed from 30000 to 60000
-    enabled = true,
-  } = options;
-
-  // Add visibility detection to pause polling when tab is hidden
-  const adjustedPollInterval = useVisibilityPolling(pollInterval);
+  const { enabled = true } = options;
 
   const cacheKey = enabled ? ['analytics', 'summary'] : null;
+  const [isStale, setIsStale] = useState(false);
 
   const {
     data,
@@ -101,12 +101,94 @@ export function useAnalyticsSummary(
       return response.data;
     },
     {
-      refreshInterval: adjustedPollInterval, // Use adjusted interval
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
+      refreshInterval: 0, // 🔥 DISABLED - WebSocket provides real-time updates every 45s
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true, // Refetch when network reconnects
       dedupingInterval: 5000,
+      keepPreviousData: true,
+      revalidateOnMount: true, // Initial fetch on mount
     }
   );
+
+  // 🔥 WebSocket: Real-time analytics updates
+  useEffect(() => {
+    if (!enabled) return;
+
+    let socket: Socket | null = null;
+    let reconnectAttempts = 0;
+
+    const setupWebSocket = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          console.log('📈 [useAnalyticsSummary] No authenticated user, skipping WebSocket setup');
+          return;
+        }
+
+        const token = await currentUser.getIdToken();
+
+        socket = io(WS_URL, {
+          auth: { token },
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 30000,
+          reconnectionAttempts: Infinity,
+        });
+
+        socket.on('connect', () => {
+          console.log('✅ [useAnalyticsSummary] WebSocket connected', socket?.id);
+          setIsStale(false);
+          reconnectAttempts = 0;
+
+          // Fetch fresh data on reconnection
+          mutate();
+        });
+
+        // Listen for analytics updates
+        socket.on('analytics:update', (payload: { data: AnalyticsSummary; timestamp: number }) => {
+          console.log('📈 [useAnalyticsSummary] Analytics update received via WebSocket');
+
+          mutate(() => payload.data, false); // Update cache without revalidation
+          setIsStale(false);
+        });
+
+        socket.on('connect_error', (error) => {
+          console.error('❌ [useAnalyticsSummary] WebSocket connection error:', error);
+          reconnectAttempts++;
+          setIsStale(true);
+
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000);
+          console.log(`⏳ [useAnalyticsSummary] Reconnecting in ${delay / 1000}s...`);
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.log('🔌 [useAnalyticsSummary] WebSocket disconnected:', reason);
+          setIsStale(true);
+
+          if (reason === 'io server disconnect') {
+            socket?.connect();
+          }
+        });
+      } catch (error) {
+        console.error('❌ [useAnalyticsSummary] WebSocket setup error:', error);
+        setIsStale(true);
+      }
+    };
+
+    setupWebSocket();
+
+    return () => {
+      if (socket) {
+        console.log('🔌 [useAnalyticsSummary] Cleaning up WebSocket');
+        socket.off('connect');
+        socket.off('analytics:update');
+        socket.off('connect_error');
+        socket.off('disconnect');
+        socket.disconnect();
+      }
+    };
+  }, [enabled, mutate]);
 
   const refetch = useCallback(async () => {
     await mutate();
@@ -117,6 +199,7 @@ export function useAnalyticsSummary(
     isLoading,
     error: error || null,
     refetch,
+    isStale, // Expose stale indicator
   };
 }
 

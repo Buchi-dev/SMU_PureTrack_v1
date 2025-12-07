@@ -19,7 +19,6 @@ import {
   Space, 
   Button,
   Divider,
-  Statistic,
   Form,
   Select,
   DatePicker,
@@ -58,6 +57,7 @@ import { reportsService } from '../../../services/reports.Service';
 // Components
 import { AdminLayout } from '../../../components/layouts';
 import { PageHeader } from '../../../components';
+import { CompactReportStats } from './components';
 import ReportHistory from './ReportHistory';
 
 // Types
@@ -86,7 +86,7 @@ export const AdminReports = () => {
   });
 
   // Global hooks
-  const { devices: devicesWithReadings, isLoading: devicesLoading } = useDevices({ pollInterval: 0 });
+  const { devices: devicesWithReadings, isLoading: devicesLoading } = useDevices(); // 🔥 NO POLLING
   const { 
     isLoading: generating,
   } = useReportMutations();
@@ -102,9 +102,14 @@ export const AdminReports = () => {
       macAddress: d.macAddress || 'N/A',
       ipAddress: d.ipAddress || 'N/A',
       sensors: d.sensors || ['tds', 'ph', 'turbidity'],
+      location: d.location || 'Unknown',
       status: d.status,
+      registrationStatus: d.isRegistered ? 'registered' : 'pending',
+      isRegistered: d.isRegistered ?? true,
       registeredAt: d.registeredAt,
       lastSeen: d.lastSeen,
+      createdAt: d.createdAt || d.registeredAt,
+      updatedAt: d.updatedAt || d.lastSeen,
       metadata: d.metadata
     }));
   }, [devicesWithReadings]);
@@ -124,29 +129,48 @@ export const AdminReports = () => {
       const startDate = dateRange?.[0]?.format('YYYY-MM-DD') || '';
       const endDate = dateRange?.[1]?.format('YYYY-MM-DD') || '';
 
+      // Step 1: Start generating
       message.loading({ content: 'Generating report...', key: 'report', duration: 0 });
-      setBackupProgress({ status: 'idle', message: '', percent: 0 });
-
-      console.log('[AdminReports] Generating report with params:', {
-        startDate,
-        endDate,
-        deviceIds,
-        deviceCount: deviceIds?.length || 0,
+      setBackupProgress({ 
+        status: 'saving', 
+        message: 'Generating report...', 
+        percent: 20 
       });
 
-      // DEBUG: Log device data being sent
-      const selectedDevices = deviceIds?.map(id => {
-        const device = devicesWithReadings.find(d => d.deviceId === id);
-        return {
-          deviceId: id,
-          name: device?.name,
-          hasReadings: device?.latestReading ? true : false,
-          latestReading: device?.latestReading,
-        };
-      }) || [];
-      
-      console.log('[AdminReports] DEBUG - Selected devices with readings:', selectedDevices);
-      console.log('[AdminReports] DEBUG - Total devices available:', devicesWithReadings.length);
+      if (import.meta.env.DEV) {
+        console.log('[AdminReports] Generating report with params:', {
+          startDate,
+          endDate,
+          deviceIds,
+          deviceCount: deviceIds?.length || 0,
+        });
+      }
+
+      if (import.meta.env.DEV) {
+        // DEBUG: Log device data being sent
+        const selectedDevices = deviceIds?.map(id => {
+          const device = devicesWithReadings.find(d => d.deviceId === id);
+          return {
+            deviceId: id,
+            name: device?.name,
+            hasReadings: device?.latestReading ? true : false,
+            latestReading: device?.latestReading,
+          };
+        }) || [];
+        
+        console.log('[AdminReports] DEBUG - Selected devices with readings:', selectedDevices);
+        console.log('[AdminReports] DEBUG - Total devices available:', devicesWithReadings.length);
+      }
+
+      // Step 2: Update message - generating report
+      setTimeout(() => {
+        message.loading({ content: 'Processing data...', key: 'report', duration: 0 });
+        setBackupProgress({ 
+          status: 'saving', 
+          message: 'Processing data...', 
+          percent: 40 
+        });
+      }, 500);
 
       // Call backend API to generate report and store PDF
       const response = await reportsService.generateWaterQualityReport({
@@ -155,21 +179,24 @@ export const AdminReports = () => {
         deviceIds: deviceIds || [],
       });
 
-      // DEBUG: Log response data
-      console.log('[AdminReports] DEBUG - Response received:', {
-        success: response.success,
-        hasPdfBlob: !!response.pdfBlob,
-        pdfBlobSize: response.pdfBlob?.length,
-        hasGridFsFileId: !!response.data?.gridFsFileId,
-        reportData: response.data,
-      });
+      if (import.meta.env.DEV) {
+        // DEBUG: Log response data
+        console.log('[AdminReports] DEBUG - Response received:', {
+          success: response.success,
+          hasPdfBlob: !!response.pdfBlob,
+          pdfBlobSize: response.pdfBlob?.length,
+          hasGridFsFileId: !!response.data?.gridFsFileId,
+          reportData: response.data,
+        });
+      }
 
       if (response.success) {
-        // Update progress - report generated
+        // Step 3: Update progress - saving to database
+        message.loading({ content: 'Saving to database...', key: 'report', duration: 0 });
         setBackupProgress({ 
           status: 'saving', 
           message: 'Saving to database...', 
-          percent: 50 
+          percent: 70 
         });
 
         // Check if PDF blob is included in response for instant download
@@ -181,6 +208,14 @@ export const AdminReports = () => {
               { type: response.pdfContentType || 'application/pdf' }
             );
 
+            // Step 4: Update progress - preparing download
+            message.loading({ content: 'Preparing download...', key: 'report', duration: 0 });
+            setBackupProgress({ 
+              status: 'saving', 
+              message: 'Preparing download...', 
+              percent: 90 
+            });
+
             // Create download link and trigger download
             const url = window.URL.createObjectURL(pdfBlob);
             const link = document.createElement('a');
@@ -191,15 +226,15 @@ export const AdminReports = () => {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
 
-            // Update progress - download completed
+            // Step 5: Update progress - completed
             setBackupProgress({ 
               status: 'completed', 
-              message: 'Report downloaded and saved to database successfully!', 
+              message: 'Report generated, saved, and downloaded successfully!', 
               percent: 100 
             });
 
             message.success({
-              content: 'Report generated, downloaded, and saved to database!',
+              content: 'Report generated, saved to database, and downloaded!',
               key: 'report',
               duration: 5
             });
@@ -208,15 +243,16 @@ export const AdminReports = () => {
             setRefreshHistoryKey(prev => prev + 1);
           } catch (downloadError) {
             console.error('[AdminReports] Instant download failed:', downloadError);
-            // Fallback to separate download call
-            if (response.data.gridFsFileId) {
+            // Fallback to separate download call using report ID
+            const reportId = (response.data as any)._id || response.data.id;
+            if (reportId) {
               try {
-                const blob = await reportsService.downloadReport(response.data.gridFsFileId);
+                const blob = await reportsService.downloadReport(reportId);
                 
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `water_quality_report_${response.data.reportId}.pdf`;
+                link.download = `water_quality_report_${reportId}.pdf`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -270,44 +306,67 @@ export const AdminReports = () => {
               setRefreshHistoryKey(prev => prev + 1);
             }
           }
-        } else if (response.data.gridFsFileId) {
-          // Fallback: PDF not included in response, download separately
-          try {
-            const blob = await reportsService.downloadReport(response.data.gridFsFileId);
-            
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `water_quality_report_${response.data.reportId}.pdf`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
+        } else {
+          // PDF not included in response, report is being generated asynchronously
+          // Wait a moment and try to download
+          const reportId = (response.data as any)._id || response.data.id;
+          if (reportId) {
+            try {
+              // Wait a bit for the report to be generated
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              
+              const blob = await reportsService.downloadReport(reportId);
+              
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `water_quality_report_${reportId}.pdf`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
 
+              setBackupProgress({ 
+                status: 'completed', 
+                message: 'Report downloaded and saved to database successfully!', 
+                percent: 100 
+              });
+
+              message.success({
+                content: 'Report generated, downloaded, and saved to database!',
+                key: 'report',
+                duration: 5
+              });
+
+              // Trigger history refresh
+              setRefreshHistoryKey(prev => prev + 1);
+            } catch (downloadError) {
+              console.error('[AdminReports] Download failed:', downloadError);
+              setBackupProgress({ 
+                status: 'failed', 
+                message: 'Report saved to database but download failed', 
+                percent: 100 
+              });
+              
+              message.warning({
+                content: 'Report saved to database successfully, but instant download failed. You can download it from Report History.',
+                key: 'report',
+                duration: 5
+              });
+
+              // Trigger history refresh
+              setRefreshHistoryKey(prev => prev + 1);
+            }
+          } else {
+            // No reportId available, but report was generated
             setBackupProgress({ 
               status: 'completed', 
-              message: 'Report downloaded and saved to database successfully!', 
+              message: 'Report generated and saved to database successfully!', 
               percent: 100 
             });
 
             message.success({
-              content: 'Report generated, downloaded, and saved to database!',
-              key: 'report',
-              duration: 5
-            });
-
-            // Trigger history refresh
-            setRefreshHistoryKey(prev => prev + 1);
-          } catch (downloadError) {
-            console.error('[AdminReports] Download failed:', downloadError);
-            setBackupProgress({ 
-              status: 'failed', 
-              message: 'Report saved to database but download failed', 
-              percent: 100 
-            });
-            
-            message.warning({
-              content: 'Report saved to database successfully, but instant download failed. You can download it from Report History.',
+              content: 'Report generated and saved to database successfully! You can download it from Report History.',
               key: 'report',
               duration: 5
             });
@@ -315,22 +374,6 @@ export const AdminReports = () => {
             // Trigger history refresh
             setRefreshHistoryKey(prev => prev + 1);
           }
-        } else {
-          // No PDF available, but report was generated
-          setBackupProgress({ 
-            status: 'completed', 
-            message: 'Report generated and saved to database successfully!', 
-            percent: 100 
-          });
-
-          message.success({
-            content: 'Report generated and saved to database successfully! You can download it from Report History.',
-            key: 'report',
-            duration: 5
-          });
-
-          // Trigger history refresh
-          setRefreshHistoryKey(prev => prev + 1);
         }
 
         form.resetFields();
@@ -385,6 +428,11 @@ export const AdminReports = () => {
                 <Row gutter={16}>
                   {/* Main Form Section */}
                   <Col xs={24} lg={24}>
+                    {/* Compact Statistics */}
+                    <div style={{ marginBottom: 16 }}>
+                      <CompactReportStats devices={devices} />
+                    </div>
+
                     <Card
                       title={
                         <Space>
@@ -407,11 +455,11 @@ export const AdminReports = () => {
                         style={{ marginBottom: 20 }}
                       />
 
-                      {/* Backup Progress Indicator */}
+                      {/* Report Generation Progress Indicator */}
                       {backupProgress.status !== 'idle' && (
                         <Card size="small" style={{ marginBottom: 20 }}>
                           <Space direction="vertical" style={{ width: '100%' }}>
-                            <Text strong>Backup Progress</Text>
+                            <Text strong>Report Generation Progress</Text>
                             <Progress 
                               percent={backupProgress.percent} 
                               status={
@@ -547,7 +595,7 @@ export const AdminReports = () => {
                         <Divider style={{ margin: '16px 0' }} />
 
                         <Row gutter={16} align="middle">
-                          <Col xs={24} sm={12}>
+                          <Col xs={24}>
                             <Form.Item style={{ marginBottom: 0 }}>
                               <Button
                                 type="primary"
@@ -561,32 +609,6 @@ export const AdminReports = () => {
                                 {generating ? 'Generating Report...' : 'Generate & Download Report'}
                               </Button>
                             </Form.Item>
-                          </Col>
-                          <Col xs={24} sm={12}>
-                            <Row gutter={8}>
-                              <Col span={8}>
-                                <Statistic
-                                  title="Devices"
-                                  value={devices.filter(d => d.status === 'online').length}
-                                  suffix={`/${devices.length}`}
-                                  valueStyle={{ color: token.colorSuccess, fontSize: 18 }}
-                                />
-                              </Col>
-                              <Col span={8}>
-                                <Statistic
-                                  title="Reports"
-                                  value={0}
-                                  valueStyle={{ color: token.colorPrimary, fontSize: 18 }}
-                                />
-                              </Col>
-                              <Col span={8}>
-                                <Statistic
-                                  title="Sensors"
-                                  value={devices.reduce((acc, d) => acc + (d.sensors?.length || 0), 0)}
-                                  valueStyle={{ color: token.colorInfo, fontSize: 18 }}
-                                />
-                              </Col>
-                            </Row>
                           </Col>
                         </Row>
                       </Form>

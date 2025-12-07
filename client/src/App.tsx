@@ -1,6 +1,7 @@
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { AuthProvider } from './contexts/AuthContext';
+import { AuthErrorBoundary } from './components/AuthErrorBoundary';
 import { useResponsiveTheme } from './theme';
 import { themeConfig } from './theme/themeConfig';
 import { ConfigProvider, App as AntdApp } from 'antd';
@@ -28,9 +29,11 @@ const App = () => {
     <SWRConfig value={swrConfig}>
       <ConfigProvider theme={responsiveTheme}>
         <AntdApp>
-          <AuthProvider>
-            <RouterProvider router={router} />
-          </AuthProvider>
+          <AuthErrorBoundary>
+            <AuthProvider>
+              <RouterProvider router={router} />
+            </AuthProvider>
+          </AuthErrorBoundary>
         </AntdApp>
       </ConfigProvider>
     </SWRConfig>

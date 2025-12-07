@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { ALERT_SEVERITY } from '../constants/waterQuality.constants';
 
 // ============================================================================
 // DOCUMENT SCHEMAS
@@ -33,13 +34,18 @@ export const NotificationPreferencesSchema = z.object({
 /**
  * Preferences Data Schema
  * Used for setup/update operations
+ * ✅ Validates alert severities against constants
  */
 export const PreferencesDataSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   email: z.string().email('Valid email is required'),
   emailNotifications: z.boolean(),
   pushNotifications: z.boolean(),
-  alertSeverities: z.array(z.string()).min(1, 'At least one severity must be selected'),
+  alertSeverities: z.array(z.enum([
+    ALERT_SEVERITY.ADVISORY,
+    ALERT_SEVERITY.WARNING,
+    ALERT_SEVERITY.CRITICAL
+  ] as const)).min(1, 'At least one severity must be selected'),
   parameters: z.array(z.string()).min(1, 'At least one parameter must be selected'),
   devices: z.array(z.string()).min(1, 'At least one device must be selected'),
   quietHoursEnabled: z.boolean(),
