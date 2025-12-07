@@ -5,7 +5,7 @@
 
 import mongoose, { Schema, Model } from 'mongoose';
 import { ISensorReadingDocument } from './sensorReading.types';
-import { COLLECTIONS } from '@core/configs/constants.config';
+import { COLLECTIONS, TIME } from '@core/configs/constants.config';
 
 /**
  * Sensor Reading Schema
@@ -95,9 +95,10 @@ sensorReadingSchema.index({ timestamp: -1, deviceId: 1 });
 // Soft delete cleanup queries
 sensorReadingSchema.index({ isDeleted: 1, scheduledPermanentDeletionAt: 1 });
 
-// TTL index for automatic data cleanup (optional - 90 days retention)
-// Uncomment if you want automatic data expiration
-// sensorReadingSchema.index({ createdAt: 1 }, { expireAfterSeconds: TIME.NINETY_DAYS / 1000 });
+// TTL index for automatic data cleanup - 90 days retention
+// ✅ ENABLED: Auto-deletes sensor readings older than 90 days
+// With 30-second intervals: ~3.9GB storage max (fits MongoDB Shared Tier)
+sensorReadingSchema.index({ createdAt: 1 }, { expireAfterSeconds: TIME.NINETY_DAYS / 1000 });
 
 /**
  * Sensor Reading Model

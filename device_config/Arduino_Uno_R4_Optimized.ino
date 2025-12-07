@@ -23,7 +23,7 @@
  * ───────────────────────────────────────────────────────────────────────────
  * ✓ WiFi Manager - Zero-configuration web portal for WiFi setup
  * ✓ WiFi Persistence - Credentials saved to EEPROM (survives reboots)
- * ✓ Scheduled Data Transmission - Every 30 minutes (:00 and :30)
+ * ✓ Timer-Based Data Transmission - Every 30 seconds (configurable)
  * ✓ Server Polling Mode - Responds to "who_is_online" queries
  * ✓ Secure MQTT - SSL/TLS connection (HiveMQ Cloud - Port 8883)
  * ✓ Calibration Mode - Fast 255ms readings for sensor calibration
@@ -61,7 +61,7 @@
  * MQTT TOPICS
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLISHES TO:
- *   • devices/{deviceId}/data        → Sensor readings every 30 min
+ *   • devices/{deviceId}/data        → Sensor readings every 30 seconds
  *   • devices/{deviceId}/register    → Registration request on boot
  *   • devices/{deviceId}/presence    → Online announcement
  *   • presence/response              → "i_am_online" server poll response
@@ -92,7 +92,7 @@
  * 
  * NORMAL MODE (CALIBRATION_MODE = false):
  *   - Sensor readings every 60 seconds
- *   - Data transmission every 30 minutes
+ *   - Data transmission every 30 seconds
  *   - Full MQTT connectivity
  *   - Production monitoring mode
  * 
@@ -214,6 +214,7 @@
 #define NTP_UPDATE_INTERVAL 3600000         // 1 hour - NTP time resync
 #define WATCHDOG_TIMEOUT_MS 8000            // 8 seconds - Hardware watchdog timeout
 #define RSSI_CHECK_INTERVAL 60000           // 1 minute - WiFi signal strength check
+#define DATA_TRANSMISSION_INTERVAL 30000    // 🔥 30 seconds - Data transmission (NEW!)
 
 // ───────────────────────────────────────────────────────────────────────────
 // Time & Restart Settings (Philippine Time UTC+8)
@@ -427,7 +428,7 @@ int ntpSyncAttempts = 0;
 // Transmission tracking
 unsigned long transmissionCount = 0;                       // Total data transmissions
 unsigned long bootCount = 0;                               // Total device reboots (EEPROM)
-int lastTransmissionMinute = -1;                           // Prevent duplicate TX in same minute
+unsigned long lastTransmissionTime = 0;                    // 🔥 Last transmission timestamp (timer-based)
 
 // Dynamic sensor read interval (changes with calibration mode)
 unsigned long sensorReadInterval = CALIBRATION_MODE ? CALIBRATION_INTERVAL : SENSOR_READ_INTERVAL;
@@ -1194,73 +1195,38 @@ void clearEEPROM() {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-//                    CLOCK-SYNCHRONIZED TRANSMISSION
+//                    TIMER-BASED TRANSMISSION (30 SECONDS)
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ───────────────────────────────────────────────────────────────────────────
-// Check if it's time for scheduled transmission (:00 or :30 minutes)
+// Check if it's time for transmission (every 30 seconds)
+// 🔥 CHANGED: From scheduled (:00/:30) to simple timer-based system
 // ───────────────────────────────────────────────────────────────────────────
 bool isTransmissionTime() {
-  if (!timeInitialized) return false;
+  unsigned long currentMillis = millis();
   
-  timeClient.update();
-  int currentMinute = timeClient.getMinutes();
+  // Check if 30 seconds have passed since last transmission
+  if (currentMillis - lastTransmissionTime >= DATA_TRANSMISSION_INTERVAL) {
+    return true;
+  }
   
-  bool isScheduledTime = (currentMinute == 0 || currentMinute == 30);
-  bool notYetTransmitted = (currentMinute != lastTransmissionMinute);
-  
-  return isScheduledTime && notYetTransmitted;
+  return false;
 }
 
 
 void getNextTransmissionTime(char* buffer, size_t bufSize) {
-  if (!timeInitialized) {
-    strncpy(buffer, "Unknown", bufSize);
-    return;
-  }
+  unsigned long timeSinceLastTx = millis() - lastTransmissionTime;
+  unsigned long timeUntilNextTx = DATA_TRANSMISSION_INTERVAL - timeSinceLastTx;
   
-  timeClient.update();
-  int currentHour = timeClient.getHours();
-  int currentMinute = timeClient.getMinutes();
+  int secondsRemaining = timeUntilNextTx / 1000;
   
-  int nextMinute, nextHour;
-  
-  if (currentMinute < 30) {
-    nextMinute = 30;
-    nextHour = currentHour;
-  } else {
-    nextMinute = 0;
-    nextHour = (currentHour + 1) % 24;
-  }
-  
-  snprintf(buffer, bufSize, "%02d:%02d UTC", nextHour, nextMinute);
+  snprintf(buffer, bufSize, "In %d seconds", secondsRemaining);
 }
 
 
 void getNextTransmissionPHTime(char* buffer, size_t bufSize) {
-  if (!timeInitialized) {
-    strncpy(buffer, "Unknown", bufSize);
-    return;
-  }
-  
-  timeClient.update();
-  unsigned long epochTime = timeClient.getEpochTime();
-  unsigned long phTime = epochTime + TIMEZONE_OFFSET_SECONDS;
-  
-  int currentHour = (phTime % 86400L) / 3600;
-  int currentMinute = (phTime % 3600) / 60;
-  
-  int nextMinute, nextHour;
-  
-  if (currentMinute < 30) {
-    nextMinute = 30;
-    nextHour = currentHour;
-  } else {
-    nextMinute = 0;
-    nextHour = (currentHour + 1) % 24;
-  }
-  
-  snprintf(buffer, bufSize, "%02d:%02d PH", nextHour, nextMinute);
+  // 🔥 SIMPLIFIED: Just show seconds remaining (same as getNextTransmissionTime)
+  getNextTransmissionTime(buffer, bufSize);
 }
 
 
@@ -2090,7 +2056,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   if (strcmp(command, "go") == 0) {
     Serial.println(F("CMD: GO - Device approved!"));
     saveApprovedStatus(true);
-    lastTransmissionMinute = -1;
+    lastTransmissionTime = 0; // 🔥 Reset timer to start transmissions immediately
     
   } else if (strcmp(command, "wait") == 0) {
     Serial.println(F("CMD: WAIT - Registration pending approval"));
@@ -2120,13 +2086,14 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     
   } else if (strcmp(command, "send_now") == 0) {
     Serial.println(F("CMD: SEND NOW"));
-    lastTransmissionMinute = -1;
+    lastTransmissionTime = 0; // 🔥 Reset timer to force immediate transmission
     
     if (mqttConnected && isApproved && !isCalibrationMode) {
       Serial.println(F("\n=== MANUAL TX (send_now) ==="));
       publishSensorData();
       publishPresenceOnline(); // Announce presence instead of status
       transmissionCount++;
+      lastTransmissionTime = millis(); // Update timer after transmission
       Serial.println(F("=== TX COMPLETE ===\n"));
     } else if (isCalibrationMode) {
       Serial.println(F("⚠ Cannot send - Calibration mode active"));
@@ -2869,7 +2836,7 @@ void setup() {
   Serial.println(F("MQTT: SSL/TLS (Port 8883) - Server Polling Only"));
   Serial.println(F("Status: Detected by server's 'who_is_online' queries"));
   Serial.println(F("Restart: 12:00 AM Philippine Time (UTC+8)"));
-  Serial.println(F("Data TX: Every 30 minutes (:00 and :30)"));
+  Serial.println(F("Data TX: Every 30 seconds (timer-based)"));
   Serial.println(F("Security: EEPROM checksum + sensor validation"));
   Serial.println(F("Reliability: Auth failure detection + NTP validation"));
   
@@ -3351,9 +3318,7 @@ void loop() {
     
     // Check if it's time for scheduled transmission (:00 or :30)
     if (isTransmissionTime()) {
-      Serial.println(F("\n=== SCHEDULED 30-MIN TX ==="));
-      Serial.print(F("Current time: "));
-      Serial.println(timeClient.getFormattedTime());
+      Serial.println(F("\n=== 30-SECOND TIMER TX ==="));
       
       if (!mqttConnected) {
         connectMQTT();
@@ -3365,13 +3330,13 @@ void loop() {
         publishPresenceOnline(); // Update presence instead of status
         transmissionCount++;
         
-        lastTransmissionMinute = timeClient.getMinutes();
+        lastTransmissionTime = millis(); // 🔥 Update timer instead of minute
         
         Serial.print(F("TX Count: "));
         Serial.println(transmissionCount);
         
-        char nextTxStr[15];
-        getNextTransmissionPHTime(nextTxStr, sizeof(nextTxStr));
+        char nextTxStr[30];
+        getNextTransmissionTime(nextTxStr, sizeof(nextTxStr));
         Serial.print(F("Next TX: "));
         Serial.println(nextTxStr);
       } else {
