@@ -10,38 +10,27 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
 import fs from 'fs';
 
-// Determine logs directory based on environment
-// In serverless/production environments (Lambda, etc.), use /tmp which is writable
-// In development, use local logs directory
-const getLogsDirectory = (): string => {
-  // Check if running in serverless environment (AWS Lambda, etc.)
-  if (process.env.LAMBDA_TASK_ROOT || process.env.AWS_EXECUTION_ENV) {
-    return '/tmp/logs';
-  }
-  
-  // Check if running in production-like environment with read-only filesystem
-  if (process.cwd().startsWith('/var/task')) {
-    return '/tmp/logs';
-  }
-  
-  // Default to local logs directory for development
-  return path.join(process.cwd(), 'logs');
-};
+// Determine if file logging should be enabled (development only)
+const isProduction = process.env.NODE_ENV === 'production';
+let canWriteLogs = !isProduction;
+let logsDir = '/tmp'; // Default fallback path
 
-// Ensure logs directory exists (with error handling)
-let logsDir: string;
-let canWriteLogs = true;
-
-try {
-  logsDir = getLogsDirectory();
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
+// Only create logs directory in development
+if (!isProduction) {
+  try {
+    logsDir = path.join(process.cwd(), 'logs');
+    
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+    
+    console.log(`📁 Logs directory created at: ${logsDir}`);
+  } catch (error) {
+    console.warn('Unable to create logs directory, falling back to console-only logging:', error);
+    canWriteLogs = false;
   }
-} catch (error) {
-  // If we can't create logs directory, fall back to console-only logging
-  console.warn('Unable to create logs directory, falling back to console-only logging:', error);
-  canWriteLogs = false;
-  logsDir = '/tmp'; // Fallback path (won't be used for file logging)
+} else {
+  console.log('🚀 Production mode: File logging disabled, using console only');
 }
 
 /**
@@ -104,28 +93,26 @@ const combinedFileTransport = canWriteLogs ? new DailyRotateFile({
 }) : null;
 
 /**
- * Console transport - Development only
+ * Console transport - Always enabled in production, customizable in development
  */
 const consoleTransport = new winston.transports.Console({
   format: consoleFormat,
-  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'http'), // Changed to 'http' in dev
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'http'),
 });
 
 /**
  * Winston Logger Instance
  */
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'http', // Changed default from 'info' to 'http' to show HTTP requests
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'http'),
   format: logFormat,
   defaultMeta: { service: 'water-quality-api' },
   transports: [
-    // Add file transports only if file logging is available
+    // File transports: Only in development
     ...(canWriteLogs && errorFileTransport ? [errorFileTransport] : []),
     ...(canWriteLogs && combinedFileTransport ? [combinedFileTransport] : []),
-    // Console transport: enabled in development, or when explicitly enabled, or when file logging is unavailable
-    ...(process.env.NODE_ENV !== 'production' || process.env.CONSOLE_LOGS === 'true' || !canWriteLogs
-      ? [consoleTransport]
-      : []),
+    // Console transport: Always enabled in production, always enabled in development
+    consoleTransport,
   ],
   // Prevent logger from exiting on uncaught exceptions
   exitOnError: false,
