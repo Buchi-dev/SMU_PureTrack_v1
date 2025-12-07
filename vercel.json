@@ -15,6 +15,6 @@
       "dest": "server/dist/index.js"
     }
   ],
-  "installCommand": "npm install --prefix ./server",
-  "buildCommand": "npm run build --prefix ./server"
+  "installCommand": "cd server && npm install",
+  "buildCommand": "cd server && npm run build"
 }
