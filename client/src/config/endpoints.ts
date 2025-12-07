@@ -75,14 +75,13 @@ export const DEVICE_ENDPOINTS = {
 // ✅ V2 Backend Routes:
 // GET /api/v1/sensor-readings - List readings
 // GET /api/v1/sensor-readings/statistics - Statistics
-// GET /api/v1/sensor-readings/:deviceId/latest - Latest reading
 // POST /api/v1/sensor-readings - Create reading
+// ❌ REMOVED: /sensor-readings/:deviceId/latest → Use WebSocket sensor:data event
 export const SENSOR_READING_ENDPOINTS = {
   LIST: `${API_VERSION}/sensor-readings`,
   STATISTICS: `${API_VERSION}/sensor-readings/statistics`,
   AGGREGATED: `${API_VERSION}/sensor-readings/aggregated`,
   COUNT: `${API_VERSION}/sensor-readings/count`,
-  LATEST: (deviceId: string) => `${API_VERSION}/sensor-readings/${deviceId}/latest`,
   CREATE: `${API_VERSION}/sensor-readings`,
   BULK: `${API_VERSION}/sensor-readings/bulk`,
 } as const;
@@ -113,12 +112,15 @@ export const ANALYTICS_ENDPOINTS = {
 } as const;
 
 // ==================== HEALTH MONITORING ====================
+// ✅ V2 Backend Routes:
+// GET /api/v1/health/system - Full system health (initial load + load balancer check)
+// ❌ REMOVED: Individual metric endpoints → Use WebSocket system:health event
+//   - /health/cpu → WebSocket broadcasts every 10s
+//   - /health/memory → WebSocket broadcasts every 10s
+//   - /health/storage → WebSocket broadcasts every 10s
+//   - /health/database → WebSocket broadcasts every 10s
 export const HEALTH_ENDPOINTS = {
   SYSTEM: `${API_VERSION}/health/system`,
-  CPU: `${API_VERSION}/health/cpu`,
-  MEMORY: `${API_VERSION}/health/memory`,
-  STORAGE: `${API_VERSION}/health/storage`,
-  DATABASE: `${API_VERSION}/health/database`,
 } as const;
 
 // ==================== QUERY BUILDERS ====================
