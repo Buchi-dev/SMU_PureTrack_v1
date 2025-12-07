@@ -147,14 +147,20 @@ userSchema.index({ status: 1, createdAt: -1 });
 
 /**
  * Pre-save hook to auto-update profileComplete field
+ * Also updates lastLogin for active users
  */
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function() {
+  // Update profileComplete based on required fields
   if (this.department && this.phoneNumber) {
     this.profileComplete = true;
   } else {
     this.profileComplete = false;
   }
-  next();
+  
+  // Update lastLogin on every save if status is active
+  if (this.status === UserStatus.ACTIVE && !this.isNew) {
+    this.lastLogin = new Date();
+  }
 });
 
 /**
@@ -183,15 +189,6 @@ userSchema.methods.toPublicProfile = function (this: IUserDocument): IUserPublic
     updatedAt: this.updatedAt,
   };
 };
-
-/**
- * Pre-save hook: Update lastLogin on every save if status is active
- */
-userSchema.pre('save', function () {
-  if (this.status === UserStatus.ACTIVE && !this.isNew) {
-    this.lastLogin = new Date();
-  }
-});
 
 /**
  * User Model

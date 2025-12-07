@@ -65,6 +65,7 @@ export interface IUser {
   status: UserStatus;
   provider: AuthProvider;
   lastLogin: Date;
+  profileComplete: boolean;
   notificationPreferences: INotificationPreferences;
   createdAt: Date;
   updatedAt: Date;
@@ -95,6 +96,7 @@ export interface IUserPublic {
   status: UserStatus;
   provider: AuthProvider;
   lastLogin: Date;
+  profileComplete: boolean;
   notificationPreferences: INotificationPreferences;
   createdAt: Date;
   updatedAt: Date;
