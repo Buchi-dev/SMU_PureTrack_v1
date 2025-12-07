@@ -3,58 +3,25 @@
  * 
  * Protected routes for system health metrics (Admin/Staff only)
  * 
+ * ✅ WebSocket Migration Complete:
+ * - All health metrics now broadcast via WebSocket 'system:health' event every 10s
+ * - This endpoint kept for initial page load and load balancer health checks
+ * 
  * @module feature/health/health.routes
  */
 
 import { Router } from 'express';
 import { requireStaff } from '@core/middlewares/auth.middleware';
-import {
-  getSystemHealth,
-  getCpuMetrics,
-  getMemoryMetrics,
-  getStorageMetrics,
-  getDatabaseMetrics,
-} from './health.controller';
+import { getSystemHealth } from './health.controller';
 
 const router = Router();
 
 /**
- * All health routes require staff authentication
- */
-
-/**
  * @route   GET /api/v1/health/system
- * @desc    Get all system health metrics
+ * @desc    Get all system health metrics (CPU, Memory, Storage, Database)
  * @access  Staff/Admin
+ * @note    Initial page load only - real-time updates via WebSocket 'system:health' event
  */
 router.get('/system', requireStaff, getSystemHealth);
-
-/**
- * @route   GET /api/v1/health/cpu
- * @desc    Get CPU metrics only
- * @access  Staff/Admin
- */
-router.get('/cpu', requireStaff, getCpuMetrics);
-
-/**
- * @route   GET /api/v1/health/memory
- * @desc    Get memory metrics only
- * @access  Staff/Admin
- */
-router.get('/memory', requireStaff, getMemoryMetrics);
-
-/**
- * @route   GET /api/v1/health/storage
- * @desc    Get storage/disk metrics only
- * @access  Staff/Admin
- */
-router.get('/storage', requireStaff, getStorageMetrics);
-
-/**
- * @route   GET /api/v1/health/database
- * @desc    Get MongoDB database metrics only
- * @access  Staff/Admin
- */
-router.get('/database', requireStaff, getDatabaseMetrics);
 
 export default router;

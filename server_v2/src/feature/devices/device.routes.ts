@@ -16,7 +16,6 @@ import {
   getDeletedDevices,
   getDeviceStatistics,
   getPendingRegistrations,
-  getOnlineDevices,
   sendCommand,
   requestImmediateData,
   checkOfflineDevices,
@@ -43,16 +42,10 @@ const router = Router();
 router.get('/deleted', requireAdmin, getDeletedDevices);
 
 /**
- * @route   GET /api/v1/devices/statistics
+ * @route   GET /api/v1/devices/stats
  * @desc    Get device statistics (must be before /:id)
  * @access  Protected (Staff/Admin)
- */
-router.get('/statistics', requireStaff, getDeviceStatistics);
-
-/**
- * @route   GET /api/v1/devices/stats
- * @desc    Get device statistics (alias for /statistics)
- * @access  Protected (Staff/Admin)
+ * @websocket Device status updates available via WebSocket 'device:status' event
  */
 router.get('/stats', requireStaff, getDeviceStatistics);
 
@@ -62,13 +55,6 @@ router.get('/stats', requireStaff, getDeviceStatistics);
  * @access  Protected (Admin only)
  */
 router.get('/pending', requireAdmin, getPendingRegistrations);
-
-/**
- * @route   GET /api/v1/devices/online
- * @desc    Get online devices
- * @access  Protected (Staff/Admin)
- */
-router.get('/online', requireStaff, getOnlineDevices);
 
 /**
  * @route   POST /api/v1/devices/check-offline

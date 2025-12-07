@@ -1,6 +1,10 @@
 /**
  * Sensor Reading Routes
  * 
+ * ✅ WebSocket Migration Complete:
+ * - Real-time sensor data now broadcast via WebSocket 'sensor:data' event
+ * - These routes kept for historical data and manual data entry only
+ * 
  * @module feature/sensorReadings/sensorReading.routes
  */
 
@@ -9,7 +13,6 @@ import {
   getAllReadings,
   createReading,
   bulkInsertReadings,
-  getLatestReading,
   getStatistics,
   getAggregatedData,
   deleteOldReadings,
@@ -21,7 +24,6 @@ import {
   sensorReadingFiltersSchema,
   createSensorReadingSchema,
   bulkInsertSchema,
-  getLatestReadingSchema,
   statisticsQuerySchema,
   aggregatedDataQuerySchema,
   deleteOldReadingsSchema,
@@ -31,19 +33,19 @@ const router = Router();
 
 /**
  * GET /api/v1/sensor-readings
- * Get sensor readings with filters
+ * Get sensor readings with filters (historical data)
  */
 router.get('/', requireStaff, validateRequest(sensorReadingFiltersSchema), getAllReadings);
 
 /**
  * GET /api/v1/sensor-readings/statistics
- * Get sensor reading statistics
+ * Get sensor reading statistics (historical)
  */
 router.get('/statistics', requireStaff, validateRequest(statisticsQuerySchema), getStatistics);
 
 /**
  * GET /api/v1/sensor-readings/aggregated
- * Get aggregated time-series data
+ * Get aggregated time-series data (for charts)
  */
 router.get('/aggregated', requireStaff, validateRequest(aggregatedDataQuerySchema), getAggregatedData);
 
@@ -52,12 +54,6 @@ router.get('/aggregated', requireStaff, validateRequest(aggregatedDataQuerySchem
  * Get reading count
  */
 router.get('/count', requireStaff, getReadingCount);
-
-/**
- * GET /api/v1/sensor-readings/:deviceId/latest
- * Get latest reading for device
- */
-router.get('/:deviceId/latest', requireStaff, validateRequest(getLatestReadingSchema), getLatestReading);
 
 /**
  * POST /api/v1/sensor-readings
