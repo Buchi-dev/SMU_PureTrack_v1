@@ -1,9 +1,0 @@
-{
-  "name": "puretrack-api-root",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Puretrack API root package",
-  "dependencies": {
-    "module-alias": "^2.2.3"
-  }
-}

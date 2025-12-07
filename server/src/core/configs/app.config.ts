@@ -44,6 +44,9 @@ const getAllowedOrigins = (): string[] => {
 
 const allowedOrigins = getAllowedOrigins();
 
+// Export allowedOrigins for logging purposes
+export { allowedOrigins };
+
 export const appConfig: Config = {
   server: {
     port: parseInt(process.env.PORT || '', 10),

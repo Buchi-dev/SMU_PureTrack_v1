@@ -3,7 +3,7 @@ import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
-import { appConfig, dbConnection, initializeFirebase } from '@core/configs';
+import { appConfig, allowedOrigins, dbConnection, initializeFirebase } from '@core/configs';
 import { errorHandler, requestLogger } from '@core/middlewares';
 import { NotFoundError } from '@utils/errors.util';
 import { mqttService, emailService, gridfsService, initializeLogger, logInfo, logError, websocketService } from '@utils';
@@ -77,9 +77,6 @@ app.use(helmet());
 // Middleware
 app.use(cors(appConfig.cors));
 
-// Explicit OPTIONS handler for preflight requests (Express 5.x compatible)
-app.options('/(.*)', cors(appConfig.cors));
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
@@ -150,7 +147,7 @@ const startServer = async (): Promise<void> => {
       logInfo(`🚀 Server is running on port ${appConfig.server.port}`);
       logInfo(`📊 Environment: ${appConfig.server.nodeEnv}`);
       logInfo(`🔗 API Version: ${appConfig.server.apiVersion}`);
-      logInfo(`🌐 CORS Origin: ${appConfig.cors.origin}`);
+      logInfo(`🌐 CORS Allowed Origins: ${allowedOrigins.length > 0 ? allowedOrigins.join(', ') : 'All origins (development mode)'}`);
       logInfo('='.repeat(50));
     });
 
